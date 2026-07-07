@@ -1,6 +1,6 @@
+import { JOB_START_CHECKLIST } from '../../constants/index.js'
 import { supabase, isSupabaseConfigured } from '../supabaseClient.js'
 import { normalizeRecord } from '../records.js'
-import { parseRecordHours } from '../weeklyTimesheet.js'
 import {
   SYNC_STATUS,
   withSyncStatus,
@@ -15,9 +15,19 @@ export {
   resolveRecordSyncStatus,
 } from './cloudSyncStatus.js'
 
-export function mapTimesheetToRow(record, userId) {
+const CHECKLIST_LABELS = {
+  hazards: 'Checked job hazards',
+  services: 'Checked underground services',
+  ppe: 'PPE is being worn',
+  emergencyAccess: 'Emergency access confirmed',
+}
+
+function isChecklistItemChecked(record, label) {
+  return (record.completedItems ?? []).some((item) => item === label)
+}
+
+export function mapJobStartToRow(record, userId) {
   const fields = record.fields ?? {}
-  const { total, chargeable, nonChargeable } = parseRecordHours(record)
 
   return {
     user_id: userId,
@@ -26,13 +36,18 @@ export function mapTimesheetToRow(record, userId) {
       syncStatus: record.syncStatus ?? SYNC_STATUS.CLOUD,
     },
     record_date: fields.date?.trim() || null,
-    employee_name: fields.employeeName?.trim() || null,
-    job_name: fields.jobProjectName?.trim() || null,
+    operator_name: fields.employeeName?.trim() || null,
+    job_name: fields.jobName?.trim() || null,
     site_location: fields.siteLocation?.trim() || null,
     machine_used: fields.machineUsed?.trim() || null,
-    total_hours: total,
-    chargeable_hours: chargeable,
-    non_chargeable_hours: nonChargeable,
+    hazards_checked: isChecklistItemChecked(record, CHECKLIST_LABELS.hazards),
+    services_checked: isChecklistItemChecked(record, CHECKLIST_LABELS.services),
+    ppe_confirmed: isChecklistItemChecked(record, CHECKLIST_LABELS.ppe),
+    emergency_access_confirmed: isChecklistItemChecked(record, CHECKLIST_LABELS.emergencyAccess),
+    checklist_completed: Boolean(
+      record.allComplete ??
+        (record.totalCount > 0 && record.completedCount === record.totalCount),
+    ),
   }
 }
 
@@ -46,35 +61,42 @@ function withCloudOwnership(record, row) {
   }
 }
 
-export function rowToTimesheetRecord(row) {
+export function rowToJobStartRecord(row) {
   const data = row.record_data
-  if (data && typeof data === 'object' && data.formType === 'timesheet') {
+  if (data && typeof data === 'object' && data.formType === 'job-start') {
     return withSyncStatus(
       normalizeRecord(withCloudOwnership(data, row)),
     )
   }
+
+  const completedItems = []
+  if (row.hazards_checked) completedItems.push(CHECKLIST_LABELS.hazards)
+  if (row.services_checked) completedItems.push(CHECKLIST_LABELS.services)
+  if (row.ppe_confirmed) completedItems.push(CHECKLIST_LABELS.ppe)
+  if (row.emergency_access_confirmed) completedItems.push(CHECKLIST_LABELS.emergencyAccess)
+
+  const totalCount = JOB_START_CHECKLIST.length
+  const completedCount = completedItems.length
 
   return withSyncStatus(
     normalizeRecord(
       withCloudOwnership(
         {
           id: row.id,
-          formType: 'timesheet',
-          formTypeLabel: 'Timesheet / Daily Work Record',
+          formType: 'job-start',
+          formTypeLabel: 'Job Start Checklist',
           fields: {
-            date: row.record_date ?? '',
-            employeeName: row.employee_name ?? '',
-            jobProjectName: row.job_name ?? '',
+            jobName: row.job_name ?? '',
             siteLocation: row.site_location ?? '',
+            employeeName: row.operator_name ?? '',
             machineUsed: row.machine_used ?? '',
-            totalHoursWorked: row.total_hours != null ? String(row.total_hours) : '',
-            chargeableHours: row.chargeable_hours != null ? String(row.chargeable_hours) : '',
-            nonChargeableHours: row.non_chargeable_hours != null ? String(row.non_chargeable_hours) : '',
+            date: row.record_date ?? '',
+            notes: '',
           },
-          completedItems: [],
-          completedCount: 0,
-          totalCount: 0,
-          allComplete: true,
+          completedItems,
+          completedCount,
+          totalCount,
+          allComplete: Boolean(row.checklist_completed),
           signatureConfirmation: '',
           photos: [],
           submittedAt: row.created_at ?? new Date().toISOString(),
@@ -86,13 +108,13 @@ export function rowToTimesheetRecord(row) {
 }
 
 function dedupeKey(record) {
-  const employee = record.fields?.employeeName?.trim().toLowerCase() ?? ''
+  const jobName = record.fields?.jobName?.trim().toLowerCase() ?? ''
   const submittedAt = record.submittedAt ?? ''
   const date = record.fields?.date ?? ''
-  return `${submittedAt}|${date}|${employee}`
+  return `${submittedAt}|${date}|${jobName}`
 }
 
-export function mergeTimesheetRecords(localTimesheets, cloudTimesheets) {
+export function mergeJobStartRecords(localJobStarts, cloudJobStarts) {
   const byId = new Map()
   const byCloudId = new Map()
   const byDedupeKey = new Map()
@@ -117,11 +139,11 @@ export function mergeTimesheetRecords(localTimesheets, cloudTimesheets) {
     return entry
   }
 
-  localTimesheets.forEach((record) => {
+  localJobStarts.forEach((record) => {
     register({ ...record, storageSource: record.cloudId ? 'both' : 'local' }, 'local')
   })
 
-  cloudTimesheets.forEach((cloudRecord) => {
+  cloudJobStarts.forEach((cloudRecord) => {
     const cloudId = cloudRecord.cloudId
     if (cloudId && byCloudId.has(cloudId)) {
       const existing = byCloudId.get(cloudId)
@@ -175,18 +197,18 @@ export function mergeTimesheetRecords(localTimesheets, cloudTimesheets) {
   return [...byId.values()].sort((a, b) => (b.submittedAt || '').localeCompare(a.submittedAt || ''))
 }
 
-export function getMergedTimesheetRecords(savedRecords, cloudTimesheets) {
-  const localTimesheets = savedRecords.filter((record) => record.formType === 'timesheet')
-  return mergeTimesheetRecords(localTimesheets, cloudTimesheets ?? [])
+export function getMergedJobStartRecords(savedRecords, cloudJobStarts) {
+  const localJobStarts = savedRecords.filter((record) => record.formType === 'job-start')
+  return mergeJobStartRecords(localJobStarts, cloudJobStarts ?? [])
 }
 
-export async function fetchTimesheetRecords(userId, { isAdmin = false } = {}) {
+export async function fetchJobStartRecords(userId, { isAdmin = false } = {}) {
   if (!isSupabaseConfigured || !supabase || !userId) {
     return { records: [], error: null }
   }
 
   let query = supabase
-    .from('timesheet_records')
+    .from('job_start_records')
     .select('*')
     .order('record_date', { ascending: false })
     .order('created_at', { ascending: false })
@@ -201,11 +223,11 @@ export async function fetchTimesheetRecords(userId, { isAdmin = false } = {}) {
     return { records: [], error }
   }
 
-  const records = (data ?? []).map(rowToTimesheetRecord)
+  const records = (data ?? []).map(rowToJobStartRecord)
   return { records, error: null }
 }
 
-export async function saveTimesheetRecord(user, record) {
+export async function saveJobStartRecord(user, record) {
   if (!isSupabaseConfigured || !supabase) {
     return { record: null, error: new Error('Supabase is not configured.') }
   }
@@ -215,10 +237,10 @@ export async function saveTimesheetRecord(user, record) {
     return { record: null, error: new Error('You must be signed in to save to the cloud.') }
   }
 
-  const row = mapTimesheetToRow(record, userId)
+  const row = mapJobStartToRow(record, userId)
 
   const { data, error } = await supabase
-    .from('timesheet_records')
+    .from('job_start_records')
     .insert(row)
     .select()
     .single()
@@ -227,5 +249,5 @@ export async function saveTimesheetRecord(user, record) {
     return { record: null, error }
   }
 
-  return { record: rowToTimesheetRecord(data), error: null }
+  return { record: rowToJobStartRecord(data), error: null }
 }

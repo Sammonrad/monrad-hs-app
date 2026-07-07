@@ -19,6 +19,7 @@ import { loadSettings } from './utils/storage/settingsStorage.js'
 import { APP_VERSION } from './constants/index.js'
 import { isSupabaseConfigured, supabase } from './utils/supabaseClient.js'
 import { fetchTimesheetRecords } from './utils/storage/timesheetCloudStorage.js'
+import { fetchJobStartRecords } from './utils/storage/jobStartCloudStorage.js'
 import { getRoleLabel, isAdminProfile, loadOrCreateProfile } from './utils/storage/userProfileStorage.js'
 
 function App() {
@@ -33,6 +34,7 @@ function App() {
   const [authLoading, setAuthLoading] = useState(false)
   const [authError, setAuthError] = useState('')
   const [cloudTimesheets, setCloudTimesheets] = useState([])
+  const [cloudJobStarts, setCloudJobStarts] = useState([])
   const [profile, setProfile] = useState(null)
 
   const openActionCount = actions.filter((action) => action.status !== 'completed').length
@@ -118,6 +120,7 @@ function App() {
     if (!session?.user?.id) {
       setProfile(null)
       setCloudTimesheets([])
+      setCloudJobStarts([])
       return undefined
     }
 
@@ -138,6 +141,7 @@ function App() {
   useEffect(() => {
     if (!session?.user?.id) {
       setCloudTimesheets([])
+      setCloudJobStarts([])
       return undefined
     }
 
@@ -149,7 +153,13 @@ function App() {
       if (isMounted) setCloudTimesheets(records)
     }
 
+    async function loadCloudJobStarts() {
+      const { records } = await fetchJobStartRecords(session.user.id, { isAdmin })
+      if (isMounted) setCloudJobStarts(records)
+    }
+
     loadCloudTimesheets()
+    loadCloudJobStarts()
 
     return () => {
       isMounted = false
@@ -273,6 +283,10 @@ function App() {
           highlightRecordId={highlightRecordId}
           onClearHighlight={handleClearHighlight}
           settings={settings}
+          user={session?.user ?? null}
+          profile={profile}
+          cloudJobStarts={cloudJobStarts}
+          setCloudJobStarts={setCloudJobStarts}
         />
       )}
 

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { FORM_TYPES } from '../constants/index.js'
 import { BackButton } from '../components/BackButton.jsx'
 import { SignatureConfirmationField } from '../components/SignatureConfirmationField.jsx'
@@ -6,6 +6,7 @@ import { PhotoUpload } from '../components/PhotoUpload.jsx'
 import { RecordDetails } from '../components/RecordDetails.jsx'
 import { RecordActions } from '../components/RecordActions.jsx'
 import { SavedRecordSignature } from '../components/SavedRecordSignature.jsx'
+import { CloudSyncBadge } from '../components/CloudSyncBadge.jsx'
 import {
   ComboField,
   TextField,
@@ -19,6 +20,16 @@ import { formatSubmittedAt, formatReportType } from '../utils/formatting.js'
 import { createEmptyDraft, getRecordTitle } from '../utils/records.js'
 import { persistSavedRecords } from '../utils/storage/recordsStorage.js'
 import { getSettingsOptions } from '../utils/storage/settingsStorage.js'
+import {
+  fetchJobStartRecords,
+  getMergedJobStartRecords,
+  getUnavailableSyncStatus,
+  isCloudSaveUnavailable,
+  resolveRecordSyncStatus,
+  saveJobStartRecord,
+  SYNC_STATUS,
+} from '../utils/storage/jobStartCloudStorage.js'
+import { isAdminProfile } from '../utils/storage/userProfileStorage.js'
 
 export function JobStartView({
   onBack,
@@ -28,11 +39,18 @@ export function JobStartView({
   highlightRecordId,
   onClearHighlight,
   settings,
+  user,
+  profile,
+  cloudJobStarts,
+  setCloudJobStarts,
 }) {
   const formConfig = FORM_TYPES['job-start']
   const [draft, setDraft] = useState(() => createEmptyDraft('job-start'))
   const [completedRecord, setCompletedRecord] = useState(null)
   const [validationError, setValidationError] = useState(null)
+  const [completedSyncStatus, setCompletedSyncStatus] = useState(null)
+  const [cloudLoadWarning, setCloudLoadWarning] = useState(null)
+  const [cloudSaving, setCloudSaving] = useState(false)
   const [recordFilter, setRecordFilter] = useState('job-start')
   const recordRef = useRef(null)
 
@@ -42,11 +60,66 @@ export function JobStartView({
   const total = checklist.length
   const completed = checked.size
   const allComplete = completed === total
+  const isAdmin = isAdminProfile(profile)
 
-  const filteredRecords =
-    recordFilter === 'all'
-      ? savedRecords
-      : savedRecords.filter((record) => record.formType === recordFilter)
+  const mergedJobStarts = useMemo(
+    () => getMergedJobStartRecords(savedRecords, cloudJobStarts),
+    [savedRecords, cloudJobStarts],
+  )
+
+  const cloudJobStartCount = mergedJobStarts.filter(
+    (record) => resolveRecordSyncStatus(record) === SYNC_STATUS.CLOUD,
+  ).length
+
+  const filteredRecords = useMemo(() => {
+    if (recordFilter === 'job-start') return mergedJobStarts
+    if (recordFilter === 'all') {
+      const otherRecords = savedRecords.filter((record) => record.formType !== 'job-start')
+      return [...mergedJobStarts, ...otherRecords].sort((a, b) =>
+        (b.submittedAt || '').localeCompare(a.submittedAt || ''),
+      )
+    }
+    return savedRecords.filter((record) => record.formType === recordFilter)
+  }, [recordFilter, mergedJobStarts, savedRecords])
+
+  function patchSavedJobStartRecord(recordId, patch) {
+    setSavedRecords((prev) => {
+      const next = prev.map((item) => (item.id === recordId ? { ...item, ...patch } : item))
+      persistSavedRecords(next)
+      return next
+    })
+    setCompletedRecord((prev) => (prev?.id === recordId ? { ...prev, ...patch } : prev))
+  }
+
+  useEffect(() => {
+    if (!user?.id) {
+      setCloudLoadWarning(null)
+      return undefined
+    }
+
+    let isMounted = true
+
+    async function loadCloudJobStarts() {
+      const { records, error } = await fetchJobStartRecords(user.id, { isAdmin })
+      if (!isMounted) return
+
+      if (error) {
+        setCloudLoadWarning(
+          `Could not load cloud job start records: ${error.message}. Showing device records only.`,
+        )
+        return
+      }
+
+      setCloudLoadWarning(null)
+      setCloudJobStarts(records)
+    }
+
+    loadCloudJobStarts()
+
+    return () => {
+      isMounted = false
+    }
+  }, [user?.id, isAdmin, setCloudJobStarts])
 
   useHighlightRecord(highlightRecordId, onClearHighlight, [filteredRecords])
 
@@ -72,7 +145,7 @@ export function JobStartView({
     updateDraft({ checked: next })
   }
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault()
 
     if (!signatureConfirmation.trim()) {
@@ -101,12 +174,47 @@ export function JobStartView({
     if (!persistSavedRecords(nextRecords)) return
     setSavedRecords(nextRecords)
     setCompletedRecord(record)
+    setCompletedSyncStatus(null)
+
+    if (isCloudSaveUnavailable(user)) {
+      const syncStatus = getUnavailableSyncStatus(user)
+      patchSavedJobStartRecord(record.id, { syncStatus })
+      setCompletedSyncStatus(syncStatus)
+      return
+    }
+
+    setCloudSaving(true)
+    const { record: cloudRecord, error } = await saveJobStartRecord(user, record)
+    setCloudSaving(false)
+
+    if (error) {
+      patchSavedJobStartRecord(record.id, { syncStatus: SYNC_STATUS.CLOUD_FAILED })
+      setCompletedSyncStatus(SYNC_STATUS.CLOUD_FAILED)
+      return
+    }
+
+    const cloudPatch = {
+      syncStatus: SYNC_STATUS.CLOUD,
+      cloudId: cloudRecord?.cloudId ?? null,
+    }
+    patchSavedJobStartRecord(record.id, cloudPatch)
+    setCompletedSyncStatus(SYNC_STATUS.CLOUD)
+
+    if (cloudRecord) {
+      setCloudJobStarts((prev) => {
+        const withoutDup = prev.filter(
+          (item) => item.cloudId !== cloudRecord.cloudId && item.id !== record.id,
+        )
+        return [cloudRecord, ...withoutDup]
+      })
+    }
   }
 
   function handleReset() {
     setDraft(createEmptyDraft('job-start'))
     setCompletedRecord(null)
     setValidationError(null)
+    setCompletedSyncStatus(null)
   }
 
   function handleClearAllRecords() {
@@ -220,6 +328,16 @@ export function JobStartView({
             Record saved to this device. Review the details below.
           </p>
 
+          {cloudSaving ? (
+            <p className="cloud-sync-status cloud-sync-status--pending" role="status">
+              Syncing to cloud…
+            </p>
+          ) : (
+            completedSyncStatus && (
+              <CloudSyncBadge syncStatus={completedSyncStatus} className="cloud-sync-status--block" />
+            )
+          )}
+
           <RecordDetails record={completedRecord} />
           <RecordActions record={completedRecord} onPrint={setPrintRecord} />
         </section>
@@ -239,7 +357,12 @@ export function JobStartView({
               Saved records
             </h2>
             <p className="saved-records__count">
-              {savedRecords.length} record{savedRecords.length === 1 ? '' : 's'} on this device
+              {filteredRecords.length} record{filteredRecords.length === 1 ? '' : 's'}
+              {recordFilter === 'job-start' && user?.id && cloudJobStartCount > 0
+                ? isAdmin
+                  ? ` (${cloudJobStartCount} from cloud — all users)`
+                  : ` (${cloudJobStartCount} synced from cloud)`
+                : ''}
             </p>
           </div>
           {savedRecords.length > 0 && (
@@ -248,6 +371,18 @@ export function JobStartView({
             </button>
           )}
         </div>
+
+        {cloudLoadWarning && (
+          <p className="backup-warning" role="alert">
+            {cloudLoadWarning}
+          </p>
+        )}
+
+        {isAdmin && user?.id && recordFilter === 'job-start' && (
+          <p className="form-hint">
+            Admin view: device records on this device plus all users&apos; cloud job start records.
+          </p>
+        )}
 
         <div className="saved-records__filters" role="tablist" aria-label="Filter records">
           <button
@@ -271,16 +406,34 @@ export function JobStartView({
 
         {filteredRecords.length === 0 ? (
           <p className="saved-records__empty">
-            {savedRecords.length === 0
+            {savedRecords.length === 0 && mergedJobStarts.length === 0
               ? 'No saved records yet. Submit a completed checklist to save one here.'
               : 'No records match this filter.'}
           </p>
         ) : (
           <ul className="saved-records__list">
-            {filteredRecords.map((record) => (
+            {filteredRecords.map((record) => {
+              const isOtherUserCloudRecord =
+                record.formType === 'job-start' &&
+                isAdmin &&
+                record.cloudUserId &&
+                record.cloudUserId !== user?.id &&
+                resolveRecordSyncStatus(record) === SYNC_STATUS.CLOUD
+
+              return (
               <li key={record.id} data-record-id={record.id} className="saved-record">
                 <div className="saved-record__header">
-                  <span className="type-badge type-badge--small">{record.formTypeLabel}</span>
+                  <div className="saved-record__badges">
+                    <span className="type-badge type-badge--small">{record.formTypeLabel}</span>
+                    {record.formType === 'job-start' && (
+                      <CloudSyncBadge record={record} size="small" />
+                    )}
+                    {isOtherUserCloudRecord && (
+                      <span className="type-badge type-badge--small type-badge--cloud-user">
+                        {record.fields?.employeeName?.trim() || 'Other user'}
+                      </span>
+                    )}
+                  </div>
                   <p className="saved-record__title">{getRecordTitle(record)}</p>
                 </div>
                 <dl className="saved-record__details">
@@ -346,7 +499,7 @@ export function JobStartView({
                 <p className="saved-record__meta">Saved {formatSubmittedAt(record.submittedAt)}</p>
                 <RecordActions record={record} onPrint={setPrintRecord} variant="saved" />
               </li>
-            ))}
+            )})}
           </ul>
         )}
       </section>
