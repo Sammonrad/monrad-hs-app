@@ -351,6 +351,71 @@ function syncActionsFromRecord(record, actions) {
   return [newAction, ...actions]
 }
 
+function getMostRecentRecordDate(records) {
+  if (!records.length) return null
+  const sorted = [...records].sort((a, b) => {
+    const timeA = a.submittedAt ? new Date(a.submittedAt).getTime() : 0
+    const timeB = b.submittedAt ? new Date(b.submittedAt).getTime() : 0
+    return timeB - timeA
+  })
+  const recent = sorted[0]
+  return recent.fields?.date || (recent.submittedAt ? formatSubmittedAt(recent.submittedAt) : null)
+}
+
+function getMostRecentActionDate(actionList) {
+  if (!actionList.length) return null
+  const sorted = [...actionList].sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+  )
+  const recent = sorted[0]
+  return recent.date || (recent.createdAt ? formatSubmittedAt(recent.createdAt) : null)
+}
+
+function getRecordsDashboardStats(savedRecords, actionList) {
+  const byType = (formType) => savedRecords.filter((record) => record.formType === formType)
+
+  return {
+    openActions: actionList.filter((action) => action.status !== 'completed').length,
+    completedActions: actionList.filter((action) => action.status === 'completed').length,
+    defectCount: savedRecords.filter(
+      (record) => record.formType === 'pre-start' && record.defectsFound === 'found',
+    ).length,
+    incidentCount: byType('incident').length,
+    sections: [
+      {
+        id: 'job-start',
+        title: 'Job Start Checklist',
+        count: byType('job-start').length,
+        recentDate: getMostRecentRecordDate(byType('job-start')),
+      },
+      {
+        id: 'pre-start',
+        title: 'Machine Pre-Start',
+        count: byType('pre-start').length,
+        recentDate: getMostRecentRecordDate(byType('pre-start')),
+      },
+      {
+        id: 'toolbox',
+        title: 'Toolbox Meeting',
+        count: byType('toolbox').length,
+        recentDate: getMostRecentRecordDate(byType('toolbox')),
+      },
+      {
+        id: 'incident',
+        title: 'Incident / Near Miss',
+        count: byType('incident').length,
+        recentDate: getMostRecentRecordDate(byType('incident')),
+      },
+      {
+        id: 'action-register',
+        title: 'Action Register',
+        count: actionList.length,
+        recentDate: getMostRecentActionDate(actionList),
+      },
+    ],
+  }
+}
+
 function createRecordId() {
   return crypto.randomUUID()
 }
@@ -997,6 +1062,12 @@ const DASHBOARD_CARDS = [
     description: 'Track open actions from forms and add manual items.',
     available: true,
   },
+  {
+    id: 'records-dashboard',
+    title: 'Records Dashboard',
+    description: 'Summary of all saved forms and safety actions.',
+    available: true,
+  },
 ]
 
 function BackButton({ onClick }) {
@@ -1024,7 +1095,9 @@ function Dashboard({ onNavigate, recordCount, openActionCount }) {
             className={
               card.id === 'action-register'
                 ? 'dashboard-card dashboard-card--register'
-                : 'dashboard-card'
+                : card.id === 'records-dashboard'
+                  ? 'dashboard-card dashboard-card--records'
+                  : 'dashboard-card'
             }
             onClick={() => onNavigate(card.id)}
           >
@@ -1333,6 +1406,83 @@ function ActionRegisterView({ onBack, actions, setActions }) {
           </ul>
         </details>
       )}
+    </>
+  )
+}
+
+function RecordsDashboardView({ onBack, onNavigate, savedRecords, actions }) {
+  const stats = getRecordsDashboardStats(savedRecords, actions)
+
+  return (
+    <>
+      <BackButton onClick={onBack} />
+
+      <header className="header">
+        <p className="company">Monrad Earthworx</p>
+        <h1 className="title">Records Dashboard</h1>
+        <p className="progress" aria-live="polite">
+          {savedRecords.length} saved record{savedRecords.length === 1 ? '' : 's'} ·{' '}
+          {actions.length} action{actions.length === 1 ? '' : 's'}
+        </p>
+      </header>
+
+      <section className="safety-summary" aria-labelledby="safety-summary-heading">
+        <h2 id="safety-summary-heading" className="safety-summary__title">
+          Safety summary
+        </h2>
+        <dl className="safety-summary__grid">
+          <div className="safety-summary__item safety-summary__item--alert">
+            <dt>Open actions</dt>
+            <dd>{stats.openActions}</dd>
+          </div>
+          <div className="safety-summary__item safety-summary__item--complete">
+            <dt>Completed actions</dt>
+            <dd>{stats.completedActions}</dd>
+          </div>
+          <div className="safety-summary__item safety-summary__item--alert">
+            <dt>Machine defects recorded</dt>
+            <dd>{stats.defectCount}</dd>
+          </div>
+          <div className="safety-summary__item">
+            <dt>Incident / near miss reports</dt>
+            <dd>{stats.incidentCount}</dd>
+          </div>
+        </dl>
+      </section>
+
+      <section className="records-summary" aria-labelledby="records-summary-heading">
+        <h2 id="records-summary-heading" className="records-summary__title">
+          Records by type
+        </h2>
+        <ul className="records-summary__list">
+          {stats.sections.map((section) => (
+            <li key={section.id} className="records-summary-card">
+              <div className="records-summary-card__content">
+                <h3 className="records-summary-card__title">{section.title}</h3>
+                <p className="records-summary-card__count">
+                  {section.id === 'action-register'
+                    ? `${section.count} action${section.count === 1 ? '' : 's'}`
+                    : `${section.count} saved record${section.count === 1 ? '' : 's'}`}
+                </p>
+                {section.recentDate ? (
+                  <p className="records-summary-card__recent">Most recent: {section.recentDate}</p>
+                ) : (
+                  <p className="records-summary-card__recent records-summary-card__recent--empty">
+                    No records yet
+                  </p>
+                )}
+              </div>
+              <button
+                type="button"
+                className="records-summary-card__btn"
+                onClick={() => onNavigate(section.id)}
+              >
+                View records
+              </button>
+            </li>
+          ))}
+        </ul>
+      </section>
     </>
   )
 }
@@ -2785,6 +2935,15 @@ function App() {
           onBack={() => setCurrentView('dashboard')}
           actions={actions}
           setActions={setActions}
+        />
+      )}
+
+      {currentView === 'records-dashboard' && (
+        <RecordsDashboardView
+          onBack={() => setCurrentView('dashboard')}
+          onNavigate={setCurrentView}
+          savedRecords={savedRecords}
+          actions={actions}
         />
       )}
 
