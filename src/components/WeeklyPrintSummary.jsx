@@ -1,11 +1,12 @@
 import { formatHoursTotal } from '../utils/weeklyTimesheet.js'
 import { formatDecimalHoursDisplay } from '../utils/formatting.js'
+import { MonradLogo } from './MonradLogo.jsx'
 
 export function WeeklyPrintSummary({ totals, weekGroups, filterDescription, generatedAt }) {
   return (
     <article className="print-record weekly-print">
       <header className="print-record__header">
-        <p className="print-record__company">Monrad Earthworx</p>
+        <MonradLogo variant="print" />
         <h1 className="print-record__title">Weekly Timesheet Summary</h1>
         <p className="print-record__meta">Generated {generatedAt}</p>
         <p className="print-record__meta">{filterDescription}</p>

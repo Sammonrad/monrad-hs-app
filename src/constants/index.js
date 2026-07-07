@@ -298,65 +298,98 @@ export const TIMESHEET_FIELD_ORDER = [
 
 export const WEEKLY_TIMESHEET_SUMMARY_LABEL = 'Weekly Timesheet Summary'
 
+export const DASHBOARD_GROUPS = [
+  {
+    id: 'site-safety',
+    title: 'Site Safety',
+    cardIds: ['job-start', 'pre-start', 'toolbox', 'incident'],
+  },
+  {
+    id: 'records-actions',
+    title: 'Records & Actions',
+    cardIds: ['action-register', 'records-dashboard'],
+  },
+  {
+    id: 'timesheets',
+    title: 'Timesheets',
+    cardIds: ['timesheet', 'weekly-timesheet-summary'],
+  },
+  {
+    id: 'setup-backup',
+    title: 'Setup & Backup',
+    cardIds: ['settings', 'backup-restore'],
+  },
+]
+
 export const DASHBOARD_CARDS = [
   {
     id: 'job-start',
     title: 'Job Start Checklist',
-    description: 'Complete job details and safety checks before work begins.',
+    description: 'Job details and safety checks before work begins.',
+    group: 'site-safety',
     available: true,
   },
   {
     id: 'pre-start',
     title: 'Machine Pre-Start',
-    description: 'Daily equipment inspection and pre-start checks.',
+    description: 'Daily machine inspection and defect reporting.',
+    group: 'site-safety',
     available: true,
   },
   {
     id: 'toolbox',
     title: 'Toolbox Meeting',
-    description: 'Record toolbox talks and hazard discussions.',
+    description: 'Record toolbox talks and site hazards.',
+    group: 'site-safety',
     available: true,
   },
   {
     id: 'incident',
     title: 'Incident / Near Miss',
-    description: 'Report incidents and near misses on site.',
-    available: true,
-  },
-  {
-    id: 'timesheet',
-    title: 'Timesheet / Daily Work Record',
-    description: 'Record daily work hours, machine time, and job details.',
-    available: true,
-  },
-  {
-    id: 'weekly-timesheet-summary',
-    title: 'Weekly Timesheet Summary',
-    description: 'Review weekly hours, chargeable time, and timesheet records.',
+    description: 'Report incidents, near misses, and follow-up.',
+    group: 'site-safety',
     available: true,
   },
   {
     id: 'action-register',
     title: 'Action Register',
-    description: 'Track open actions from forms and add manual items.',
+    description: 'Track open, overdue, and critical actions.',
+    group: 'records-actions',
     available: true,
   },
   {
     id: 'records-dashboard',
     title: 'Records Dashboard',
-    description: 'Summary of all saved forms and safety actions.',
+    description: 'Search all forms and view safety summary.',
+    group: 'records-actions',
+    available: true,
+  },
+  {
+    id: 'timesheet',
+    title: 'Timesheet / Daily Work Record',
+    description: 'Daily hours, jobs, and work completed.',
+    group: 'timesheets',
+    available: true,
+  },
+  {
+    id: 'weekly-timesheet-summary',
+    title: 'Weekly Timesheet Summary',
+    description: 'Weekly hour totals and filtered records.',
+    group: 'timesheets',
     available: true,
   },
   {
     id: 'settings',
     title: 'Settings / Setup',
-    description: 'Manage operators, machines, and common sites.',
+    description: 'Operators, machines, and common sites.',
+    group: 'setup-backup',
     available: true,
   },
   {
     id: 'backup-restore',
     title: 'Backup / Restore',
-    description: 'Export or import all app data on this device.',
+    description: 'Export or restore all app data.',
+    group: 'setup-backup',
     available: true,
   },
 ]

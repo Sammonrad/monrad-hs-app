@@ -2,6 +2,7 @@ import { formatSubmittedAt } from '../utils/formatting.js'
 import { getRecordDetailRows } from '../utils/recordDetails.js'
 import { isSeriousDefect } from '../utils/defects.js'
 import { DefectWarning } from './DefectWarning.jsx'
+import { MonradLogo } from './MonradLogo.jsx'
 
 export function PrintableRecord({ record }) {
   const detailRows = getRecordDetailRows(record)
@@ -9,7 +10,7 @@ export function PrintableRecord({ record }) {
   return (
     <article className="print-record">
       <header className="print-record__header">
-        <p className="print-record__company">Monrad Earthworx</p>
+        <MonradLogo variant="print" />
         <h1 className="print-record__title">{record.formTypeLabel}</h1>
         <p className="print-record__meta">
           Record saved: {formatSubmittedAt(record.submittedAt)}
