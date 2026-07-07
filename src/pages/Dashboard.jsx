@@ -20,7 +20,7 @@ function getDashboardCardClass(cardId) {
   }
 }
 
-export function Dashboard({ onNavigate, recordCount, openActionCount, savedRecords, actions }) {
+export function Dashboard({ onNavigate, recordCount, openActionCount, savedRecords, actions, userEmail }) {
   const alerts = getSafetyAlerts(savedRecords ?? [], actions ?? [])
   const cardsById = useMemo(
     () => Object.fromEntries(DASHBOARD_CARDS.map((card) => [card.id, card])),
@@ -133,10 +133,8 @@ export function Dashboard({ onNavigate, recordCount, openActionCount, savedRecor
       )}
 
       <footer className="dashboard__footer">
+        {userEmail && <p className="app-version app-version--secondary">Signed in as {userEmail}</p>}
         <p className="app-version">Monrad Earthworx H&amp;S v{APP_VERSION}</p>
-        <p className="coming-soon">
-          Cloud sync &amp; login — coming soon (local storage only for now).
-        </p>
       </footer>
     </div>
   )

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import './App.css'
 import { Dashboard } from './pages/Dashboard.jsx'
+import { AuthView } from './pages/AuthView.jsx'
 import { ActionRegisterView } from './pages/ActionRegisterView.jsx'
 import { RecordsDashboardView } from './pages/RecordsDashboardView.jsx'
 import { SettingsView } from './pages/SettingsView.jsx'
@@ -16,6 +17,7 @@ import { loadSavedRecords } from './utils/storage/recordsStorage.js'
 import { loadActions, persistActions, syncActionsFromRecord } from './utils/storage/actionsStorage.js'
 import { loadSettings } from './utils/storage/settingsStorage.js'
 import { APP_VERSION } from './constants/index.js'
+import { isSupabaseConfigured, supabase } from './utils/supabaseClient.js'
 
 function App() {
   const [currentView, setCurrentView] = useState('dashboard')
@@ -24,6 +26,10 @@ function App() {
   const [settings, setSettings] = useState(() => loadSettings())
   const [printRecord, setPrintRecord] = useState(null)
   const [highlightRecordId, setHighlightRecordId] = useState(null)
+  const [session, setSession] = useState(null)
+  const [authReady, setAuthReady] = useState(false)
+  const [authLoading, setAuthLoading] = useState(false)
+  const [authError, setAuthError] = useState('')
 
   const openActionCount = actions.filter((action) => action.status !== 'completed').length
 
@@ -68,8 +74,103 @@ function App() {
     }
   }, [printRecord])
 
+  useEffect(() => {
+    if (!isSupabaseConfigured || !supabase) {
+      setAuthReady(true)
+      return undefined
+    }
+
+    let isMounted = true
+
+    async function loadSession() {
+      const { data, error } = await supabase.auth.getSession()
+
+      if (!isMounted) return
+      if (error) {
+        setAuthError(error.message)
+      } else {
+        setSession(data.session ?? null)
+      }
+      setAuthReady(true)
+    }
+
+    loadSession()
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      setSession(nextSession)
+      setAuthError('')
+      setAuthReady(true)
+    })
+
+    return () => {
+      isMounted = false
+      subscription.unsubscribe()
+    }
+  }, [])
+
+  async function signIn(email, password) {
+    if (!supabase) return
+    setAuthLoading(true)
+    setAuthError('')
+    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    if (error) setAuthError(error.message)
+    setAuthLoading(false)
+  }
+
+  async function signUp(email, password) {
+    if (!supabase) return
+    setAuthLoading(true)
+    setAuthError('')
+    const { error } = await supabase.auth.signUp({ email, password })
+    if (error) {
+      setAuthError(error.message)
+    } else {
+      setAuthError('Check your email to confirm your account if confirmation is enabled.')
+    }
+    setAuthLoading(false)
+  }
+
+  async function signOut() {
+    if (!supabase) return
+    setAuthLoading(true)
+    setAuthError('')
+    const { error } = await supabase.auth.signOut()
+    if (error) setAuthError(error.message)
+    setAuthLoading(false)
+  }
+
+  const userEmail = session?.user?.email ?? ''
+  const showAuthView = authReady && (!isSupabaseConfigured || !session)
+
   return (
     <div className="app">
+      {!authReady && (
+        <section className="auth-card" aria-live="polite">
+          <p className="progress">Checking authentication...</p>
+        </section>
+      )}
+
+      {showAuthView && (
+        <AuthView
+          onSignIn={signIn}
+          onSignUp={signUp}
+          isLoading={authLoading}
+          errorMessage={authError}
+          isConfigMissing={!isSupabaseConfigured}
+        />
+      )}
+
+      {authReady && session && (
+        <>
+          <div className="app-auth-meta no-print">
+            <p className="app-auth-meta__email">{userEmail}</p>
+            <button type="button" className="action-btn" onClick={signOut} disabled={authLoading}>
+              Sign out
+            </button>
+          </div>
+
       {printRecord && (
         <div className="print-area" aria-hidden="true">
           <PrintableRecord record={printRecord} />
@@ -83,6 +184,7 @@ function App() {
           openActionCount={openActionCount}
           savedRecords={savedRecords}
           actions={actions}
+          userEmail={userEmail}
         />
       )}
 
@@ -180,8 +282,11 @@ function App() {
 
       {currentView !== 'dashboard' && (
         <footer className="app-footer no-print">
+          <p className="app-version app-version--secondary">Signed in as {userEmail}</p>
           <p className="app-version">Monrad Earthworx H&amp;S v{APP_VERSION}</p>
         </footer>
+      )}
+        </>
       )}
     </div>
   )
