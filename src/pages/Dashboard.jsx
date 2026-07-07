@@ -23,7 +23,9 @@ export function Dashboard({ onNavigate, recordCount, openActionCount }) {
                   ? 'dashboard-card dashboard-card--settings'
                   : card.id === 'backup-restore'
                     ? 'dashboard-card dashboard-card--backup'
-                    : 'dashboard-card'
+                    : card.id === 'weekly-timesheet-summary'
+                      ? 'dashboard-card dashboard-card--weekly'
+                      : 'dashboard-card'
             }
             onClick={() => onNavigate(card.id)}
           >

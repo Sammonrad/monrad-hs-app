@@ -276,6 +276,8 @@ export const TIMESHEET_FIELD_ORDER = [
   'notes',
 ]
 
+export const WEEKLY_TIMESHEET_SUMMARY_LABEL = 'Weekly Timesheet Summary'
+
 export const DASHBOARD_CARDS = [
   {
     id: 'job-start',
@@ -305,6 +307,12 @@ export const DASHBOARD_CARDS = [
     id: 'timesheet',
     title: 'Timesheet / Daily Work Record',
     description: 'Record daily work hours, machine time, and job details.',
+    available: true,
+  },
+  {
+    id: 'weekly-timesheet-summary',
+    title: 'Weekly Timesheet Summary',
+    description: 'Review weekly hours, chargeable time, and timesheet records.',
     available: true,
   },
   {

@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { BackButton } from '../components/BackButton.jsx'
 import { formatSubmittedAt } from '../utils/formatting.js'
+import { getTimesheetRecords } from '../utils/weeklyTimesheet.js'
 import {
   getRecordsDashboardStats,
   buildSearchableItems,
@@ -16,6 +17,7 @@ export function RecordsDashboardView({
   onViewRecord,
 }) {
   const stats = getRecordsDashboardStats(savedRecords, actions)
+  const timesheetCount = getTimesheetRecords(savedRecords).length
   const allItems = useMemo(() => buildSearchableItems(savedRecords, actions), [savedRecords, actions])
 
   const [searchQuery, setSearchQuery] = useState('')
@@ -99,6 +101,25 @@ export function RecordsDashboardView({
           </div>
         </dl>
       </section>
+
+      {timesheetCount > 0 && (
+        <section className="weekly-dashboard-link no-print" aria-labelledby="weekly-link-heading">
+          <h2 id="weekly-link-heading" className="records-summary__title">
+            Timesheet reports
+          </h2>
+          <p className="weekly-dashboard-link__text">
+            {timesheetCount} timesheet record{timesheetCount === 1 ? '' : 's'} saved — view weekly
+            hours and chargeable totals.
+          </p>
+          <button
+            type="button"
+            className="action-btn action-btn--primary"
+            onClick={() => onNavigate('weekly-timesheet-summary')}
+          >
+            Open weekly timesheet summary
+          </button>
+        </section>
+      )}
 
       <section className="records-search" aria-labelledby="records-search-heading">
         <div className="records-search__header">

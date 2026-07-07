@@ -200,6 +200,254 @@ body {
   color: #c41e3a;
 }
 
+.dashboard-card--weekly {
+  border-color: #333;
+}
+
+.dashboard-card--weekly .dashboard-card__title {
+  color: #1a1a1a;
+}
+
+.weekly-section__title {
+  margin: 0 0 0.75rem;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #1a1a1a;
+}
+
+.weekly-filters {
+  margin-bottom: 1.25rem;
+  padding: 1rem;
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+}
+
+.weekly-filters__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.875rem;
+}
+
+.weekly-filters__grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.75rem;
+}
+
+@media (min-width: 640px) {
+  .weekly-filters__grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.weekly-summary {
+  margin-bottom: 1.25rem;
+  padding: 1rem;
+  background: #fafafa;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+}
+
+.weekly-summary__grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.75rem;
+  margin: 0;
+}
+
+@media (min-width: 640px) {
+  .weekly-summary__grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.weekly-summary__item {
+  padding: 0.75rem;
+  background: #fff;
+  border: 1px solid #eee;
+  border-radius: 6px;
+}
+
+.weekly-summary__item dt {
+  margin: 0 0 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #666;
+}
+
+.weekly-summary__item dd {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #1a1a1a;
+}
+
+.weekly-summary__item--highlight {
+  border-color: #c41e3a;
+}
+
+.weekly-summary__item--highlight dd {
+  color: #c41e3a;
+}
+
+.weekly-summary__filters {
+  margin: 0.875rem 0 0;
+  font-size: 0.85rem;
+  line-height: 1.45;
+  color: #666;
+}
+
+.weekly-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.weekly-toolbar__count {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #666;
+}
+
+.weekly-empty {
+  margin: 0;
+  padding: 1.25rem;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: #666;
+  text-align: center;
+  background: #fafafa;
+  border: 1px dashed #ccc;
+  border-radius: 8px;
+}
+
+.weekly-group {
+  margin-bottom: 1.5rem;
+}
+
+.weekly-group__title {
+  margin: 0 0 0.75rem;
+  padding-bottom: 0.5rem;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #1a1a1a;
+  border-bottom: 2px solid #c41e3a;
+}
+
+.weekly-records {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.weekly-record {
+  padding: 1rem;
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+}
+
+.weekly-record__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.weekly-record__date {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #1a1a1a;
+}
+
+.weekly-record__details {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.5rem 0.75rem;
+  margin: 0;
+}
+
+@media (min-width: 640px) {
+  .weekly-record__details {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.weekly-record__row dt {
+  margin: 0;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #888;
+}
+
+.weekly-record__row dd {
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.35;
+  color: #333;
+  word-break: break-word;
+}
+
+.weekly-record__work {
+  margin: 0.75rem 0 0;
+  padding-top: 0.75rem;
+  font-size: 0.85rem;
+  line-height: 1.45;
+  color: #444;
+  border-top: 1px solid #eee;
+}
+
+.weekly-record__work-label {
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+.weekly-dashboard-link {
+  margin-bottom: 1.5rem;
+  padding: 1rem;
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+}
+
+.weekly-dashboard-link__text {
+  margin: 0 0 0.875rem;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  color: #666;
+}
+
+.weekly-print__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.65rem;
+  line-height: 1.3;
+}
+
+.weekly-print__table th,
+.weekly-print__table td {
+  padding: 0.35rem 0.4rem;
+  text-align: left;
+  vertical-align: top;
+  border: 1px solid #ccc;
+  word-break: break-word;
+}
+
+.weekly-print__table th {
+  font-weight: 700;
+  background: #f5f5f5;
+}
+
 .backup-intro {
   margin: 0 0 1.5rem;
   padding: 1rem;
@@ -1978,6 +2226,15 @@ body {
     background: #c41e3a !important;
     print-color-adjust: exact;
     -webkit-print-color-adjust: exact;
+    break-inside: avoid;
+  }
+
+  .weekly-print__table {
+    font-size: 0.6rem;
+    break-inside: auto;
+  }
+
+  .weekly-print__table tr {
     break-inside: avoid;
   }
 }

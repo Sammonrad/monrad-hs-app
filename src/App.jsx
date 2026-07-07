@@ -9,6 +9,7 @@ import { JobStartView } from './pages/JobStartView.jsx'
 import { PreStartView } from './pages/PreStartView.jsx'
 import { ToolboxView } from './pages/ToolboxView.jsx'
 import { TimesheetView } from './pages/TimesheetView.jsx'
+import { WeeklyTimesheetSummaryView } from './pages/WeeklyTimesheetSummaryView.jsx'
 import { IncidentView } from './pages/IncidentView.jsx'
 import { PrintableRecord } from './components/PrintableRecord.jsx'
 import { loadSavedRecords } from './utils/storage/recordsStorage.js'
@@ -155,6 +156,10 @@ function App() {
           onClearHighlight={handleClearHighlight}
           settings={settings}
         />
+      )}
+
+      {currentView === 'weekly-timesheet-summary' && (
+        <WeeklyTimesheetSummaryView onBack={goToDashboard} savedRecords={savedRecords} />
       )}
 
       {currentView === 'incident' && (
