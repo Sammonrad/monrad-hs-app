@@ -5,6 +5,7 @@ import { SignatureConfirmationField } from '../components/SignatureConfirmationF
 import { RecordDetails } from '../components/RecordDetails.jsx'
 import { RecordActions } from '../components/RecordActions.jsx'
 import { SavedRecordSignature } from '../components/SavedRecordSignature.jsx'
+import { TimesheetCloudSyncBadge } from '../components/TimesheetCloudSyncBadge.jsx'
 import {
   ComboField,
   TextField,
@@ -22,8 +23,13 @@ import { getSettingsOptions } from '../utils/storage/settingsStorage.js'
 import {
   fetchTimesheetRecords,
   getMergedTimesheetRecords,
+  getUnavailableSyncStatus,
+  isCloudSaveUnavailable,
+  resolveRecordSyncStatus,
   saveTimesheetRecord,
+  SYNC_STATUS,
 } from '../utils/storage/timesheetCloudStorage.js'
+import { isAdminProfile } from '../utils/storage/userProfileStorage.js'
 import {
   calculateLabourHours,
   calculateAutoChargeableHours,
@@ -39,6 +45,7 @@ export function TimesheetView({
   onClearHighlight,
   settings,
   user,
+  profile,
   cloudTimesheets,
   setCloudTimesheets,
 }) {
@@ -46,7 +53,7 @@ export function TimesheetView({
   const [draft, setDraft] = useState(() => createEmptyDraft('timesheet'))
   const [completedRecord, setCompletedRecord] = useState(null)
   const [validationError, setValidationError] = useState(null)
-  const [cloudSaveWarning, setCloudSaveWarning] = useState(null)
+  const [completedSyncStatus, setCompletedSyncStatus] = useState(null)
   const [cloudLoadWarning, setCloudLoadWarning] = useState(null)
   const [cloudSaving, setCloudSaving] = useState(false)
   const [chargeableEdited, setChargeableEdited] = useState(false)
@@ -73,8 +80,18 @@ export function TimesheetView({
   )
 
   const cloudRecordCount = timesheetRecords.filter(
-    (record) => record.storageSource === 'cloud' || record.storageSource === 'both',
+    (record) => resolveRecordSyncStatus(record) === SYNC_STATUS.CLOUD,
   ).length
+  const isAdmin = isAdminProfile(profile)
+
+  function patchSavedTimesheetRecord(recordId, patch) {
+    setSavedRecords((prev) => {
+      const next = prev.map((item) => (item.id === recordId ? { ...item, ...patch } : item))
+      persistSavedRecords(next)
+      return next
+    })
+    setCompletedRecord((prev) => (prev?.id === recordId ? { ...prev, ...patch } : prev))
+  }
 
   useEffect(() => {
     if (!user?.id) {
@@ -85,7 +102,7 @@ export function TimesheetView({
     let isMounted = true
 
     async function loadCloudTimesheets() {
-      const { records, error } = await fetchTimesheetRecords(user.id)
+      const { records, error } = await fetchTimesheetRecords(user.id, { isAdmin })
       if (!isMounted) return
 
       if (error) {
@@ -104,7 +121,7 @@ export function TimesheetView({
     return () => {
       isMounted = false
     }
-  }, [user?.id, setCloudTimesheets])
+  }, [user?.id, isAdmin, setCloudTimesheets])
 
   useHighlightRecord(highlightRecordId, onClearHighlight, [timesheetRecords])
 
@@ -211,20 +228,31 @@ export function TimesheetView({
     if (!persistSavedRecords(nextRecords)) return
     setSavedRecords(nextRecords)
     setCompletedRecord(record)
-    setCloudSaveWarning(null)
+    setCompletedSyncStatus(null)
 
-    if (!user?.id) return
+    if (isCloudSaveUnavailable(user)) {
+      const syncStatus = getUnavailableSyncStatus(user)
+      patchSavedTimesheetRecord(record.id, { syncStatus })
+      setCompletedSyncStatus(syncStatus)
+      return
+    }
 
     setCloudSaving(true)
     const { record: cloudRecord, error } = await saveTimesheetRecord(user, record)
     setCloudSaving(false)
 
     if (error) {
-      setCloudSaveWarning(
-        `Saved on this device, but cloud sync failed: ${error.message}. Your record is safe locally.`,
-      )
+      patchSavedTimesheetRecord(record.id, { syncStatus: SYNC_STATUS.CLOUD_FAILED })
+      setCompletedSyncStatus(SYNC_STATUS.CLOUD_FAILED)
       return
     }
+
+    const cloudPatch = {
+      syncStatus: SYNC_STATUS.CLOUD,
+      cloudId: cloudRecord?.cloudId ?? null,
+    }
+    patchSavedTimesheetRecord(record.id, cloudPatch)
+    setCompletedSyncStatus(SYNC_STATUS.CLOUD)
 
     if (cloudRecord) {
       setCloudTimesheets((prev) => {
@@ -240,7 +268,7 @@ export function TimesheetView({
     setDraft(createEmptyDraft('timesheet'))
     setCompletedRecord(null)
     setValidationError(null)
-    setCloudSaveWarning(null)
+    setCompletedSyncStatus(null)
     setChargeableEdited(false)
   }
 
@@ -451,19 +479,17 @@ export function TimesheetView({
           </div>
 
           <p className="record__saved" role="status">
-            {cloudSaving
-              ? 'Saved on this device. Syncing to cloud…'
-              : cloudSaveWarning
-                ? 'Saved on this device. Cloud sync did not complete — see warning below.'
-                : user?.id
-                  ? 'Record saved to this device and cloud. Review the details below.'
-                  : 'Record saved to this device. Review the details below.'}
+            Record saved to this device. Review the details below.
           </p>
 
-          {cloudSaveWarning && (
-            <p className="backup-warning" role="alert">
-              {cloudSaveWarning}
+          {cloudSaving ? (
+            <p className="cloud-sync-status cloud-sync-status--pending" role="status">
+              Syncing to cloud…
             </p>
+          ) : (
+            completedSyncStatus && (
+              <TimesheetCloudSyncBadge syncStatus={completedSyncStatus} className="cloud-sync-status--block" />
+            )
           )}
 
           <RecordDetails record={completedRecord} />
@@ -487,7 +513,9 @@ export function TimesheetView({
             <p className="saved-records__count">
               {timesheetRecords.length} record{timesheetRecords.length === 1 ? '' : 's'}
               {user?.id && cloudRecordCount > 0
-                ? ` (${cloudRecordCount} synced from cloud)`
+                ? isAdmin
+                  ? ` (${cloudRecordCount} from cloud — all users)`
+                  : ` (${cloudRecordCount} synced from cloud)`
                 : ' on this device'}
             </p>
           </div>
@@ -504,16 +532,37 @@ export function TimesheetView({
           </p>
         )}
 
+        {isAdmin && user?.id && (
+          <p className="form-hint">
+            Admin view: device records on this device plus all users&apos; cloud timesheets.
+          </p>
+        )}
+
         {timesheetRecords.length === 0 ? (
           <p className="saved-records__empty">
             No saved timesheet records yet. Submit a completed record to save one here.
           </p>
         ) : (
           <ul className="saved-records__list">
-            {timesheetRecords.map((record) => (
+            {timesheetRecords.map((record) => {
+              const isOtherUserCloudRecord =
+                isAdmin &&
+                record.cloudUserId &&
+                record.cloudUserId !== user?.id &&
+                resolveRecordSyncStatus(record) === SYNC_STATUS.CLOUD
+
+              return (
               <li key={record.id} data-record-id={record.id} className="saved-record">
                 <div className="saved-record__header">
-                  <span className="type-badge type-badge--small">{record.formTypeLabel}</span>
+                  <div className="saved-record__badges">
+                    <span className="type-badge type-badge--small">{record.formTypeLabel}</span>
+                    <TimesheetCloudSyncBadge record={record} size="small" />
+                    {isOtherUserCloudRecord && (
+                      <span className="type-badge type-badge--small type-badge--cloud-user">
+                        {record.fields?.employeeName?.trim() || 'Other user'}
+                      </span>
+                    )}
+                  </div>
                   <p className="saved-record__title">{getRecordTitle(record)}</p>
                 </div>
                 <dl className="saved-record__details">
@@ -533,12 +582,10 @@ export function TimesheetView({
 
                 <p className="saved-record__meta">
                   Saved {formatSubmittedAt(record.submittedAt)}
-                  {record.storageSource === 'cloud' && ' · Cloud only'}
-                  {record.storageSource === 'both' && ' · Device + cloud'}
                 </p>
                 <RecordActions record={record} onPrint={setPrintRecord} variant="saved" />
               </li>
-            ))}
+            )})}
           </ul>
         )}
       </section>

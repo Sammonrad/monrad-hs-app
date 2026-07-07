@@ -13,8 +13,15 @@ import {
   describeActiveFilters,
 } from '../utils/weeklyTimesheet.js'
 import { getMergedTimesheetRecords } from '../utils/storage/timesheetCloudStorage.js'
+import { isAdminProfile } from '../utils/storage/userProfileStorage.js'
 
-export function WeeklyTimesheetSummaryView({ onBack, savedRecords, cloudTimesheets = [] }) {
+export function WeeklyTimesheetSummaryView({
+  onBack,
+  savedRecords,
+  cloudTimesheets = [],
+  profile,
+  user,
+}) {
   const allTimesheets = useMemo(
     () => getMergedTimesheetRecords(savedRecords, cloudTimesheets),
     [savedRecords, cloudTimesheets],
@@ -31,6 +38,7 @@ export function WeeklyTimesheetSummaryView({ onBack, savedRecords, cloudTimeshee
   const weekGroups = useMemo(() => groupByWeek(filteredRecords), [filteredRecords])
   const totals = useMemo(() => calculateTotals(filteredRecords), [filteredRecords])
   const filterDescription = useMemo(() => describeActiveFilters(filters), [filters])
+  const isAdmin = isAdminProfile(profile)
 
   const hasActiveFilters =
     filters.employee ||
@@ -94,8 +102,17 @@ export function WeeklyTimesheetSummaryView({ onBack, savedRecords, cloudTimeshee
         <h1 className="title">Weekly Timesheet Summary</h1>
         <p className="progress" aria-live="polite">
           {allTimesheets.length} timesheet record{allTimesheets.length === 1 ? '' : 's'}
-          {cloudTimesheets.length > 0 ? ' (device + cloud)' : ' on this device'}
+          {cloudTimesheets.length > 0
+            ? isAdmin
+              ? ' (device + all users\' cloud)'
+              : ' (device + cloud)'
+            : ' on this device'}
         </p>
+        {isAdmin && user?.id && (
+          <p className="form-hint">
+            Admin view includes cloud timesheets from all users. Device records remain local to this device.
+          </p>
+        )}
       </header>
 
       <section className="weekly-filters no-print" aria-labelledby="weekly-filters-heading">

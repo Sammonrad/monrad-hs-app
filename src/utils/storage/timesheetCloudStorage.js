@@ -2,13 +2,76 @@ import { supabase, isSupabaseConfigured } from '../supabaseClient.js'
 import { normalizeRecord } from '../records.js'
 import { parseRecordHours } from '../weeklyTimesheet.js'
 
+export const SYNC_STATUS = {
+  CLOUD: 'cloud',
+  LOCAL_ONLY: 'local-only',
+  OFFLINE: 'offline',
+  CLOUD_FAILED: 'cloud-failed',
+}
+
+export function isCloudSaveUnavailable(user) {
+  if (!isSupabaseConfigured || !supabase) return true
+  if (!user?.id) return true
+  if (typeof navigator !== 'undefined' && !navigator.onLine) return true
+  return false
+}
+
+export function getUnavailableSyncStatus(user) {
+  if (typeof navigator !== 'undefined' && !navigator.onLine) return SYNC_STATUS.OFFLINE
+  if (!user?.id) return SYNC_STATUS.LOCAL_ONLY
+  return SYNC_STATUS.OFFLINE
+}
+
+export function getSyncStatusLabel(syncStatus) {
+  switch (syncStatus) {
+    case SYNC_STATUS.CLOUD:
+      return 'Saved to cloud'
+    case SYNC_STATUS.CLOUD_FAILED:
+      return 'Saved locally only — cloud save failed'
+    case SYNC_STATUS.OFFLINE:
+    case SYNC_STATUS.LOCAL_ONLY:
+    default:
+      return 'Offline/local save only'
+  }
+}
+
+export function getSyncStatusModifier(syncStatus) {
+  switch (syncStatus) {
+    case SYNC_STATUS.CLOUD:
+      return 'cloud-sync-status--cloud'
+    case SYNC_STATUS.CLOUD_FAILED:
+      return 'cloud-sync-status--failed'
+    case SYNC_STATUS.OFFLINE:
+    case SYNC_STATUS.LOCAL_ONLY:
+    default:
+      return 'cloud-sync-status--offline'
+  }
+}
+
+export function resolveRecordSyncStatus(record) {
+  if (!record) return SYNC_STATUS.LOCAL_ONLY
+  if (record.syncStatus) return record.syncStatus
+  if (record.cloudId || record.storageSource === 'cloud' || record.storageSource === 'both') {
+    return SYNC_STATUS.CLOUD
+  }
+  return SYNC_STATUS.LOCAL_ONLY
+}
+
+function withSyncStatus(record) {
+  const syncStatus = resolveRecordSyncStatus(record)
+  return { ...record, syncStatus }
+}
+
 export function mapTimesheetToRow(record, userId) {
   const fields = record.fields ?? {}
   const { total, chargeable, nonChargeable } = parseRecordHours(record)
 
   return {
     user_id: userId,
-    record_data: record,
+    record_data: {
+      ...record,
+      syncStatus: record.syncStatus ?? SYNC_STATUS.CLOUD,
+    },
     record_date: fields.date?.trim() || null,
     employee_name: fields.employeeName?.trim() || null,
     job_name: fields.jobProjectName?.trim() || null,
@@ -20,40 +83,53 @@ export function mapTimesheetToRow(record, userId) {
   }
 }
 
+function withCloudOwnership(record, row) {
+  return {
+    ...record,
+    cloudId: row.id,
+    cloudUserId: row.user_id ?? null,
+    storageSource: 'cloud',
+    syncStatus: record.syncStatus ?? SYNC_STATUS.CLOUD,
+  }
+}
+
 export function rowToTimesheetRecord(row) {
   const data = row.record_data
   if (data && typeof data === 'object' && data.formType === 'timesheet') {
-    return normalizeRecord({
-      ...data,
-      cloudId: row.id,
-      storageSource: 'cloud',
-    })
+    return withSyncStatus(
+      normalizeRecord(withCloudOwnership(data, row)),
+    )
   }
 
-  return normalizeRecord({
-    id: row.id,
-    formType: 'timesheet',
-    formTypeLabel: 'Timesheet / Daily Work Record',
-    fields: {
-      date: row.record_date ?? '',
-      employeeName: row.employee_name ?? '',
-      jobProjectName: row.job_name ?? '',
-      siteLocation: row.site_location ?? '',
-      machineUsed: row.machine_used ?? '',
-      totalHoursWorked: row.total_hours != null ? String(row.total_hours) : '',
-      chargeableHours: row.chargeable_hours != null ? String(row.chargeable_hours) : '',
-      nonChargeableHours: row.non_chargeable_hours != null ? String(row.non_chargeable_hours) : '',
-    },
-    completedItems: [],
-    completedCount: 0,
-    totalCount: 0,
-    allComplete: true,
-    signatureConfirmation: '',
-    photos: [],
-    submittedAt: row.created_at ?? new Date().toISOString(),
-    cloudId: row.id,
-    storageSource: 'cloud',
-  })
+  return withSyncStatus(
+    normalizeRecord(
+      withCloudOwnership(
+        {
+          id: row.id,
+          formType: 'timesheet',
+          formTypeLabel: 'Timesheet / Daily Work Record',
+          fields: {
+            date: row.record_date ?? '',
+            employeeName: row.employee_name ?? '',
+            jobProjectName: row.job_name ?? '',
+            siteLocation: row.site_location ?? '',
+            machineUsed: row.machine_used ?? '',
+            totalHoursWorked: row.total_hours != null ? String(row.total_hours) : '',
+            chargeableHours: row.chargeable_hours != null ? String(row.chargeable_hours) : '',
+            nonChargeableHours: row.non_chargeable_hours != null ? String(row.non_chargeable_hours) : '',
+          },
+          completedItems: [],
+          completedCount: 0,
+          totalCount: 0,
+          allComplete: true,
+          signatureConfirmation: '',
+          photos: [],
+          submittedAt: row.created_at ?? new Date().toISOString(),
+        },
+        row,
+      ),
+    ),
+  )
 }
 
 function dedupeKey(record) {
@@ -69,13 +145,17 @@ export function mergeTimesheetRecords(localTimesheets, cloudTimesheets) {
   const byDedupeKey = new Map()
 
   function register(record, source) {
-    const entry = {
+    const entry = withSyncStatus({
       ...record,
       storageSource: record.storageSource === 'cloud' && source === 'local'
         ? 'both'
         : record.storageSource === 'local' && source === 'cloud'
           ? 'both'
           : source,
+    })
+
+    if (entry.storageSource === 'both' || entry.cloudId) {
+      entry.syncStatus = SYNC_STATUS.CLOUD
     }
 
     byId.set(entry.id, entry)
@@ -92,13 +172,14 @@ export function mergeTimesheetRecords(localTimesheets, cloudTimesheets) {
     const cloudId = cloudRecord.cloudId
     if (cloudId && byCloudId.has(cloudId)) {
       const existing = byCloudId.get(cloudId)
-      const merged = {
+      const merged = withSyncStatus({
         ...existing,
         ...cloudRecord,
         id: existing.id,
         cloudId,
         storageSource: 'both',
-      }
+        syncStatus: SYNC_STATUS.CLOUD,
+      })
       byId.set(existing.id, merged)
       byCloudId.set(cloudId, merged)
       byDedupeKey.set(dedupeKey(merged), merged)
@@ -108,11 +189,12 @@ export function mergeTimesheetRecords(localTimesheets, cloudTimesheets) {
     const localId = cloudRecord.id
     if (localId && byId.has(localId)) {
       const existing = byId.get(localId)
-      const merged = {
+      const merged = withSyncStatus({
         ...existing,
         cloudId: cloudId ?? existing.cloudId,
         storageSource: 'both',
-      }
+        syncStatus: SYNC_STATUS.CLOUD,
+      })
       byId.set(localId, merged)
       if (merged.cloudId) byCloudId.set(merged.cloudId, merged)
       byDedupeKey.set(dedupeKey(merged), merged)
@@ -122,11 +204,12 @@ export function mergeTimesheetRecords(localTimesheets, cloudTimesheets) {
     const dupKey = dedupeKey(cloudRecord)
     if (byDedupeKey.has(dupKey)) {
       const existing = byDedupeKey.get(dupKey)
-      const merged = {
+      const merged = withSyncStatus({
         ...existing,
         cloudId: cloudId ?? existing.cloudId,
         storageSource: 'both',
-      }
+        syncStatus: SYNC_STATUS.CLOUD,
+      })
       byId.set(existing.id, merged)
       if (merged.cloudId) byCloudId.set(merged.cloudId, merged)
       byDedupeKey.set(dupKey, merged)
@@ -144,17 +227,22 @@ export function getMergedTimesheetRecords(savedRecords, cloudTimesheets) {
   return mergeTimesheetRecords(localTimesheets, cloudTimesheets ?? [])
 }
 
-export async function fetchTimesheetRecords(userId) {
+export async function fetchTimesheetRecords(userId, { isAdmin = false } = {}) {
   if (!isSupabaseConfigured || !supabase || !userId) {
     return { records: [], error: null }
   }
 
-  const { data, error } = await supabase
+  let query = supabase
     .from('timesheet_records')
     .select('*')
-    .eq('user_id', userId)
     .order('record_date', { ascending: false })
     .order('created_at', { ascending: false })
+
+  if (!isAdmin) {
+    query = query.eq('user_id', userId)
+  }
+
+  const { data, error } = await query
 
   if (error) {
     return { records: [], error }

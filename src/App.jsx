@@ -19,6 +19,7 @@ import { loadSettings } from './utils/storage/settingsStorage.js'
 import { APP_VERSION } from './constants/index.js'
 import { isSupabaseConfigured, supabase } from './utils/supabaseClient.js'
 import { fetchTimesheetRecords } from './utils/storage/timesheetCloudStorage.js'
+import { getRoleLabel, isAdminProfile, loadOrCreateProfile } from './utils/storage/userProfileStorage.js'
 
 function App() {
   const [currentView, setCurrentView] = useState('dashboard')
@@ -32,6 +33,7 @@ function App() {
   const [authLoading, setAuthLoading] = useState(false)
   const [authError, setAuthError] = useState('')
   const [cloudTimesheets, setCloudTimesheets] = useState([])
+  const [profile, setProfile] = useState(null)
 
   const openActionCount = actions.filter((action) => action.status !== 'completed').length
 
@@ -114,14 +116,36 @@ function App() {
 
   useEffect(() => {
     if (!session?.user?.id) {
+      setProfile(null)
       setCloudTimesheets([])
       return undefined
     }
 
     let isMounted = true
 
+    async function loadProfile() {
+      const { profile: nextProfile } = await loadOrCreateProfile(session.user)
+      if (isMounted) setProfile(nextProfile)
+    }
+
+    loadProfile()
+
+    return () => {
+      isMounted = false
+    }
+  }, [session?.user?.id, session?.user?.email])
+
+  useEffect(() => {
+    if (!session?.user?.id) {
+      setCloudTimesheets([])
+      return undefined
+    }
+
+    let isMounted = true
+    const isAdmin = isAdminProfile(profile)
+
     async function loadCloudTimesheets() {
-      const { records } = await fetchTimesheetRecords(session.user.id)
+      const { records } = await fetchTimesheetRecords(session.user.id, { isAdmin })
       if (isMounted) setCloudTimesheets(records)
     }
 
@@ -130,7 +154,7 @@ function App() {
     return () => {
       isMounted = false
     }
-  }, [session?.user?.id])
+  }, [session?.user?.id, profile?.role])
 
   async function signIn(email, password) {
     if (!supabase) return
@@ -164,6 +188,7 @@ function App() {
   }
 
   const userEmail = session?.user?.email ?? ''
+  const roleLabel = profile ? getRoleLabel(profile) : ''
   const showAuthView = authReady && (!isSupabaseConfigured || !session)
 
   return (
@@ -187,7 +212,10 @@ function App() {
       {authReady && session && (
         <>
           <div className="app-auth-meta no-print">
-            <p className="app-auth-meta__email">{userEmail}</p>
+            <div className="app-auth-meta__identity">
+              <p className="app-auth-meta__email">{userEmail}</p>
+              {roleLabel && <span className="app-auth-meta__role">{roleLabel}</span>}
+            </div>
             <button type="button" className="action-btn" onClick={signOut} disabled={authLoading}>
               Sign out
             </button>
@@ -207,6 +235,7 @@ function App() {
           savedRecords={savedRecords}
           actions={actions}
           userEmail={userEmail}
+          profile={profile}
         />
       )}
 
@@ -283,6 +312,7 @@ function App() {
           onClearHighlight={handleClearHighlight}
           settings={settings}
           user={session?.user ?? null}
+          profile={profile}
           cloudTimesheets={cloudTimesheets}
           setCloudTimesheets={setCloudTimesheets}
         />
@@ -293,6 +323,8 @@ function App() {
           onBack={goToDashboard}
           savedRecords={savedRecords}
           cloudTimesheets={cloudTimesheets}
+          profile={profile}
+          user={session?.user ?? null}
         />
       )}
 
@@ -311,7 +343,10 @@ function App() {
 
       {currentView !== 'dashboard' && (
         <footer className="app-footer no-print">
-          <p className="app-version app-version--secondary">Signed in as {userEmail}</p>
+          <p className="app-version app-version--secondary">
+            Signed in as {userEmail}
+            {roleLabel ? ` · ${roleLabel}` : ''}
+          </p>
           <p className="app-version">Monrad Earthworx H&amp;S v{APP_VERSION}</p>
         </footer>
       )}
