@@ -87,9 +87,25 @@ export function RecordsDashboardView({
             <dt>Open actions</dt>
             <dd>{stats.openActions}</dd>
           </div>
+          <div className="safety-summary__item safety-summary__item--alert">
+            <dt>Overdue actions</dt>
+            <dd>{stats.overdueActions}</dd>
+          </div>
+          <div className="safety-summary__item safety-summary__item--alert">
+            <dt>Critical actions</dt>
+            <dd>{stats.criticalActions}</dd>
+          </div>
           <div className="safety-summary__item safety-summary__item--complete">
             <dt>Completed actions</dt>
             <dd>{stats.completedActions}</dd>
+          </div>
+          <div className="safety-summary__item safety-summary__item--alert">
+            <dt>Unresolved machine defects</dt>
+            <dd>{stats.unresolvedMachineDefects}</dd>
+          </div>
+          <div className="safety-summary__item safety-summary__item--alert">
+            <dt>Unresolved incident actions</dt>
+            <dd>{stats.unresolvedIncidentActions}</dd>
           </div>
           <div className="safety-summary__item safety-summary__item--alert">
             <dt>Machine defects recorded</dt>
@@ -217,6 +233,8 @@ export function RecordsDashboardView({
                 className={[
                   'search-result',
                   item.itemType === 'action' && item.isOpenAction ? 'search-result--open' : '',
+                  item.isOverdue ? 'search-result--overdue' : '',
+                  item.isCritical ? 'search-result--critical' : '',
                   item.hasDefect ? 'search-result--defect' : '',
                   item.action?.status === 'completed' ? 'search-result--completed' : '',
                 ]

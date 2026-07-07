@@ -179,6 +179,26 @@ export const ACTION_STATUS_LABELS = {
   completed: 'Completed',
 }
 
+export const ACTION_PRIORITY_LABELS = {
+  low: 'Low',
+  medium: 'Medium',
+  high: 'High',
+  critical: 'Critical',
+}
+
+export const DEFAULT_ACTION_PRIORITY = 'medium'
+
+export const ACTION_PRIORITIES = ['low', 'medium', 'high', 'critical']
+
+export const ACTION_REGISTER_FILTERS = [
+  { id: 'all', label: 'All' },
+  { id: 'open', label: 'Open' },
+  { id: 'in-progress', label: 'In Progress' },
+  { id: 'completed', label: 'Completed' },
+  { id: 'overdue', label: 'Overdue' },
+  { id: 'critical', label: 'Critical' },
+]
+
 export const SOURCE_TYPE_LABELS = {
   'pre-start': 'Machine Pre-Start',
   toolbox: 'Toolbox Meeting',

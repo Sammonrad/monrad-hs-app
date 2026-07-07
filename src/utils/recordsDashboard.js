@@ -1,9 +1,12 @@
 import {
   ACTION_STATUS_LABELS,
+  ACTION_PRIORITY_LABELS,
   SOURCE_TYPE_LABELS,
 } from '../constants/index.js'
 import { formatSubmittedAt, formatReportType, formatDefectSeverity } from './formatting.js'
 import { getRecordTitle, getFormTypeLabel } from './records.js'
+import { isOverdue } from './storage/actionsStorage.js'
+import { getSafetyAlerts } from './safetyAlerts.js'
 
 export function getMostRecentRecordDate(records) {
   if (!records.length) return null
@@ -27,10 +30,15 @@ export function getMostRecentActionDate(actionList) {
 
 export function getRecordsDashboardStats(savedRecords, actionList) {
   const byType = (formType) => savedRecords.filter((record) => record.formType === formType)
+  const safetyAlerts = getSafetyAlerts(savedRecords, actionList)
 
   return {
-    openActions: actionList.filter((action) => action.status !== 'completed').length,
+    openActions: safetyAlerts.openActions,
     completedActions: actionList.filter((action) => action.status === 'completed').length,
+    overdueActions: safetyAlerts.overdueActions,
+    criticalActions: safetyAlerts.criticalActions,
+    unresolvedMachineDefects: safetyAlerts.unresolvedMachineDefects,
+    unresolvedIncidentActions: safetyAlerts.unresolvedIncidentActions,
     defectCount: savedRecords.filter(
       (record) => record.formType === 'pre-start' && record.defectsFound === 'found',
     ).length,
@@ -144,9 +152,13 @@ function getActionSearchHaystack(action) {
     action.personResponsible,
     action.notes,
     action.status,
+    action.priority,
+    action.dueDate,
     ACTION_STATUS_LABELS[action.status],
+    ACTION_PRIORITY_LABELS[action.priority],
     SOURCE_TYPE_LABELS[action.sourceType],
     action.date,
+    isOverdue(action) ? 'overdue' : '',
   ])
 }
 
@@ -176,6 +188,13 @@ function recordToSearchItem(record) {
 }
 
 function actionToSearchItem(action) {
+  const overdue = isOverdue(action)
+  const statusParts = [
+    ACTION_STATUS_LABELS[action.status] || action.status,
+    ACTION_PRIORITY_LABELS[action.priority] || action.priority,
+  ]
+  if (overdue) statusParts.push('Overdue')
+
   return {
     id: `action-${action.id}`,
     itemType: 'action',
@@ -184,7 +203,7 @@ function actionToSearchItem(action) {
     date: action.date || '',
     site: action.site || '',
     title: action.description || 'Action item',
-    status: ACTION_STATUS_LABELS[action.status] || action.status,
+    status: statusParts.join(' · '),
     searchText: getActionSearchHaystack(action),
     record: null,
     action,
@@ -192,6 +211,8 @@ function actionToSearchItem(action) {
     hasDefect: false,
     isIncident: action.sourceType === 'incident',
     isOpenAction: action.status !== 'completed',
+    isOverdue: overdue,
+    isCritical: action.priority === 'critical' && action.status !== 'completed',
   }
 }
 

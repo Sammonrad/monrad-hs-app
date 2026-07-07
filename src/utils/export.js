@@ -7,6 +7,12 @@ import {
   formatMachineOperable,
 } from './formatting.js'
 import { isSeriousDefect } from './defects.js'
+import {
+  ACTION_STATUS_LABELS,
+  ACTION_PRIORITY_LABELS,
+  SOURCE_TYPE_LABELS,
+} from '../constants/index.js'
+import { isOverdue } from './storage/actionsStorage.js'
 
 export function buildTextSummary(record) {
   const lines = [
@@ -82,6 +88,39 @@ export function exportRecordText(record) {
   downloadFile(
     buildTextSummary(record),
     `monrad-${record.formType}-${record.id.slice(0, 8)}.txt`,
+    'text/plain',
+  )
+}
+
+export function buildActionTextSummary(action) {
+  const overdue = isOverdue(action)
+  const lines = [
+    'Monrad Earthworx — Action Export',
+    `Source: ${SOURCE_TYPE_LABELS[action.sourceType] ?? action.sourceType}`,
+    `Status: ${ACTION_STATUS_LABELS[action.status] ?? action.status}${overdue ? ' — Overdue' : ''}`,
+    `Priority: ${ACTION_PRIORITY_LABELS[action.priority] ?? action.priority}`,
+    `Date: ${action.date || '—'}`,
+    `Due date: ${action.dueDate || '—'}`,
+    `Site: ${action.site || '—'}`,
+    `Description: ${action.description || '—'}`,
+    `Person responsible: ${action.personResponsible || '—'}`,
+  ]
+  if (action.notes) lines.push(`Notes: ${action.notes}`)
+  return lines.join('\n')
+}
+
+export function exportActionJson(action) {
+  downloadFile(
+    JSON.stringify(action, null, 2),
+    `monrad-action-${action.id.slice(0, 8)}.json`,
+    'application/json',
+  )
+}
+
+export function exportActionText(action) {
+  downloadFile(
+    buildActionTextSummary(action),
+    `monrad-action-${action.id.slice(0, 8)}.txt`,
     'text/plain',
   )
 }

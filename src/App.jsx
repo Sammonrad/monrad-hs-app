@@ -80,6 +80,8 @@ function App() {
           onNavigate={setCurrentView}
           recordCount={savedRecords.length}
           openActionCount={openActionCount}
+          savedRecords={savedRecords}
+          actions={actions}
         />
       )}
 

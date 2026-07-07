@@ -1,6 +1,15 @@
 import { DASHBOARD_CARDS } from '../constants/index.js'
+import { getSafetyAlerts } from '../utils/safetyAlerts.js'
 
-export function Dashboard({ onNavigate, recordCount, openActionCount }) {
+export function Dashboard({ onNavigate, recordCount, openActionCount, savedRecords, actions }) {
+  const alerts = getSafetyAlerts(savedRecords ?? [], actions ?? [])
+  const hasAlerts =
+    alerts.openActions > 0 ||
+    alerts.overdueActions > 0 ||
+    alerts.criticalActions > 0 ||
+    alerts.unresolvedMachineDefects > 0 ||
+    alerts.unresolvedIncidentActions > 0
+
   return (
     <div className="dashboard">
       <header className="dashboard__header">
@@ -8,6 +17,61 @@ export function Dashboard({ onNavigate, recordCount, openActionCount }) {
         <h1 className="dashboard__title">Monrad Earthworx H&amp;S App</h1>
         <p className="dashboard__subtitle">Health &amp; safety forms for the field</p>
       </header>
+
+      {hasAlerts && (
+        <section className="safety-alerts" aria-labelledby="dashboard-safety-heading">
+          <div className="safety-alerts__header">
+            <h2 id="dashboard-safety-heading" className="safety-alerts__title">
+              Safety alerts
+            </h2>
+            <button
+              type="button"
+              className="safety-alerts__link"
+              onClick={() => onNavigate('action-register')}
+            >
+              View action register
+            </button>
+          </div>
+          <dl className="safety-alerts__grid">
+            <div className="safety-alerts__item">
+              <dt>Open actions</dt>
+              <dd>{alerts.openActions}</dd>
+            </div>
+            <div
+              className={`safety-alerts__item${
+                alerts.overdueActions > 0 ? ' safety-alerts__item--alert' : ''
+              }`}
+            >
+              <dt>Overdue actions</dt>
+              <dd>{alerts.overdueActions}</dd>
+            </div>
+            <div
+              className={`safety-alerts__item${
+                alerts.criticalActions > 0 ? ' safety-alerts__item--alert' : ''
+              }`}
+            >
+              <dt>Critical actions</dt>
+              <dd>{alerts.criticalActions}</dd>
+            </div>
+            <div
+              className={`safety-alerts__item${
+                alerts.unresolvedMachineDefects > 0 ? ' safety-alerts__item--alert' : ''
+              }`}
+            >
+              <dt>Unresolved machine defects</dt>
+              <dd>{alerts.unresolvedMachineDefects}</dd>
+            </div>
+            <div
+              className={`safety-alerts__item${
+                alerts.unresolvedIncidentActions > 0 ? ' safety-alerts__item--alert' : ''
+              }`}
+            >
+              <dt>Unresolved incident actions</dt>
+              <dd>{alerts.unresolvedIncidentActions}</dd>
+            </div>
+          </dl>
+        </section>
+      )}
 
       <nav className="dashboard__nav" aria-label="Form types">
         {DASHBOARD_CARDS.map((card) => (

@@ -1,15 +1,24 @@
-import { ACTION_STATUS_LABELS, SOURCE_TYPE_LABELS } from '../constants/index.js'
+import {
+  ACTION_STATUS_LABELS,
+  ACTION_PRIORITY_LABELS,
+  SOURCE_TYPE_LABELS,
+  ACTION_PRIORITIES,
+} from '../constants/index.js'
 import { isOverdue } from '../utils/storage/actionsStorage.js'
+import { isCriticalAction } from '../utils/safetyAlerts.js'
 import { SummaryRow } from './FormFields.jsx'
+import { exportActionJson, exportActionText } from '../utils/export.js'
 
-export function ActionCard({ action, onUpdate, onComplete }) {
+export function ActionCard({ action, onUpdate, onComplete, onPrint }) {
   const overdue = isOverdue(action)
+  const critical = isCriticalAction(action)
   const serious = action.serious && action.status !== 'completed'
   const cardClass = [
     'action-card',
     action.status === 'completed' ? 'action-card--completed' : '',
     overdue ? 'action-card--overdue' : '',
-    serious && !overdue ? 'action-card--serious' : '',
+    critical ? 'action-card--critical' : '',
+    serious && !overdue && !critical ? 'action-card--serious' : '',
   ]
     .filter(Boolean)
     .join(' ')
@@ -20,8 +29,18 @@ export function ActionCard({ action, onUpdate, onComplete }) {
         <span className="type-badge type-badge--small">
           {SOURCE_TYPE_LABELS[action.sourceType] ?? action.sourceType}
         </span>
-        {action.status !== 'completed' && (overdue || serious) && (
-          <span className="action-card__warning">{overdue ? 'Overdue' : 'Serious'}</span>
+        <span
+          className={`action-priority action-priority--${action.priority}${
+            critical ? ' action-priority--critical-open' : ''
+          }`}
+        >
+          {ACTION_PRIORITY_LABELS[action.priority] ?? action.priority}
+        </span>
+        {action.status !== 'completed' && overdue && (
+          <span className="action-card__warning">Overdue</span>
+        )}
+        {action.status !== 'completed' && !overdue && serious && (
+          <span className="action-card__warning">Serious</span>
         )}
         <span className={`action-status action-status--${action.status}`}>
           {ACTION_STATUS_LABELS[action.status] ?? action.status}
@@ -33,7 +52,11 @@ export function ActionCard({ action, onUpdate, onComplete }) {
         <SummaryRow label="Site / location" value={action.site} />
         <SummaryRow label="Description" value={action.description} />
         <SummaryRow label="Person responsible" value={action.personResponsible} />
-        <SummaryRow label="Due / follow-up" value={action.dueDate} />
+        <SummaryRow label="Due date" value={action.dueDate} />
+        <SummaryRow
+          label="Priority"
+          value={ACTION_PRIORITY_LABELS[action.priority] ?? action.priority}
+        />
       </dl>
 
       {action.status !== 'completed' && (
@@ -51,6 +74,31 @@ export function ActionCard({ action, onUpdate, onComplete }) {
             </select>
           </label>
 
+          <label className="field action-card__status-field">
+            <span className="field__label">Priority</span>
+            <select
+              className="field__input"
+              value={action.priority}
+              onChange={(e) => onUpdate(action.id, { priority: e.target.value })}
+            >
+              {ACTION_PRIORITIES.map((priority) => (
+                <option key={priority} value={priority}>
+                  {ACTION_PRIORITY_LABELS[priority]}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="field action-card__status-field">
+            <span className="field__label">Due date</span>
+            <input
+              type="date"
+              className="field__input"
+              value={action.dueDate}
+              onChange={(e) => onUpdate(action.id, { dueDate: e.target.value })}
+            />
+          </label>
+
           <button
             type="button"
             className="action-card__complete-btn"
@@ -60,6 +108,20 @@ export function ActionCard({ action, onUpdate, onComplete }) {
           </button>
         </>
       )}
+
+      <div className="action-card__actions no-print">
+        {onPrint && (
+          <button type="button" className="print-record-btn" onClick={() => onPrint(action)}>
+            Print action
+          </button>
+        )}
+        <button type="button" className="action-btn" onClick={() => exportActionJson(action)}>
+          Export JSON
+        </button>
+        <button type="button" className="action-btn" onClick={() => exportActionText(action)}>
+          Export text
+        </button>
+      </div>
 
       <label className="field">
         <span className="field__label">Notes</span>

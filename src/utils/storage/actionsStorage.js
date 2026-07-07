@@ -1,7 +1,21 @@
-import { ACTIONS_STORAGE_KEY, TODAY } from '../../constants/index.js'
+import { ACTIONS_STORAGE_KEY, TODAY, DEFAULT_ACTION_PRIORITY, ACTION_PRIORITIES } from '../../constants/index.js'
 import { createRecordId } from '../ids.js'
 import { formatDefectSeverity } from '../formatting.js'
 import { isSeriousDefect } from '../defects.js'
+
+function normalizePriority(priority) {
+  return ACTION_PRIORITIES.includes(priority) ? priority : DEFAULT_ACTION_PRIORITY
+}
+
+export function priorityFromDefectSeverity(severity) {
+  const map = {
+    low: 'low',
+    medium: 'medium',
+    high: 'high',
+    critical: 'critical',
+  }
+  return map[severity] ?? DEFAULT_ACTION_PRIORITY
+}
 
 export function normalizeAction(action) {
   return {
@@ -14,6 +28,7 @@ export function normalizeAction(action) {
     personResponsible: action.personResponsible ?? '',
     dueDate: action.dueDate ?? '',
     status: action.status ?? 'open',
+    priority: normalizePriority(action.priority),
     notes: action.notes ?? '',
     createdAt: action.createdAt ?? new Date().toISOString(),
     autoCreated: action.autoCreated ?? false,
@@ -70,6 +85,7 @@ function createActionFromRecord(record) {
     date: fields.date || TODAY(),
     site: fields.siteLocation || '',
     status: 'open',
+    priority: DEFAULT_ACTION_PRIORITY,
     notes: '',
     createdAt: new Date().toISOString(),
     autoCreated: true,
@@ -85,6 +101,7 @@ function createActionFromRecord(record) {
       description: `${record.defectDescription || 'Defect reported'}${severityNote}`,
       personResponsible: record.reportedTo || fields.operatorName || '',
       dueDate: '',
+      priority: priorityFromDefectSeverity(record.defectSeverity),
       serious: isSeriousDefect(record),
     }
   }
@@ -95,6 +112,7 @@ function createActionFromRecord(record) {
       description: fields.correctiveActionRequired.trim(),
       personResponsible: fields.correctiveActionPerson || fields.reportedBy || '',
       dueDate: fields.followUpDate || '',
+      priority: 'high',
     }
   }
 
@@ -125,6 +143,7 @@ export function createEmptyManualAction() {
     description: '',
     personResponsible: '',
     dueDate: '',
+    priority: DEFAULT_ACTION_PRIORITY,
     notes: '',
   }
 }
