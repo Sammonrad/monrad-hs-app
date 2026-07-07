@@ -1,0 +1,289 @@
+import { useMemo, useState } from 'react'
+import { BackButton } from '../components/BackButton.jsx'
+import { formatSubmittedAt } from '../utils/formatting.js'
+import {
+  getRecordsDashboardStats,
+  buildSearchableItems,
+  filterSearchItems,
+} from '../utils/recordsDashboard.js'
+
+export function RecordsDashboardView({
+  onBack,
+  onNavigate,
+  savedRecords,
+  actions,
+  setPrintRecord,
+  onViewRecord,
+}) {
+  const stats = getRecordsDashboardStats(savedRecords, actions)
+  const allItems = useMemo(() => buildSearchableItems(savedRecords, actions), [savedRecords, actions])
+
+  const [searchQuery, setSearchQuery] = useState('')
+  const [typeFilter, setTypeFilter] = useState('all')
+  const [dateFilter, setDateFilter] = useState('')
+  const [openActionsOnly, setOpenActionsOnly] = useState(false)
+  const [defectsOnly, setDefectsOnly] = useState(false)
+  const [incidentsOnly, setIncidentsOnly] = useState(false)
+
+  const filteredItems = useMemo(
+    () =>
+      filterSearchItems(allItems, {
+        searchQuery,
+        typeFilter,
+        dateFilter,
+        openActionsOnly,
+        defectsOnly,
+        incidentsOnly,
+      }),
+    [allItems, searchQuery, typeFilter, dateFilter, openActionsOnly, defectsOnly, incidentsOnly],
+  )
+
+  const hasActiveFilters =
+    searchQuery.trim() ||
+    typeFilter !== 'all' ||
+    dateFilter ||
+    openActionsOnly ||
+    defectsOnly ||
+    incidentsOnly
+
+  function clearFilters() {
+    setSearchQuery('')
+    setTypeFilter('all')
+    setDateFilter('')
+    setOpenActionsOnly(false)
+    setDefectsOnly(false)
+    setIncidentsOnly(false)
+  }
+
+  function handleViewItem(item) {
+    if (item.itemType === 'action') {
+      onNavigate('action-register')
+      return
+    }
+    onViewRecord?.(item.record)
+  }
+
+  return (
+    <>
+      <BackButton onClick={onBack} />
+
+      <header className="header">
+        <p className="company">Monrad Earthworx</p>
+        <h1 className="title">Records Dashboard</h1>
+        <p className="progress" aria-live="polite">
+          {savedRecords.length} saved record{savedRecords.length === 1 ? '' : 's'} ·{' '}
+          {actions.length} action{actions.length === 1 ? '' : 's'}
+        </p>
+      </header>
+
+      <section className="safety-summary" aria-labelledby="safety-summary-heading">
+        <h2 id="safety-summary-heading" className="safety-summary__title">
+          Safety summary
+        </h2>
+        <dl className="safety-summary__grid">
+          <div className="safety-summary__item safety-summary__item--alert">
+            <dt>Open actions</dt>
+            <dd>{stats.openActions}</dd>
+          </div>
+          <div className="safety-summary__item safety-summary__item--complete">
+            <dt>Completed actions</dt>
+            <dd>{stats.completedActions}</dd>
+          </div>
+          <div className="safety-summary__item safety-summary__item--alert">
+            <dt>Machine defects recorded</dt>
+            <dd>{stats.defectCount}</dd>
+          </div>
+          <div className="safety-summary__item">
+            <dt>Incident / near miss reports</dt>
+            <dd>{stats.incidentCount}</dd>
+          </div>
+        </dl>
+      </section>
+
+      <section className="records-search" aria-labelledby="records-search-heading">
+        <div className="records-search__header">
+          <h2 id="records-search-heading" className="records-summary__title">
+            Search &amp; filter
+          </h2>
+          {hasActiveFilters && (
+            <button type="button" className="records-search__clear" onClick={clearFilters}>
+              Clear filters
+            </button>
+          )}
+        </div>
+
+        <label className="field records-search__query">
+          <span className="field__label">Search</span>
+          <input
+            type="search"
+            className="field__input"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Job name, site, operator, machine, notes, actions..."
+          />
+        </label>
+
+        <div className="records-search__filters">
+          <label className="field records-search__filter">
+            <span className="field__label">Record type</span>
+            <select
+              className="field__input"
+              value={typeFilter}
+              onChange={(e) => setTypeFilter(e.target.value)}
+            >
+              <option value="all">All</option>
+              <option value="job-start">Job Start</option>
+              <option value="pre-start">Pre-Start</option>
+              <option value="toolbox">Toolbox</option>
+              <option value="incident">Incident</option>
+              <option value="timesheet">Timesheet</option>
+              <option value="action">Actions</option>
+            </select>
+          </label>
+
+          <label className="field records-search__filter">
+            <span className="field__label">Date</span>
+            <input
+              type="date"
+              className="field__input"
+              value={dateFilter}
+              onChange={(e) => setDateFilter(e.target.value)}
+            />
+          </label>
+        </div>
+
+        <div className="records-search__toggles">
+          <label className="records-search__toggle">
+            <input
+              type="checkbox"
+              checked={openActionsOnly}
+              onChange={(e) => setOpenActionsOnly(e.target.checked)}
+            />
+            <span>Open actions only</span>
+          </label>
+          <label className="records-search__toggle">
+            <input
+              type="checkbox"
+              checked={defectsOnly}
+              onChange={(e) => setDefectsOnly(e.target.checked)}
+            />
+            <span>Machine defects only</span>
+          </label>
+          <label className="records-search__toggle">
+            <input
+              type="checkbox"
+              checked={incidentsOnly}
+              onChange={(e) => setIncidentsOnly(e.target.checked)}
+            />
+            <span>Incidents / near misses only</span>
+          </label>
+        </div>
+
+        <p className="records-search__count" aria-live="polite">
+          {filteredItems.length} result{filteredItems.length === 1 ? '' : 's'}
+          {hasActiveFilters ? ' matching filters' : ''}
+        </p>
+
+        {filteredItems.length === 0 ? (
+          <p className="records-search__empty">
+            No records match your search and filters. Try different keywords or clear filters.
+          </p>
+        ) : (
+          <ul className="records-search__results">
+            {filteredItems.map((item) => (
+              <li
+                key={item.id}
+                className={[
+                  'search-result',
+                  item.itemType === 'action' && item.isOpenAction ? 'search-result--open' : '',
+                  item.hasDefect ? 'search-result--defect' : '',
+                  item.action?.status === 'completed' ? 'search-result--completed' : '',
+                ]
+                  .filter(Boolean)
+                  .join(' ')}
+              >
+                <div className="search-result__header">
+                  <span className="type-badge type-badge--small">{item.typeLabel}</span>
+                  {item.status && (
+                    <span
+                      className={
+                        item.itemType === 'action'
+                          ? `action-status action-status--${item.action.status}`
+                          : 'search-result__status'
+                      }
+                    >
+                      {item.status}
+                    </span>
+                  )}
+                </div>
+                <p className="search-result__title">{item.title}</p>
+                <dl className="search-result__meta">
+                  <div className="search-result__row">
+                    <dt>Date</dt>
+                    <dd>{item.date || (item.submittedAt ? formatSubmittedAt(item.submittedAt) : '—')}</dd>
+                  </div>
+                  <div className="search-result__row">
+                    <dt>Site</dt>
+                    <dd>{item.site || '—'}</dd>
+                  </div>
+                </dl>
+                <div className="search-result__actions">
+                  {item.itemType === 'record' && (
+                    <button
+                      type="button"
+                      className="print-record-btn"
+                      onClick={() => setPrintRecord(item.record)}
+                    >
+                      Print Record
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="records-summary-card__btn"
+                    onClick={() => handleViewItem(item)}
+                  >
+                    View
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section className="records-summary" aria-labelledby="records-summary-heading">
+        <h2 id="records-summary-heading" className="records-summary__title">
+          Records by type
+        </h2>
+        <ul className="records-summary__list">
+          {stats.sections.map((section) => (
+            <li key={section.id} className="records-summary-card">
+              <div className="records-summary-card__content">
+                <h3 className="records-summary-card__title">{section.title}</h3>
+                <p className="records-summary-card__count">
+                  {section.id === 'action-register'
+                    ? `${section.count} action${section.count === 1 ? '' : 's'}`
+                    : `${section.count} saved record${section.count === 1 ? '' : 's'}`}
+                </p>
+                {section.recentDate ? (
+                  <p className="records-summary-card__recent">Most recent: {section.recentDate}</p>
+                ) : (
+                  <p className="records-summary-card__recent records-summary-card__recent--empty">
+                    No records yet
+                  </p>
+                )}
+              </div>
+              <button
+                type="button"
+                className="records-summary-card__btn"
+                onClick={() => onNavigate(section.id)}
+              >
+                View records
+              </button>
+            </li>
+          ))}
+        </ul>
+      </section>
+    </>
+  )
+}
