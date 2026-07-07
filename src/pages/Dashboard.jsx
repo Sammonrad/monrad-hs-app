@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { DASHBOARD_GROUPS, DASHBOARD_CARDS } from '../constants/index.js'
+import { DASHBOARD_GROUPS, DASHBOARD_CARDS, APP_VERSION } from '../constants/index.js'
 import { getSafetyAlerts } from '../utils/safetyAlerts.js'
 import { MonradLogo } from '../components/MonradLogo.jsx'
 
@@ -132,9 +132,12 @@ export function Dashboard({ onNavigate, recordCount, openActionCount, savedRecor
         </p>
       )}
 
-      <p className="coming-soon dashboard__footer">
-        Cloud sync &amp; login — coming soon (local storage only for now).
-      </p>
+      <footer className="dashboard__footer">
+        <p className="app-version">Monrad Earthworx H&amp;S v{APP_VERSION}</p>
+        <p className="coming-soon">
+          Cloud sync &amp; login — coming soon (local storage only for now).
+        </p>
+      </footer>
     </div>
   )
 }

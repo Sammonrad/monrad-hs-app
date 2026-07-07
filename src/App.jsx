@@ -15,6 +15,7 @@ import { PrintableRecord } from './components/PrintableRecord.jsx'
 import { loadSavedRecords } from './utils/storage/recordsStorage.js'
 import { loadActions, persistActions, syncActionsFromRecord } from './utils/storage/actionsStorage.js'
 import { loadSettings } from './utils/storage/settingsStorage.js'
+import { APP_VERSION } from './constants/index.js'
 
 function App() {
   const [currentView, setCurrentView] = useState('dashboard')
@@ -175,6 +176,12 @@ function App() {
           onClearHighlight={handleClearHighlight}
           settings={settings}
         />
+      )}
+
+      {currentView !== 'dashboard' && (
+        <footer className="app-footer no-print">
+          <p className="app-version">Monrad Earthworx H&amp;S v{APP_VERSION}</p>
+        </footer>
       )}
     </div>
   )

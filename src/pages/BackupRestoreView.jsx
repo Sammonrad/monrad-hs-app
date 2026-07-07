@@ -67,8 +67,13 @@ export function BackupRestoreView({ onBack }) {
       </header>
 
       <p className="backup-intro">
-        Use this page to back up your app data before clearing browser data, changing computers,
-        or making major app changes.
+        All app data is stored on this device and browser only — it is not synced to the cloud.
+        Export backups regularly so you do not lose records if browser data is cleared or you change
+        devices.
+      </p>
+
+      <p className="backup-note" role="note">
+        Recommended: download a backup after important entries and at least once per week.
       </p>
 
       <section className="backup-section" aria-labelledby="backup-export-heading">
@@ -76,7 +81,7 @@ export function BackupRestoreView({ onBack }) {
           1. Export all app data
         </h2>
         <p className="backup-section__text">
-          Download a JSON backup of everything stored on this device.
+          Download a JSON backup of everything stored on this device and browser.
         </p>
         <ul className="backup-keys">
           {APP_STORAGE_KEYS.map((item) => (

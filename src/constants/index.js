@@ -76,6 +76,8 @@ export const DEFECT_SEVERITY_LABELS = {
   critical: 'Critical',
 }
 
+export const APP_VERSION = '0.1'
+
 export const FORM_TYPES = {
   'job-start': {
     id: 'job-start',
