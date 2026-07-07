@@ -3,7 +3,9 @@ import './App.css'
 
 const STORAGE_KEY = 'monrad-earthworx-job-records'
 const ACTIONS_STORAGE_KEY = 'monrad-earthworx-actions'
+const SETTINGS_STORAGE_KEY = 'monrad-earthworx-settings'
 const MAX_PHOTOS = 3
+const MACHINE_TYPES = ['Excavator', 'Truck', 'Loader', 'Roller', 'Other']
 const TODAY = () => new Date().toISOString().slice(0, 10)
 
 const JOB_START_CHECKLIST = [
@@ -349,6 +351,62 @@ function syncActionsFromRecord(record, actions) {
   const newAction = createActionFromRecord(record)
   if (!newAction || hasActionForRecord(actions, record)) return actions
   return [newAction, ...actions]
+}
+
+function createEmptySettings() {
+  return { operators: [], machines: [], sites: [] }
+}
+
+function normalizeSettings(data) {
+  return {
+    operators: Array.isArray(data?.operators)
+      ? data.operators
+          .map((item) => ({ id: item.id ?? createRecordId(), name: item.name ?? '' }))
+          .filter((item) => item.name.trim())
+      : [],
+    machines: Array.isArray(data?.machines)
+      ? data.machines
+          .map((item) => ({
+            id: item.id ?? createRecordId(),
+            name: item.name ?? '',
+            type: MACHINE_TYPES.includes(item.type) ? item.type : 'Other',
+          }))
+          .filter((item) => item.name.trim())
+      : [],
+    sites: Array.isArray(data?.sites)
+      ? data.sites
+          .map((item) => ({ id: item.id ?? createRecordId(), name: item.name ?? '' }))
+          .filter((item) => item.name.trim())
+      : [],
+  }
+}
+
+function loadSettings() {
+  try {
+    const raw = localStorage.getItem(SETTINGS_STORAGE_KEY)
+    if (!raw) return createEmptySettings()
+    return normalizeSettings(JSON.parse(raw))
+  } catch {
+    return createEmptySettings()
+  }
+}
+
+function persistSettings(settings) {
+  try {
+    localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings))
+    return true
+  } catch {
+    window.alert('Could not save settings to this device.')
+    return false
+  }
+}
+
+function getSettingsOptions(settings) {
+  return {
+    operators: settings.operators.map((item) => item.name),
+    machines: settings.machines.map((item) => item.name),
+    sites: settings.sites.map((item) => item.name),
+  }
 }
 
 function getMostRecentRecordDate(records) {
@@ -1234,6 +1292,12 @@ const DASHBOARD_CARDS = [
     description: 'Summary of all saved forms and safety actions.',
     available: true,
   },
+  {
+    id: 'settings',
+    title: 'Settings / Setup',
+    description: 'Manage operators, machines, and common sites.',
+    available: true,
+  },
 ]
 
 function BackButton({ onClick }) {
@@ -1263,7 +1327,9 @@ function Dashboard({ onNavigate, recordCount, openActionCount }) {
                 ? 'dashboard-card dashboard-card--register'
                 : card.id === 'records-dashboard'
                   ? 'dashboard-card dashboard-card--records'
-                  : 'dashboard-card'
+                  : card.id === 'settings'
+                    ? 'dashboard-card dashboard-card--settings'
+                    : 'dashboard-card'
             }
             onClick={() => onNavigate(card.id)}
           >
@@ -1856,6 +1922,233 @@ function RecordsDashboardView({
   )
 }
 
+function SettingsListItem({ title, subtitle, onDelete }) {
+  return (
+    <li className="settings-list__item">
+      <div className="settings-list__content">
+        <p className="settings-list__title">{title}</p>
+        {subtitle && <p className="settings-list__subtitle">{subtitle}</p>}
+      </div>
+      <button type="button" className="settings-list__delete" onClick={onDelete}>
+        Delete
+      </button>
+    </li>
+  )
+}
+
+function SettingsView({ onBack, settings, setSettings }) {
+  const [operatorName, setOperatorName] = useState('')
+  const [machineName, setMachineName] = useState('')
+  const [machineType, setMachineType] = useState('Excavator')
+  const [siteName, setSiteName] = useState('')
+
+  function updateSettings(next) {
+    if (!persistSettings(next)) return false
+    setSettings(next)
+    return true
+  }
+
+  function handleAddOperator(event) {
+    event.preventDefault()
+    const name = operatorName.trim()
+    if (!name) return
+    if (settings.operators.some((item) => item.name.toLowerCase() === name.toLowerCase())) {
+      window.alert('This operator is already in the list.')
+      return
+    }
+    updateSettings({
+      ...settings,
+      operators: [...settings.operators, { id: createRecordId(), name }],
+    })
+    setOperatorName('')
+  }
+
+  function handleAddMachine(event) {
+    event.preventDefault()
+    const name = machineName.trim()
+    if (!name) return
+    if (settings.machines.some((item) => item.name.toLowerCase() === name.toLowerCase())) {
+      window.alert('This machine is already in the list.')
+      return
+    }
+    updateSettings({
+      ...settings,
+      machines: [...settings.machines, { id: createRecordId(), name, type: machineType }],
+    })
+    setMachineName('')
+    setMachineType('Excavator')
+  }
+
+  function handleAddSite(event) {
+    event.preventDefault()
+    const name = siteName.trim()
+    if (!name) return
+    if (settings.sites.some((item) => item.name.toLowerCase() === name.toLowerCase())) {
+      window.alert('This site is already in the list.')
+      return
+    }
+    updateSettings({
+      ...settings,
+      sites: [...settings.sites, { id: createRecordId(), name }],
+    })
+    setSiteName('')
+  }
+
+  function deleteOperator(id) {
+    updateSettings({
+      ...settings,
+      operators: settings.operators.filter((item) => item.id !== id),
+    })
+  }
+
+  function deleteMachine(id) {
+    updateSettings({
+      ...settings,
+      machines: settings.machines.filter((item) => item.id !== id),
+    })
+  }
+
+  function deleteSite(id) {
+    updateSettings({
+      ...settings,
+      sites: settings.sites.filter((item) => item.id !== id),
+    })
+  }
+
+  return (
+    <>
+      <BackButton onClick={onBack} />
+
+      <header className="header">
+        <p className="company">Monrad Earthworx</p>
+        <h1 className="title">Settings / Setup</h1>
+        <p className="progress">Operators, machines, and sites for quick form entry</p>
+      </header>
+
+      <section className="settings-section" aria-labelledby="settings-operators-heading">
+        <h2 id="settings-operators-heading" className="settings-section__title">
+          1. Operators / staff
+        </h2>
+        <form className="settings-form" onSubmit={handleAddOperator}>
+          <label className="field">
+            <span className="field__label">Add operator name</span>
+            <input
+              type="text"
+              className="field__input"
+              value={operatorName}
+              onChange={(e) => setOperatorName(e.target.value)}
+              placeholder="e.g. John Smith"
+            />
+          </label>
+          <button type="submit" className="action-btn action-btn--primary">
+            Add operator
+          </button>
+        </form>
+        {settings.operators.length === 0 ? (
+          <p className="settings-section__empty">No operators saved yet.</p>
+        ) : (
+          <ul className="settings-list">
+            {settings.operators.map((item) => (
+              <SettingsListItem
+                key={item.id}
+                title={item.name}
+                onDelete={() => deleteOperator(item.id)}
+              />
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section className="settings-section" aria-labelledby="settings-machines-heading">
+        <h2 id="settings-machines-heading" className="settings-section__title">
+          2. Machines
+        </h2>
+        <form className="settings-form" onSubmit={handleAddMachine}>
+          <label className="field">
+            <span className="field__label">Machine name / ID</span>
+            <input
+              type="text"
+              className="field__input"
+              value={machineName}
+              onChange={(e) => setMachineName(e.target.value)}
+              placeholder="e.g. EX-01"
+            />
+          </label>
+          <label className="field">
+            <span className="field__label">Machine type</span>
+            <select
+              className="field__input"
+              value={machineType}
+              onChange={(e) => setMachineType(e.target.value)}
+            >
+              {MACHINE_TYPES.map((type) => (
+                <option key={type} value={type}>
+                  {type}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button type="submit" className="action-btn action-btn--primary">
+            Add machine
+          </button>
+        </form>
+        {settings.machines.length === 0 ? (
+          <p className="settings-section__empty">No machines saved yet.</p>
+        ) : (
+          <ul className="settings-list">
+            {settings.machines.map((item) => (
+              <SettingsListItem
+                key={item.id}
+                title={item.name}
+                subtitle={item.type}
+                onDelete={() => deleteMachine(item.id)}
+              />
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section className="settings-section" aria-labelledby="settings-sites-heading">
+        <h2 id="settings-sites-heading" className="settings-section__title">
+          3. Common sites / locations
+        </h2>
+        <form className="settings-form" onSubmit={handleAddSite}>
+          <label className="field">
+            <span className="field__label">Add site name</span>
+            <input
+              type="text"
+              className="field__input"
+              value={siteName}
+              onChange={(e) => setSiteName(e.target.value)}
+              placeholder="e.g. Riverside subdivision"
+            />
+          </label>
+          <button type="submit" className="action-btn action-btn--primary">
+            Add site
+          </button>
+        </form>
+        {settings.sites.length === 0 ? (
+          <p className="settings-section__empty">No sites saved yet.</p>
+        ) : (
+          <ul className="settings-list">
+            {settings.sites.map((item) => (
+              <SettingsListItem
+                key={item.id}
+                title={item.name}
+                onDelete={() => deleteSite(item.id)}
+              />
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <p className="form-hint">
+        Saved lists appear as suggestions on forms. You can still type any value manually.
+      </p>
+    </>
+  )
+}
+
 function ComingSoonView({ title, onBack }) {
   return (
     <div className="placeholder-view">
@@ -1881,6 +2174,7 @@ function JobStartView({
   setPrintRecord,
   highlightRecordId,
   onClearHighlight,
+  settings,
 }) {
   const formConfig = FORM_TYPES['job-start']
   const [draft, setDraft] = useState(() => createEmptyDraft('job-start'))
@@ -1890,6 +2184,7 @@ function JobStartView({
   const recordRef = useRef(null)
 
   const { fields, checked, signatureConfirmation, photos } = draft
+  const comboOptions = getSettingsOptions(settings)
   const checklist = formConfig.checklist
   const total = checklist.length
   const completed = checked.size
@@ -1987,9 +2282,9 @@ function JobStartView({
         <fieldset className="job-form__fieldset">
           <legend className="job-form__legend">1. Job details</legend>
           <TextField label="Job name" field="jobName" value={fields.jobName} onChange={updateField} placeholder="e.g. Driveway excavation" />
-          <TextField label="Site location" field="siteLocation" value={fields.siteLocation} onChange={updateField} placeholder="Address or site name" />
-          <TextField label="Employee / operator name" field="employeeName" value={fields.employeeName} onChange={updateField} placeholder="Your name" />
-          <TextField label="Machine used" field="machineUsed" value={fields.machineUsed} onChange={updateField} placeholder="e.g. 5T excavator" />
+          <ComboField label="Site location" field="siteLocation" value={fields.siteLocation} onChange={updateField} placeholder="Address or site name" options={comboOptions.sites} listId="job-start-sites" />
+          <ComboField label="Employee / operator name" field="employeeName" value={fields.employeeName} onChange={updateField} placeholder="Your name" options={comboOptions.operators} listId="job-start-operators" />
+          <ComboField label="Machine used" field="machineUsed" value={fields.machineUsed} onChange={updateField} placeholder="e.g. 5T excavator" options={comboOptions.machines} listId="job-start-machines" />
           <DateField value={fields.date} onChange={updateField} />
           <NotesField value={fields.notes} onChange={updateField} />
         </fieldset>
@@ -2206,6 +2501,7 @@ function PreStartView({
   onRecordSaved,
   highlightRecordId,
   onClearHighlight,
+  settings,
 }) {
   const formConfig = FORM_TYPES['pre-start']
   const [draft, setDraft] = useState(() => createEmptyDraft('pre-start'))
@@ -2226,6 +2522,7 @@ function PreStartView({
     reportedTo,
     defectPhotos,
   } = draft
+  const comboOptions = getSettingsOptions(settings)
   const checklist = formConfig.checklist
   const total = checklist.length
   const completed = checked.size
@@ -2361,10 +2658,10 @@ function PreStartView({
         <fieldset className="job-form__fieldset">
           <legend className="job-form__legend">1. Pre-start details</legend>
           <DateField value={fields.date} onChange={updateField} />
-          <TextField label="Operator name" field="operatorName" value={fields.operatorName} onChange={updateField} placeholder="Your name" />
-          <TextField label="Machine name / ID" field="machineNameId" value={fields.machineNameId} onChange={updateField} placeholder="e.g. EX-01 or 5T excavator" />
+          <ComboField label="Operator name" field="operatorName" value={fields.operatorName} onChange={updateField} placeholder="Your name" options={comboOptions.operators} listId="pre-start-operators" />
+          <ComboField label="Machine name / ID" field="machineNameId" value={fields.machineNameId} onChange={updateField} placeholder="e.g. EX-01 or 5T excavator" options={comboOptions.machines} listId="pre-start-machines" />
           <TextField label="Machine hours" field="machineHours" value={fields.machineHours} onChange={updateField} placeholder="Current hour meter reading" />
-          <TextField label="Site / job location" field="siteLocation" value={fields.siteLocation} onChange={updateField} placeholder="Site or yard" />
+          <ComboField label="Site / job location" field="siteLocation" value={fields.siteLocation} onChange={updateField} placeholder="Site or yard" options={comboOptions.sites} listId="pre-start-sites" />
           <NotesField value={fields.notes} onChange={updateField} />
         </fieldset>
 
@@ -2667,6 +2964,7 @@ function ToolboxView({
   onRecordSaved,
   highlightRecordId,
   onClearHighlight,
+  settings,
 }) {
   const formConfig = FORM_TYPES.toolbox
   const [draft, setDraft] = useState(() => createEmptyDraft('toolbox'))
@@ -2675,6 +2973,7 @@ function ToolboxView({
   const recordRef = useRef(null)
 
   const { fields, checked, signatureConfirmation, photos } = draft
+  const comboOptions = getSettingsOptions(settings)
   const checklist = formConfig.checklist
   const total = checklist.length
   const completed = checked.size
@@ -2779,8 +3078,8 @@ function ToolboxView({
           <legend className="job-form__legend">1. Meeting details</legend>
           <DateField value={fields.date} onChange={updateField} />
           <TextField label="Job / project name" field="jobProjectName" value={fields.jobProjectName} onChange={updateField} placeholder="e.g. Riverside subdivision" />
-          <TextField label="Site location" field="siteLocation" value={fields.siteLocation} onChange={updateField} placeholder="Address or site name" />
-          <TextField label="Meeting led by" field="meetingLedBy" value={fields.meetingLedBy} onChange={updateField} placeholder="Facilitator name" />
+          <ComboField label="Site location" field="siteLocation" value={fields.siteLocation} onChange={updateField} placeholder="Address or site name" options={comboOptions.sites} listId="toolbox-sites" />
+          <ComboField label="Meeting led by" field="meetingLedBy" value={fields.meetingLedBy} onChange={updateField} placeholder="Facilitator name" options={comboOptions.operators} listId="toolbox-operators" />
           <TextField label="Attendees" field="attendees" value={fields.attendees} onChange={updateField} placeholder="Names or crew count" />
           <TextField label="Work planned today" field="workPlannedToday" value={fields.workPlannedToday} onChange={updateField} placeholder="Tasks planned for today" />
           <TextField label="Main hazards discussed" field="mainHazardsDiscussed" value={fields.mainHazardsDiscussed} onChange={updateField} placeholder="Key hazards covered" />
@@ -2953,6 +3252,7 @@ function IncidentView({
   onRecordSaved,
   highlightRecordId,
   onClearHighlight,
+  settings,
 }) {
   const formConfig = FORM_TYPES.incident
   const [draft, setDraft] = useState(() => createEmptyDraft('incident'))
@@ -2961,6 +3261,7 @@ function IncidentView({
   const recordRef = useRef(null)
 
   const { fields, checked, signatureConfirmation, photos } = draft
+  const comboOptions = getSettingsOptions(settings)
   const checklist = formConfig.checklist
   const total = checklist.length
   const completed = checked.size
@@ -3073,8 +3374,8 @@ function IncidentView({
           <legend className="job-form__legend">1. Report details</legend>
           <DateField value={fields.date} onChange={updateField} />
           <TextField label="Time" field="time" value={fields.time} onChange={updateField} placeholder="e.g. 14:30" />
-          <TextField label="Reported by" field="reportedBy" value={fields.reportedBy} onChange={updateField} placeholder="Your name" />
-          <TextField label="Site / job location" field="siteLocation" value={fields.siteLocation} onChange={updateField} placeholder="Where it occurred" />
+          <ComboField label="Reported by" field="reportedBy" value={fields.reportedBy} onChange={updateField} placeholder="Your name" options={comboOptions.operators} listId="incident-operators" />
+          <ComboField label="Site / job location" field="siteLocation" value={fields.siteLocation} onChange={updateField} placeholder="Where it occurred" options={comboOptions.sites} listId="incident-sites" />
           <SelectField
             label="Type of report"
             field="reportType"
@@ -3268,6 +3569,7 @@ function App() {
   const [currentView, setCurrentView] = useState('dashboard')
   const [savedRecords, setSavedRecords] = useState(() => loadSavedRecords())
   const [actions, setActions] = useState(() => loadActions())
+  const [settings, setSettings] = useState(() => loadSettings())
   const [printRecord, setPrintRecord] = useState(null)
   const [highlightRecordId, setHighlightRecordId] = useState(null)
 
@@ -3349,6 +3651,10 @@ function App() {
         />
       )}
 
+      {currentView === 'settings' && (
+        <SettingsView onBack={goToDashboard} settings={settings} setSettings={setSettings} />
+      )}
+
       {currentView === 'job-start' && (
         <JobStartView
           onBack={goToDashboard}
@@ -3357,6 +3663,7 @@ function App() {
           setPrintRecord={setPrintRecord}
           highlightRecordId={highlightRecordId}
           onClearHighlight={handleClearHighlight}
+          settings={settings}
         />
       )}
 
@@ -3369,6 +3676,7 @@ function App() {
           onRecordSaved={handleRecordSaved}
           highlightRecordId={highlightRecordId}
           onClearHighlight={handleClearHighlight}
+          settings={settings}
         />
       )}
 
@@ -3381,6 +3689,7 @@ function App() {
           onRecordSaved={handleRecordSaved}
           highlightRecordId={highlightRecordId}
           onClearHighlight={handleClearHighlight}
+          settings={settings}
         />
       )}
 
@@ -3393,9 +3702,40 @@ function App() {
           onRecordSaved={handleRecordSaved}
           highlightRecordId={highlightRecordId}
           onClearHighlight={handleClearHighlight}
+          settings={settings}
         />
       )}
     </div>
+  )
+}
+
+function ComboField({ label, field, value, onChange, placeholder, options = [], listId }) {
+  const datalistId = listId || `combo-${field}`
+  const hasOptions = options.length > 0
+
+  return (
+    <label className="field">
+      <span className="field__label">{label}</span>
+      <input
+        type="text"
+        className="field__input"
+        list={hasOptions ? datalistId : undefined}
+        value={value}
+        onChange={(e) => onChange(field, e.target.value)}
+        placeholder={placeholder}
+        autoComplete="off"
+      />
+      {hasOptions && (
+        <datalist id={datalistId}>
+          {options.map((option) => (
+            <option key={option} value={option} />
+          ))}
+        </datalist>
+      )}
+      {hasOptions && (
+        <span className="field__hint">Pick from saved list or type manually</span>
+      )}
+    </label>
   )
 }
 
