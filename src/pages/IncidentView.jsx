@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { FORM_TYPES } from '../constants/index.js'
 import { BackButton } from '../components/BackButton.jsx'
 import { SignatureConfirmationField } from '../components/SignatureConfirmationField.jsx'
@@ -6,6 +6,7 @@ import { PhotoUpload } from '../components/PhotoUpload.jsx'
 import { RecordDetails } from '../components/RecordDetails.jsx'
 import { RecordActions } from '../components/RecordActions.jsx'
 import { SavedRecordSignature } from '../components/SavedRecordSignature.jsx'
+import { CloudSyncBadge } from '../components/CloudSyncBadge.jsx'
 import {
   ComboField,
   TextField,
@@ -20,6 +21,16 @@ import { formatSubmittedAt, formatReportType } from '../utils/formatting.js'
 import { createEmptyDraft, getRecordTitle } from '../utils/records.js'
 import { persistSavedRecords } from '../utils/storage/recordsStorage.js'
 import { getSettingsOptions } from '../utils/storage/settingsStorage.js'
+import {
+  fetchIncidentRecords,
+  getMergedIncidentRecords,
+  getUnavailableSyncStatus,
+  isCloudSaveUnavailable,
+  resolveRecordSyncStatus,
+  saveIncidentRecord,
+  SYNC_STATUS,
+} from '../utils/storage/incidentCloudStorage.js'
+import { isAdminProfile } from '../utils/storage/userProfileStorage.js'
 
 export function IncidentView({
   onBack,
@@ -30,11 +41,18 @@ export function IncidentView({
   highlightRecordId,
   onClearHighlight,
   settings,
+  user,
+  profile,
+  cloudIncidents,
+  setCloudIncidents,
 }) {
   const formConfig = FORM_TYPES.incident
   const [draft, setDraft] = useState(() => createEmptyDraft('incident'))
   const [completedRecord, setCompletedRecord] = useState(null)
   const [validationError, setValidationError] = useState(null)
+  const [completedSyncStatus, setCompletedSyncStatus] = useState(null)
+  const [cloudLoadWarning, setCloudLoadWarning] = useState(null)
+  const [cloudSaving, setCloudSaving] = useState(false)
   const recordRef = useRef(null)
 
   const { fields, checked, signatureConfirmation, photos } = draft
@@ -43,8 +61,55 @@ export function IncidentView({
   const total = checklist.length
   const completed = checked.size
   const allComplete = completed === total
+  const isAdmin = isAdminProfile(profile)
 
-  const incidentRecords = savedRecords.filter((record) => record.formType === 'incident')
+  const incidentRecords = useMemo(
+    () => getMergedIncidentRecords(savedRecords, cloudIncidents),
+    [savedRecords, cloudIncidents],
+  )
+
+  const cloudIncidentCount = incidentRecords.filter(
+    (record) => resolveRecordSyncStatus(record) === SYNC_STATUS.CLOUD,
+  ).length
+
+  function patchSavedIncidentRecord(recordId, patch) {
+    setSavedRecords((prev) => {
+      const next = prev.map((item) => (item.id === recordId ? { ...item, ...patch } : item))
+      persistSavedRecords(next)
+      return next
+    })
+    setCompletedRecord((prev) => (prev?.id === recordId ? { ...prev, ...patch } : prev))
+  }
+
+  useEffect(() => {
+    if (!user?.id) {
+      setCloudLoadWarning(null)
+      return undefined
+    }
+
+    let isMounted = true
+
+    async function loadCloudIncidents() {
+      const { records, error } = await fetchIncidentRecords(user.id, { isAdmin })
+      if (!isMounted) return
+
+      if (error) {
+        setCloudLoadWarning(
+          `Could not load cloud incident records: ${error.message}. Showing device records only.`,
+        )
+        return
+      }
+
+      setCloudLoadWarning(null)
+      setCloudIncidents(records)
+    }
+
+    loadCloudIncidents()
+
+    return () => {
+      isMounted = false
+    }
+  }, [user?.id, isAdmin, setCloudIncidents])
 
   useHighlightRecord(highlightRecordId, onClearHighlight, [incidentRecords])
 
@@ -70,7 +135,7 @@ export function IncidentView({
     updateDraft({ checked: next })
   }
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault()
 
     if (
@@ -112,19 +177,54 @@ export function IncidentView({
     if (!persistSavedRecords(nextRecords)) return
     setSavedRecords(nextRecords)
     setCompletedRecord(record)
+    setCompletedSyncStatus(null)
     onRecordSaved?.(record)
+
+    if (isCloudSaveUnavailable(user)) {
+      const syncStatus = getUnavailableSyncStatus(user)
+      patchSavedIncidentRecord(record.id, { syncStatus })
+      setCompletedSyncStatus(syncStatus)
+      return
+    }
+
+    setCloudSaving(true)
+    const { record: cloudRecord, error } = await saveIncidentRecord(user, record)
+    setCloudSaving(false)
+
+    if (error) {
+      patchSavedIncidentRecord(record.id, { syncStatus: SYNC_STATUS.CLOUD_FAILED })
+      setCompletedSyncStatus(SYNC_STATUS.CLOUD_FAILED)
+      return
+    }
+
+    const cloudPatch = {
+      syncStatus: SYNC_STATUS.CLOUD,
+      cloudId: cloudRecord?.cloudId ?? null,
+    }
+    patchSavedIncidentRecord(record.id, cloudPatch)
+    setCompletedSyncStatus(SYNC_STATUS.CLOUD)
+
+    if (cloudRecord) {
+      setCloudIncidents((prev) => {
+        const withoutDup = prev.filter(
+          (item) => item.cloudId !== cloudRecord.cloudId && item.id !== record.id,
+        )
+        return [cloudRecord, ...withoutDup]
+      })
+    }
   }
 
   function handleReset() {
     setDraft(createEmptyDraft('incident'))
     setCompletedRecord(null)
     setValidationError(null)
+    setCompletedSyncStatus(null)
   }
 
   function handleClearIncidentRecords() {
     if (incidentRecords.length === 0) return
     const confirmed = window.confirm(
-      'Delete all saved incident records? Other saved records will be kept.',
+      'Delete all saved incident records from this device? Cloud records will remain. Other saved records will be kept.',
     )
     if (!confirmed) return
     setSavedRecords((prev) => {
@@ -236,8 +336,8 @@ export function IncidentView({
           Record incident details, complete the checklist, attach photos if available, then save.
         </p>
 
-        <button type="submit" className="submit-btn">
-          Save completed record
+        <button type="submit" className="submit-btn" disabled={cloudSaving}>
+          {cloudSaving ? 'Saving…' : 'Save completed record'}
         </button>
       </form>
 
@@ -266,6 +366,16 @@ export function IncidentView({
             Record saved to this device. Review the details below.
           </p>
 
+          {cloudSaving ? (
+            <p className="cloud-sync-status cloud-sync-status--pending" role="status">
+              Syncing to cloud…
+            </p>
+          ) : (
+            completedSyncStatus && (
+              <CloudSyncBadge syncStatus={completedSyncStatus} className="cloud-sync-status--block" />
+            )
+          )}
+
           <RecordDetails record={completedRecord} />
           <RecordActions record={completedRecord} onPrint={setPrintRecord} />
         </section>
@@ -285,7 +395,12 @@ export function IncidentView({
               Saved incident records
             </h2>
             <p className="saved-records__count">
-              {incidentRecords.length} record{incidentRecords.length === 1 ? '' : 's'} on this device
+              {incidentRecords.length} record{incidentRecords.length === 1 ? '' : 's'}
+              {user?.id && cloudIncidentCount > 0
+                ? isAdmin
+                  ? ` (${cloudIncidentCount} from cloud — all users)`
+                  : ` (${cloudIncidentCount} synced from cloud)`
+                : ' on this device'}
             </p>
           </div>
           {incidentRecords.length > 0 && (
@@ -295,16 +410,43 @@ export function IncidentView({
           )}
         </div>
 
+        {cloudLoadWarning && (
+          <p className="backup-warning" role="alert">
+            {cloudLoadWarning}
+          </p>
+        )}
+
+        {isAdmin && user?.id && (
+          <p className="form-hint">
+            Admin view: device records on this device plus all users&apos; cloud incident records.
+          </p>
+        )}
+
         {incidentRecords.length === 0 ? (
           <p className="saved-records__empty">
             No saved incident records yet. Submit a completed report to save one here.
           </p>
         ) : (
           <ul className="saved-records__list">
-            {incidentRecords.map((record) => (
+            {incidentRecords.map((record) => {
+              const isOtherUserCloudRecord =
+                isAdmin &&
+                record.cloudUserId &&
+                record.cloudUserId !== user?.id &&
+                resolveRecordSyncStatus(record) === SYNC_STATUS.CLOUD
+
+              return (
               <li key={record.id} data-record-id={record.id} className="saved-record">
                 <div className="saved-record__header">
-                  <span className="type-badge type-badge--small">{record.formTypeLabel}</span>
+                  <div className="saved-record__badges">
+                    <span className="type-badge type-badge--small">{record.formTypeLabel}</span>
+                    <CloudSyncBadge record={record} size="small" />
+                    {isOtherUserCloudRecord && (
+                      <span className="type-badge type-badge--small type-badge--cloud-user">
+                        {record.fields?.reportedBy?.trim() || 'Other user'}
+                      </span>
+                    )}
+                  </div>
                   <p className="saved-record__title">{getRecordTitle(record)}</p>
                 </div>
                 <dl className="saved-record__details">
@@ -334,7 +476,8 @@ export function IncidentView({
                 <p className="saved-record__meta">Saved {formatSubmittedAt(record.submittedAt)}</p>
                 <RecordActions record={record} onPrint={setPrintRecord} variant="saved" />
               </li>
-            ))}
+              )
+            })}
           </ul>
         )}
       </section>

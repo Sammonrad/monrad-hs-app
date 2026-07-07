@@ -22,6 +22,7 @@ import { fetchTimesheetRecords } from './utils/storage/timesheetCloudStorage.js'
 import { fetchJobStartRecords } from './utils/storage/jobStartCloudStorage.js'
 import { fetchPreStartRecords } from './utils/storage/preStartCloudStorage.js'
 import { fetchToolboxRecords } from './utils/storage/toolboxCloudStorage.js'
+import { fetchIncidentRecords } from './utils/storage/incidentCloudStorage.js'
 import { getRoleLabel, isAdminProfile, loadOrCreateProfile } from './utils/storage/userProfileStorage.js'
 
 function App() {
@@ -39,6 +40,7 @@ function App() {
   const [cloudJobStarts, setCloudJobStarts] = useState([])
   const [cloudPreStarts, setCloudPreStarts] = useState([])
   const [cloudToolboxRecords, setCloudToolboxRecords] = useState([])
+  const [cloudIncidents, setCloudIncidents] = useState([])
   const [profile, setProfile] = useState(null)
 
   const openActionCount = actions.filter((action) => action.status !== 'completed').length
@@ -127,6 +129,7 @@ function App() {
       setCloudJobStarts([])
       setCloudPreStarts([])
       setCloudToolboxRecords([])
+      setCloudIncidents([])
       return undefined
     }
 
@@ -150,6 +153,7 @@ function App() {
       setCloudJobStarts([])
       setCloudPreStarts([])
       setCloudToolboxRecords([])
+      setCloudIncidents([])
       return undefined
     }
 
@@ -176,10 +180,16 @@ function App() {
       if (isMounted) setCloudToolboxRecords(records)
     }
 
+    async function loadCloudIncidents() {
+      const { records } = await fetchIncidentRecords(session.user.id, { isAdmin })
+      if (isMounted) setCloudIncidents(records)
+    }
+
     loadCloudTimesheets()
     loadCloudJobStarts()
     loadCloudPreStarts()
     loadCloudToolboxRecords()
+    loadCloudIncidents()
 
     return () => {
       isMounted = false
@@ -380,6 +390,10 @@ function App() {
           highlightRecordId={highlightRecordId}
           onClearHighlight={handleClearHighlight}
           settings={settings}
+          user={session?.user ?? null}
+          profile={profile}
+          cloudIncidents={cloudIncidents}
+          setCloudIncidents={setCloudIncidents}
         />
       )}
 
