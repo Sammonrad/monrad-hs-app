@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { FORM_TYPES, MAX_PHOTOS } from '../constants/index.js'
 import { BackButton } from '../components/BackButton.jsx'
 import { SignatureConfirmationField } from '../components/SignatureConfirmationField.jsx'
@@ -8,6 +8,7 @@ import { DefectWarning } from '../components/DefectWarning.jsx'
 import { RecordDetails } from '../components/RecordDetails.jsx'
 import { RecordActions } from '../components/RecordActions.jsx'
 import { SavedRecordSignature } from '../components/SavedRecordSignature.jsx'
+import { CloudSyncBadge } from '../components/CloudSyncBadge.jsx'
 import {
   ComboField,
   TextField,
@@ -28,6 +29,16 @@ import { isSeriousDefect } from '../utils/defects.js'
 import { createEmptyDraft, getRecordTitle } from '../utils/records.js'
 import { persistSavedRecords } from '../utils/storage/recordsStorage.js'
 import { getSettingsOptions } from '../utils/storage/settingsStorage.js'
+import {
+  fetchPreStartRecords,
+  getMergedPreStartRecords,
+  getUnavailableSyncStatus,
+  isCloudSaveUnavailable,
+  resolveRecordSyncStatus,
+  savePreStartRecord,
+  SYNC_STATUS,
+} from '../utils/storage/preStartCloudStorage.js'
+import { isAdminProfile } from '../utils/storage/userProfileStorage.js'
 
 export function PreStartView({
   onBack,
@@ -38,11 +49,18 @@ export function PreStartView({
   highlightRecordId,
   onClearHighlight,
   settings,
+  user,
+  profile,
+  cloudPreStarts,
+  setCloudPreStarts,
 }) {
   const formConfig = FORM_TYPES['pre-start']
   const [draft, setDraft] = useState(() => createEmptyDraft('pre-start'))
   const [completedRecord, setCompletedRecord] = useState(null)
   const [validationError, setValidationError] = useState(null)
+  const [completedSyncStatus, setCompletedSyncStatus] = useState(null)
+  const [cloudLoadWarning, setCloudLoadWarning] = useState(null)
+  const [cloudSaving, setCloudSaving] = useState(false)
   const recordRef = useRef(null)
 
   const {
@@ -68,7 +86,55 @@ export function PreStartView({
     defectsSelected &&
     (defectSeverity === 'critical' || machineOperableSafely === 'no')
 
-  const preStartRecords = savedRecords.filter((record) => record.formType === 'pre-start')
+  const isAdmin = isAdminProfile(profile)
+
+  const preStartRecords = useMemo(
+    () => getMergedPreStartRecords(savedRecords, cloudPreStarts),
+    [savedRecords, cloudPreStarts],
+  )
+
+  const cloudPreStartCount = preStartRecords.filter(
+    (record) => resolveRecordSyncStatus(record) === SYNC_STATUS.CLOUD,
+  ).length
+
+  function patchSavedPreStartRecord(recordId, patch) {
+    setSavedRecords((prev) => {
+      const next = prev.map((item) => (item.id === recordId ? { ...item, ...patch } : item))
+      persistSavedRecords(next)
+      return next
+    })
+    setCompletedRecord((prev) => (prev?.id === recordId ? { ...prev, ...patch } : prev))
+  }
+
+  useEffect(() => {
+    if (!user?.id) {
+      setCloudLoadWarning(null)
+      return undefined
+    }
+
+    let isMounted = true
+
+    async function loadCloudPreStarts() {
+      const { records, error } = await fetchPreStartRecords(user.id, { isAdmin })
+      if (!isMounted) return
+
+      if (error) {
+        setCloudLoadWarning(
+          `Could not load cloud pre-start records: ${error.message}. Showing device records only.`,
+        )
+        return
+      }
+
+      setCloudLoadWarning(null)
+      setCloudPreStarts(records)
+    }
+
+    loadCloudPreStarts()
+
+    return () => {
+      isMounted = false
+    }
+  }, [user?.id, isAdmin, setCloudPreStarts])
 
   useHighlightRecord(highlightRecordId, onClearHighlight, [preStartRecords])
 
@@ -94,7 +160,7 @@ export function PreStartView({
     updateDraft({ checked: next })
   }
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault()
 
     if (!fields.operatorName.trim() || !fields.machineNameId.trim()) {
@@ -156,13 +222,48 @@ export function PreStartView({
     if (!persistSavedRecords(nextRecords)) return
     setSavedRecords(nextRecords)
     setCompletedRecord(record)
+    setCompletedSyncStatus(null)
     onRecordSaved?.(record)
+
+    if (isCloudSaveUnavailable(user)) {
+      const syncStatus = getUnavailableSyncStatus(user)
+      patchSavedPreStartRecord(record.id, { syncStatus })
+      setCompletedSyncStatus(syncStatus)
+      return
+    }
+
+    setCloudSaving(true)
+    const { record: cloudRecord, error } = await savePreStartRecord(user, record)
+    setCloudSaving(false)
+
+    if (error) {
+      patchSavedPreStartRecord(record.id, { syncStatus: SYNC_STATUS.CLOUD_FAILED })
+      setCompletedSyncStatus(SYNC_STATUS.CLOUD_FAILED)
+      return
+    }
+
+    const cloudPatch = {
+      syncStatus: SYNC_STATUS.CLOUD,
+      cloudId: cloudRecord?.cloudId ?? null,
+    }
+    patchSavedPreStartRecord(record.id, cloudPatch)
+    setCompletedSyncStatus(SYNC_STATUS.CLOUD)
+
+    if (cloudRecord) {
+      setCloudPreStarts((prev) => {
+        const withoutDup = prev.filter(
+          (item) => item.cloudId !== cloudRecord.cloudId && item.id !== record.id,
+        )
+        return [cloudRecord, ...withoutDup]
+      })
+    }
   }
 
   function handleReset() {
     setDraft(createEmptyDraft('pre-start'))
     setCompletedRecord(null)
     setValidationError(null)
+    setCompletedSyncStatus(null)
   }
 
   function handleClearPreStartRecords() {
@@ -383,6 +484,16 @@ export function PreStartView({
             Record saved to this device. Review the details below.
           </p>
 
+          {cloudSaving ? (
+            <p className="cloud-sync-status cloud-sync-status--pending" role="status">
+              Syncing to cloud…
+            </p>
+          ) : (
+            completedSyncStatus && (
+              <CloudSyncBadge syncStatus={completedSyncStatus} className="cloud-sync-status--block" />
+            )
+          )}
+
           <RecordDetails record={completedRecord} />
           <RecordActions record={completedRecord} onPrint={setPrintRecord} />
         </section>
@@ -402,7 +513,12 @@ export function PreStartView({
               Saved pre-start records
             </h2>
             <p className="saved-records__count">
-              {preStartRecords.length} record{preStartRecords.length === 1 ? '' : 's'} on this device
+              {preStartRecords.length} record{preStartRecords.length === 1 ? '' : 's'}
+              {user?.id && cloudPreStartCount > 0
+                ? isAdmin
+                  ? ` (${cloudPreStartCount} from cloud — all users)`
+                  : ` (${cloudPreStartCount} synced from cloud)`
+                : ' on this device'}
             </p>
           </div>
           {preStartRecords.length > 0 && (
@@ -412,16 +528,43 @@ export function PreStartView({
           )}
         </div>
 
+        {cloudLoadWarning && (
+          <p className="backup-warning" role="alert">
+            {cloudLoadWarning}
+          </p>
+        )}
+
+        {isAdmin && user?.id && (
+          <p className="form-hint">
+            Admin view: device records on this device plus all users&apos; cloud pre-start records.
+          </p>
+        )}
+
         {preStartRecords.length === 0 ? (
           <p className="saved-records__empty">
             No saved pre-start records yet. Submit a completed checklist to save one here.
           </p>
         ) : (
           <ul className="saved-records__list">
-            {preStartRecords.map((record) => (
+            {preStartRecords.map((record) => {
+              const isOtherUserCloudRecord =
+                isAdmin &&
+                record.cloudUserId &&
+                record.cloudUserId !== user?.id &&
+                resolveRecordSyncStatus(record) === SYNC_STATUS.CLOUD
+
+              return (
               <li key={record.id} data-record-id={record.id} className="saved-record">
                 <div className="saved-record__header">
-                  <span className="type-badge type-badge--small">{record.formTypeLabel}</span>
+                  <div className="saved-record__badges">
+                    <span className="type-badge type-badge--small">{record.formTypeLabel}</span>
+                    <CloudSyncBadge record={record} size="small" />
+                    {isOtherUserCloudRecord && (
+                      <span className="type-badge type-badge--small type-badge--cloud-user">
+                        {record.fields?.operatorName?.trim() || 'Other user'}
+                      </span>
+                    )}
+                  </div>
                   <p className="saved-record__title">{getRecordTitle(record)}</p>
                 </div>
                 <dl className="saved-record__details">
@@ -484,7 +627,7 @@ export function PreStartView({
                 <p className="saved-record__meta">Saved {formatSubmittedAt(record.submittedAt)}</p>
                 <RecordActions record={record} onPrint={setPrintRecord} variant="saved" />
               </li>
-            ))}
+            )})}
           </ul>
         )}
       </section>

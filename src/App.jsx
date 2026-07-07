@@ -20,6 +20,7 @@ import { APP_VERSION } from './constants/index.js'
 import { isSupabaseConfigured, supabase } from './utils/supabaseClient.js'
 import { fetchTimesheetRecords } from './utils/storage/timesheetCloudStorage.js'
 import { fetchJobStartRecords } from './utils/storage/jobStartCloudStorage.js'
+import { fetchPreStartRecords } from './utils/storage/preStartCloudStorage.js'
 import { getRoleLabel, isAdminProfile, loadOrCreateProfile } from './utils/storage/userProfileStorage.js'
 
 function App() {
@@ -35,6 +36,7 @@ function App() {
   const [authError, setAuthError] = useState('')
   const [cloudTimesheets, setCloudTimesheets] = useState([])
   const [cloudJobStarts, setCloudJobStarts] = useState([])
+  const [cloudPreStarts, setCloudPreStarts] = useState([])
   const [profile, setProfile] = useState(null)
 
   const openActionCount = actions.filter((action) => action.status !== 'completed').length
@@ -121,6 +123,7 @@ function App() {
       setProfile(null)
       setCloudTimesheets([])
       setCloudJobStarts([])
+      setCloudPreStarts([])
       return undefined
     }
 
@@ -142,6 +145,7 @@ function App() {
     if (!session?.user?.id) {
       setCloudTimesheets([])
       setCloudJobStarts([])
+      setCloudPreStarts([])
       return undefined
     }
 
@@ -158,8 +162,14 @@ function App() {
       if (isMounted) setCloudJobStarts(records)
     }
 
+    async function loadCloudPreStarts() {
+      const { records } = await fetchPreStartRecords(session.user.id, { isAdmin })
+      if (isMounted) setCloudPreStarts(records)
+    }
+
     loadCloudTimesheets()
     loadCloudJobStarts()
+    loadCloudPreStarts()
 
     return () => {
       isMounted = false
@@ -300,6 +310,10 @@ function App() {
           highlightRecordId={highlightRecordId}
           onClearHighlight={handleClearHighlight}
           settings={settings}
+          user={session?.user ?? null}
+          profile={profile}
+          cloudPreStarts={cloudPreStarts}
+          setCloudPreStarts={setCloudPreStarts}
         />
       )}
 
