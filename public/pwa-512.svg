@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="Monrad H&amp;S">
+  <rect width="512" height="512" rx="64" fill="#c41e3a"/>
+  <text x="256" y="228" font-family="system-ui, Segoe UI, sans-serif" font-size="88" font-weight="700" fill="#ffffff" text-anchor="middle">Monrad</text>
+  <text x="256" y="320" font-family="system-ui, Segoe UI, sans-serif" font-size="72" font-weight="600" fill="#ffffff" text-anchor="middle">H&amp;S</text>
+</svg>
