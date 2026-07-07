@@ -12,17 +12,18 @@ export default defineConfig({
       includeAssets: [
         'favicon.svg',
         'manifest.webmanifest',
-        'monrad-logo-cropped.jpg',
         'pwa-192.svg',
         'pwa-512.svg',
+        'icons.svg',
       ],
       workbox: {
-        globPatterns: [],
+        globPatterns: [
+          '**/*.{js,css,html,svg,png,jpg,jpeg,webp,ico}',
+        ],
         navigateFallback: null,
-        runtimeCaching: [],
       },
       devOptions: {
-        enabled: true,
+        enabled: false,
       },
     }),
   ],
