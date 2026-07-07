@@ -21,6 +21,7 @@ import { isSupabaseConfigured, supabase } from './utils/supabaseClient.js'
 import { fetchTimesheetRecords } from './utils/storage/timesheetCloudStorage.js'
 import { fetchJobStartRecords } from './utils/storage/jobStartCloudStorage.js'
 import { fetchPreStartRecords } from './utils/storage/preStartCloudStorage.js'
+import { fetchToolboxRecords } from './utils/storage/toolboxCloudStorage.js'
 import { getRoleLabel, isAdminProfile, loadOrCreateProfile } from './utils/storage/userProfileStorage.js'
 
 function App() {
@@ -37,6 +38,7 @@ function App() {
   const [cloudTimesheets, setCloudTimesheets] = useState([])
   const [cloudJobStarts, setCloudJobStarts] = useState([])
   const [cloudPreStarts, setCloudPreStarts] = useState([])
+  const [cloudToolboxRecords, setCloudToolboxRecords] = useState([])
   const [profile, setProfile] = useState(null)
 
   const openActionCount = actions.filter((action) => action.status !== 'completed').length
@@ -124,6 +126,7 @@ function App() {
       setCloudTimesheets([])
       setCloudJobStarts([])
       setCloudPreStarts([])
+      setCloudToolboxRecords([])
       return undefined
     }
 
@@ -146,6 +149,7 @@ function App() {
       setCloudTimesheets([])
       setCloudJobStarts([])
       setCloudPreStarts([])
+      setCloudToolboxRecords([])
       return undefined
     }
 
@@ -167,9 +171,15 @@ function App() {
       if (isMounted) setCloudPreStarts(records)
     }
 
+    async function loadCloudToolboxRecords() {
+      const { records } = await fetchToolboxRecords(session.user.id, { isAdmin })
+      if (isMounted) setCloudToolboxRecords(records)
+    }
+
     loadCloudTimesheets()
     loadCloudJobStarts()
     loadCloudPreStarts()
+    loadCloudToolboxRecords()
 
     return () => {
       isMounted = false
@@ -327,6 +337,10 @@ function App() {
           highlightRecordId={highlightRecordId}
           onClearHighlight={handleClearHighlight}
           settings={settings}
+          user={session?.user ?? null}
+          profile={profile}
+          cloudToolboxRecords={cloudToolboxRecords}
+          setCloudToolboxRecords={setCloudToolboxRecords}
         />
       )}
 

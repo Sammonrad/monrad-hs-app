@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { FORM_TYPES } from '../constants/index.js'
 import { BackButton } from '../components/BackButton.jsx'
 import { SignatureConfirmationField } from '../components/SignatureConfirmationField.jsx'
@@ -6,6 +6,7 @@ import { PhotoUpload } from '../components/PhotoUpload.jsx'
 import { RecordDetails } from '../components/RecordDetails.jsx'
 import { RecordActions } from '../components/RecordActions.jsx'
 import { SavedRecordSignature } from '../components/SavedRecordSignature.jsx'
+import { CloudSyncBadge } from '../components/CloudSyncBadge.jsx'
 import {
   ComboField,
   TextField,
@@ -19,6 +20,16 @@ import { formatSubmittedAt } from '../utils/formatting.js'
 import { createEmptyDraft, getRecordTitle } from '../utils/records.js'
 import { persistSavedRecords } from '../utils/storage/recordsStorage.js'
 import { getSettingsOptions } from '../utils/storage/settingsStorage.js'
+import {
+  fetchToolboxRecords,
+  getMergedToolboxRecords,
+  getUnavailableSyncStatus,
+  isCloudSaveUnavailable,
+  resolveRecordSyncStatus,
+  saveToolboxRecord,
+  SYNC_STATUS,
+} from '../utils/storage/toolboxCloudStorage.js'
+import { isAdminProfile } from '../utils/storage/userProfileStorage.js'
 
 export function ToolboxView({
   onBack,
@@ -29,11 +40,18 @@ export function ToolboxView({
   highlightRecordId,
   onClearHighlight,
   settings,
+  user,
+  profile,
+  cloudToolboxRecords,
+  setCloudToolboxRecords,
 }) {
   const formConfig = FORM_TYPES.toolbox
   const [draft, setDraft] = useState(() => createEmptyDraft('toolbox'))
   const [completedRecord, setCompletedRecord] = useState(null)
   const [validationError, setValidationError] = useState(null)
+  const [completedSyncStatus, setCompletedSyncStatus] = useState(null)
+  const [cloudLoadWarning, setCloudLoadWarning] = useState(null)
+  const [cloudSaving, setCloudSaving] = useState(false)
   const recordRef = useRef(null)
 
   const { fields, checked, signatureConfirmation, photos } = draft
@@ -42,8 +60,55 @@ export function ToolboxView({
   const total = checklist.length
   const completed = checked.size
   const allComplete = completed === total
+  const isAdmin = isAdminProfile(profile)
 
-  const toolboxRecords = savedRecords.filter((record) => record.formType === 'toolbox')
+  const toolboxRecords = useMemo(
+    () => getMergedToolboxRecords(savedRecords, cloudToolboxRecords),
+    [savedRecords, cloudToolboxRecords],
+  )
+
+  const cloudToolboxCount = toolboxRecords.filter(
+    (record) => resolveRecordSyncStatus(record) === SYNC_STATUS.CLOUD,
+  ).length
+
+  function patchSavedToolboxRecord(recordId, patch) {
+    setSavedRecords((prev) => {
+      const next = prev.map((item) => (item.id === recordId ? { ...item, ...patch } : item))
+      persistSavedRecords(next)
+      return next
+    })
+    setCompletedRecord((prev) => (prev?.id === recordId ? { ...prev, ...patch } : prev))
+  }
+
+  useEffect(() => {
+    if (!user?.id) {
+      setCloudLoadWarning(null)
+      return undefined
+    }
+
+    let isMounted = true
+
+    async function loadCloudToolboxRecords() {
+      const { records, error } = await fetchToolboxRecords(user.id, { isAdmin })
+      if (!isMounted) return
+
+      if (error) {
+        setCloudLoadWarning(
+          `Could not load cloud toolbox records: ${error.message}. Showing device records only.`,
+        )
+        return
+      }
+
+      setCloudLoadWarning(null)
+      setCloudToolboxRecords(records)
+    }
+
+    loadCloudToolboxRecords()
+
+    return () => {
+      isMounted = false
+    }
+  }, [user?.id, isAdmin, setCloudToolboxRecords])
 
   useHighlightRecord(highlightRecordId, onClearHighlight, [toolboxRecords])
 
@@ -69,7 +134,7 @@ export function ToolboxView({
     updateDraft({ checked: next })
   }
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault()
 
     if (!fields.jobProjectName.trim() || !fields.siteLocation.trim() || !fields.meetingLedBy.trim()) {
@@ -103,13 +168,48 @@ export function ToolboxView({
     if (!persistSavedRecords(nextRecords)) return
     setSavedRecords(nextRecords)
     setCompletedRecord(record)
+    setCompletedSyncStatus(null)
     onRecordSaved?.(record)
+
+    if (isCloudSaveUnavailable(user)) {
+      const syncStatus = getUnavailableSyncStatus(user)
+      patchSavedToolboxRecord(record.id, { syncStatus })
+      setCompletedSyncStatus(syncStatus)
+      return
+    }
+
+    setCloudSaving(true)
+    const { record: cloudRecord, error } = await saveToolboxRecord(user, record)
+    setCloudSaving(false)
+
+    if (error) {
+      patchSavedToolboxRecord(record.id, { syncStatus: SYNC_STATUS.CLOUD_FAILED })
+      setCompletedSyncStatus(SYNC_STATUS.CLOUD_FAILED)
+      return
+    }
+
+    const cloudPatch = {
+      syncStatus: SYNC_STATUS.CLOUD,
+      cloudId: cloudRecord?.cloudId ?? null,
+    }
+    patchSavedToolboxRecord(record.id, cloudPatch)
+    setCompletedSyncStatus(SYNC_STATUS.CLOUD)
+
+    if (cloudRecord) {
+      setCloudToolboxRecords((prev) => {
+        const withoutDup = prev.filter(
+          (item) => item.cloudId !== cloudRecord.cloudId && item.id !== record.id,
+        )
+        return [cloudRecord, ...withoutDup]
+      })
+    }
   }
 
   function handleReset() {
     setDraft(createEmptyDraft('toolbox'))
     setCompletedRecord(null)
     setValidationError(null)
+    setCompletedSyncStatus(null)
   }
 
   function handleClearToolboxRecords() {
@@ -202,8 +302,8 @@ export function ToolboxView({
           Record meeting details, complete the checklist, then save your toolbox record.
         </p>
 
-        <button type="submit" className="submit-btn">
-          Save completed record
+        <button type="submit" className="submit-btn" disabled={cloudSaving}>
+          {cloudSaving ? 'Saving…' : 'Save completed record'}
         </button>
       </form>
 
@@ -232,6 +332,16 @@ export function ToolboxView({
             Record saved to this device. Review the details below.
           </p>
 
+          {cloudSaving ? (
+            <p className="cloud-sync-status cloud-sync-status--pending" role="status">
+              Syncing to cloud…
+            </p>
+          ) : (
+            completedSyncStatus && (
+              <CloudSyncBadge syncStatus={completedSyncStatus} className="cloud-sync-status--block" />
+            )
+          )}
+
           <RecordDetails record={completedRecord} />
           <RecordActions record={completedRecord} onPrint={setPrintRecord} />
         </section>
@@ -251,7 +361,12 @@ export function ToolboxView({
               Saved toolbox records
             </h2>
             <p className="saved-records__count">
-              {toolboxRecords.length} record{toolboxRecords.length === 1 ? '' : 's'} on this device
+              {toolboxRecords.length} record{toolboxRecords.length === 1 ? '' : 's'}
+              {user?.id && cloudToolboxCount > 0
+                ? isAdmin
+                  ? ` (${cloudToolboxCount} from cloud — all users)`
+                  : ` (${cloudToolboxCount} synced from cloud)`
+                : ' on this device'}
             </p>
           </div>
           {toolboxRecords.length > 0 && (
@@ -261,16 +376,43 @@ export function ToolboxView({
           )}
         </div>
 
+        {cloudLoadWarning && (
+          <p className="backup-warning" role="alert">
+            {cloudLoadWarning}
+          </p>
+        )}
+
+        {isAdmin && user?.id && (
+          <p className="form-hint">
+            Admin view: device records on this device plus all users&apos; cloud toolbox records.
+          </p>
+        )}
+
         {toolboxRecords.length === 0 ? (
           <p className="saved-records__empty">
             No saved toolbox records yet. Submit a completed meeting to save one here.
           </p>
         ) : (
           <ul className="saved-records__list">
-            {toolboxRecords.map((record) => (
+            {toolboxRecords.map((record) => {
+              const isOtherUserCloudRecord =
+                isAdmin &&
+                record.cloudUserId &&
+                record.cloudUserId !== user?.id &&
+                resolveRecordSyncStatus(record) === SYNC_STATUS.CLOUD
+
+              return (
               <li key={record.id} data-record-id={record.id} className="saved-record">
                 <div className="saved-record__header">
-                  <span className="type-badge type-badge--small">{record.formTypeLabel}</span>
+                  <div className="saved-record__badges">
+                    <span className="type-badge type-badge--small">{record.formTypeLabel}</span>
+                    <CloudSyncBadge record={record} size="small" />
+                    {isOtherUserCloudRecord && (
+                      <span className="type-badge type-badge--small type-badge--cloud-user">
+                        {record.fields?.meetingLedBy?.trim() || 'Other user'}
+                      </span>
+                    )}
+                  </div>
                   <p className="saved-record__title">{getRecordTitle(record)}</p>
                 </div>
                 <dl className="saved-record__details">
@@ -300,7 +442,8 @@ export function ToolboxView({
                 <p className="saved-record__meta">Saved {formatSubmittedAt(record.submittedAt)}</p>
                 <RecordActions record={record} onPrint={setPrintRecord} variant="saved" />
               </li>
-            ))}
+              )
+            })}
           </ul>
         )}
       </section>
