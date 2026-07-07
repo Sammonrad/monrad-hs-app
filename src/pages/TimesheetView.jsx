@@ -20,6 +20,11 @@ import { createEmptyDraft, getRecordTitle } from '../utils/records.js'
 import { persistSavedRecords } from '../utils/storage/recordsStorage.js'
 import { getSettingsOptions } from '../utils/storage/settingsStorage.js'
 import {
+  fetchTimesheetRecords,
+  getMergedTimesheetRecords,
+  saveTimesheetRecord,
+} from '../utils/storage/timesheetCloudStorage.js'
+import {
   calculateLabourHours,
   calculateAutoChargeableHours,
   parseDecimalHours,
@@ -33,11 +38,17 @@ export function TimesheetView({
   highlightRecordId,
   onClearHighlight,
   settings,
+  user,
+  cloudTimesheets,
+  setCloudTimesheets,
 }) {
   const formConfig = FORM_TYPES.timesheet
   const [draft, setDraft] = useState(() => createEmptyDraft('timesheet'))
   const [completedRecord, setCompletedRecord] = useState(null)
   const [validationError, setValidationError] = useState(null)
+  const [cloudSaveWarning, setCloudSaveWarning] = useState(null)
+  const [cloudLoadWarning, setCloudLoadWarning] = useState(null)
+  const [cloudSaving, setCloudSaving] = useState(false)
   const [chargeableEdited, setChargeableEdited] = useState(false)
   const recordRef = useRef(null)
 
@@ -56,7 +67,44 @@ export function TimesheetView({
 
   const displayedChargeableHours = chargeableEdited ? fields.chargeableHours : autoChargeableHours
 
-  const timesheetRecords = savedRecords.filter((record) => record.formType === 'timesheet')
+  const timesheetRecords = useMemo(
+    () => getMergedTimesheetRecords(savedRecords, cloudTimesheets),
+    [savedRecords, cloudTimesheets],
+  )
+
+  const cloudRecordCount = timesheetRecords.filter(
+    (record) => record.storageSource === 'cloud' || record.storageSource === 'both',
+  ).length
+
+  useEffect(() => {
+    if (!user?.id) {
+      setCloudLoadWarning(null)
+      return undefined
+    }
+
+    let isMounted = true
+
+    async function loadCloudTimesheets() {
+      const { records, error } = await fetchTimesheetRecords(user.id)
+      if (!isMounted) return
+
+      if (error) {
+        setCloudLoadWarning(
+          `Could not load cloud timesheets: ${error.message}. Showing device records only.`,
+        )
+        return
+      }
+
+      setCloudLoadWarning(null)
+      setCloudTimesheets(records)
+    }
+
+    loadCloudTimesheets()
+
+    return () => {
+      isMounted = false
+    }
+  }, [user?.id, setCloudTimesheets])
 
   useHighlightRecord(highlightRecordId, onClearHighlight, [timesheetRecords])
 
@@ -84,7 +132,7 @@ export function TimesheetView({
     updateDraft({ fields: { ...fields, chargeableHours: value } })
   }
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault()
 
     if (
@@ -163,12 +211,36 @@ export function TimesheetView({
     if (!persistSavedRecords(nextRecords)) return
     setSavedRecords(nextRecords)
     setCompletedRecord(record)
+    setCloudSaveWarning(null)
+
+    if (!user?.id) return
+
+    setCloudSaving(true)
+    const { record: cloudRecord, error } = await saveTimesheetRecord(user, record)
+    setCloudSaving(false)
+
+    if (error) {
+      setCloudSaveWarning(
+        `Saved on this device, but cloud sync failed: ${error.message}. Your record is safe locally.`,
+      )
+      return
+    }
+
+    if (cloudRecord) {
+      setCloudTimesheets((prev) => {
+        const withoutDup = prev.filter(
+          (item) => item.cloudId !== cloudRecord.cloudId && item.id !== record.id,
+        )
+        return [cloudRecord, ...withoutDup]
+      })
+    }
   }
 
   function handleReset() {
     setDraft(createEmptyDraft('timesheet'))
     setCompletedRecord(null)
     setValidationError(null)
+    setCloudSaveWarning(null)
     setChargeableEdited(false)
   }
 
@@ -379,8 +451,20 @@ export function TimesheetView({
           </div>
 
           <p className="record__saved" role="status">
-            Record saved to this device. Review the details below.
+            {cloudSaving
+              ? 'Saved on this device. Syncing to cloud…'
+              : cloudSaveWarning
+                ? 'Saved on this device. Cloud sync did not complete — see warning below.'
+                : user?.id
+                  ? 'Record saved to this device and cloud. Review the details below.'
+                  : 'Record saved to this device. Review the details below.'}
           </p>
+
+          {cloudSaveWarning && (
+            <p className="backup-warning" role="alert">
+              {cloudSaveWarning}
+            </p>
+          )}
 
           <RecordDetails record={completedRecord} />
           <RecordActions record={completedRecord} onPrint={setPrintRecord} />
@@ -401,7 +485,10 @@ export function TimesheetView({
               Saved timesheet records
             </h2>
             <p className="saved-records__count">
-              {timesheetRecords.length} record{timesheetRecords.length === 1 ? '' : 's'} on this device
+              {timesheetRecords.length} record{timesheetRecords.length === 1 ? '' : 's'}
+              {user?.id && cloudRecordCount > 0
+                ? ` (${cloudRecordCount} synced from cloud)`
+                : ' on this device'}
             </p>
           </div>
           {timesheetRecords.length > 0 && (
@@ -410,6 +497,12 @@ export function TimesheetView({
             </button>
           )}
         </div>
+
+        {cloudLoadWarning && (
+          <p className="backup-warning" role="alert">
+            {cloudLoadWarning}
+          </p>
+        )}
 
         {timesheetRecords.length === 0 ? (
           <p className="saved-records__empty">
@@ -438,7 +531,11 @@ export function TimesheetView({
 
                 <SavedRecordSignature record={record} />
 
-                <p className="saved-record__meta">Saved {formatSubmittedAt(record.submittedAt)}</p>
+                <p className="saved-record__meta">
+                  Saved {formatSubmittedAt(record.submittedAt)}
+                  {record.storageSource === 'cloud' && ' · Cloud only'}
+                  {record.storageSource === 'both' && ' · Device + cloud'}
+                </p>
                 <RecordActions record={record} onPrint={setPrintRecord} variant="saved" />
               </li>
             ))}

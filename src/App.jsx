@@ -18,6 +18,7 @@ import { loadActions, persistActions, syncActionsFromRecord } from './utils/stor
 import { loadSettings } from './utils/storage/settingsStorage.js'
 import { APP_VERSION } from './constants/index.js'
 import { isSupabaseConfigured, supabase } from './utils/supabaseClient.js'
+import { fetchTimesheetRecords } from './utils/storage/timesheetCloudStorage.js'
 
 function App() {
   const [currentView, setCurrentView] = useState('dashboard')
@@ -30,6 +31,7 @@ function App() {
   const [authReady, setAuthReady] = useState(false)
   const [authLoading, setAuthLoading] = useState(false)
   const [authError, setAuthError] = useState('')
+  const [cloudTimesheets, setCloudTimesheets] = useState([])
 
   const openActionCount = actions.filter((action) => action.status !== 'completed').length
 
@@ -109,6 +111,26 @@ function App() {
       subscription.unsubscribe()
     }
   }, [])
+
+  useEffect(() => {
+    if (!session?.user?.id) {
+      setCloudTimesheets([])
+      return undefined
+    }
+
+    let isMounted = true
+
+    async function loadCloudTimesheets() {
+      const { records } = await fetchTimesheetRecords(session.user.id)
+      if (isMounted) setCloudTimesheets(records)
+    }
+
+    loadCloudTimesheets()
+
+    return () => {
+      isMounted = false
+    }
+  }, [session?.user?.id])
 
   async function signIn(email, password) {
     if (!supabase) return
@@ -260,11 +282,18 @@ function App() {
           highlightRecordId={highlightRecordId}
           onClearHighlight={handleClearHighlight}
           settings={settings}
+          user={session?.user ?? null}
+          cloudTimesheets={cloudTimesheets}
+          setCloudTimesheets={setCloudTimesheets}
         />
       )}
 
       {currentView === 'weekly-timesheet-summary' && (
-        <WeeklyTimesheetSummaryView onBack={goToDashboard} savedRecords={savedRecords} />
+        <WeeklyTimesheetSummaryView
+          onBack={goToDashboard}
+          savedRecords={savedRecords}
+          cloudTimesheets={cloudTimesheets}
+        />
       )}
 
       {currentView === 'incident' && (

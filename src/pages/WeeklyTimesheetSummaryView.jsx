@@ -5,7 +5,6 @@ import { ComboField } from '../components/FormFields.jsx'
 import { formatDecimalHoursDisplay } from '../utils/formatting.js'
 import {
   EMPTY_WEEKLY_FILTERS,
-  getTimesheetRecords,
   filterTimesheets,
   groupByWeek,
   calculateTotals,
@@ -13,9 +12,13 @@ import {
   getFilterOptions,
   describeActiveFilters,
 } from '../utils/weeklyTimesheet.js'
+import { getMergedTimesheetRecords } from '../utils/storage/timesheetCloudStorage.js'
 
-export function WeeklyTimesheetSummaryView({ onBack, savedRecords }) {
-  const allTimesheets = useMemo(() => getTimesheetRecords(savedRecords), [savedRecords])
+export function WeeklyTimesheetSummaryView({ onBack, savedRecords, cloudTimesheets = [] }) {
+  const allTimesheets = useMemo(
+    () => getMergedTimesheetRecords(savedRecords, cloudTimesheets),
+    [savedRecords, cloudTimesheets],
+  )
   const filterOptions = useMemo(() => getFilterOptions(allTimesheets), [allTimesheets])
 
   const [filters, setFilters] = useState(EMPTY_WEEKLY_FILTERS)
@@ -90,7 +93,8 @@ export function WeeklyTimesheetSummaryView({ onBack, savedRecords }) {
         <p className="company">Monrad Earthworx</p>
         <h1 className="title">Weekly Timesheet Summary</h1>
         <p className="progress" aria-live="polite">
-          {allTimesheets.length} timesheet record{allTimesheets.length === 1 ? '' : 's'} on this device
+          {allTimesheets.length} timesheet record{allTimesheets.length === 1 ? '' : 's'}
+          {cloudTimesheets.length > 0 ? ' (device + cloud)' : ' on this device'}
         </p>
       </header>
 
