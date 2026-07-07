@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
 
 const STORAGE_KEY = 'monrad-earthworx-job-records'
@@ -414,6 +414,172 @@ function getRecordsDashboardStats(savedRecords, actionList) {
       },
     ],
   }
+}
+
+function collectSearchableText(parts) {
+  return parts
+    .filter((value) => value != null && String(value).trim())
+    .join(' ')
+    .toLowerCase()
+}
+
+function getRecordSearchHaystack(record) {
+  const fields = record.fields ?? {}
+  return collectSearchableText([
+    fields.jobName,
+    fields.siteLocation,
+    fields.employeeName,
+    fields.machineUsed,
+    fields.operatorName,
+    fields.operator,
+    fields.machineNameId,
+    fields.machine,
+    fields.machineHours,
+    fields.hourMeter,
+    fields.notes,
+    fields.jobProjectName,
+    fields.topic,
+    fields.meetingLedBy,
+    fields.facilitator,
+    fields.attendees,
+    fields.workPlannedToday,
+    fields.mainHazardsDiscussed,
+    fields.controlsAgreed,
+    fields.weatherGroundConditions,
+    fields.reportedBy,
+    fields.whatHappened,
+    fields.description,
+    fields.personInvolved,
+    fields.immediateActionTaken,
+    fields.possibleCause,
+    fields.correctiveActionRequired,
+    fields.correctiveActionPerson,
+    record.defectDescription,
+    record.actionRequired,
+    record.reportedTo,
+    record.signatureConfirmation,
+    record.formTypeLabel,
+    getFormTypeLabel(record.formType),
+    formatReportType(fields.reportType),
+    formatDefectSeverity(record.defectSeverity),
+    getRecordTitle(record),
+  ])
+}
+
+function getActionSearchHaystack(action) {
+  return collectSearchableText([
+    action.description,
+    action.site,
+    action.personResponsible,
+    action.notes,
+    action.status,
+    ACTION_STATUS_LABELS[action.status],
+    SOURCE_TYPE_LABELS[action.sourceType],
+    action.date,
+  ])
+}
+
+function recordToSearchItem(record) {
+  return {
+    id: `record-${record.id}`,
+    itemType: 'record',
+    resultType: record.formType,
+    typeLabel: record.formTypeLabel || getFormTypeLabel(record.formType),
+    date: record.fields?.date || '',
+    site: record.fields?.siteLocation || '',
+    title: getRecordTitle(record),
+    status:
+      record.completedCount != null
+        ? record.allComplete
+          ? 'All checks done'
+          : 'Partial'
+        : null,
+    searchText: getRecordSearchHaystack(record),
+    record,
+    action: null,
+    submittedAt: record.submittedAt || '',
+    hasDefect: record.formType === 'pre-start' && record.defectsFound === 'found',
+    isIncident: record.formType === 'incident',
+    isOpenAction: false,
+  }
+}
+
+function actionToSearchItem(action) {
+  return {
+    id: `action-${action.id}`,
+    itemType: 'action',
+    resultType: 'action',
+    typeLabel: 'Action Register',
+    date: action.date || '',
+    site: action.site || '',
+    title: action.description || 'Action item',
+    status: ACTION_STATUS_LABELS[action.status] || action.status,
+    searchText: getActionSearchHaystack(action),
+    record: null,
+    action,
+    submittedAt: action.createdAt || '',
+    hasDefect: false,
+    isIncident: action.sourceType === 'incident',
+    isOpenAction: action.status !== 'completed',
+  }
+}
+
+function buildSearchableItems(savedRecords, actionList) {
+  return [
+    ...savedRecords.map(recordToSearchItem),
+    ...actionList.map(actionToSearchItem),
+  ].sort((a, b) => {
+    const timeA = a.submittedAt ? new Date(a.submittedAt).getTime() : 0
+    const timeB = b.submittedAt ? new Date(b.submittedAt).getTime() : 0
+    return timeB - timeA
+  })
+}
+
+function itemMatchesDate(item, dateFilter) {
+  if (!dateFilter) return true
+  const candidates = [
+    item.date,
+    item.submittedAt?.slice(0, 10),
+    item.record?.fields?.date,
+    item.action?.createdAt?.slice(0, 10),
+  ].filter(Boolean)
+  return candidates.some((value) => value === dateFilter || value.startsWith(dateFilter))
+}
+
+function filterSearchItems(items, { searchQuery, typeFilter, dateFilter, openActionsOnly, defectsOnly, incidentsOnly }) {
+  const query = searchQuery.trim().toLowerCase()
+
+  return items.filter((item) => {
+    if (query && !item.searchText.includes(query)) return false
+    if (typeFilter !== 'all' && item.resultType !== typeFilter) return false
+    if (!itemMatchesDate(item, dateFilter)) return false
+    if (openActionsOnly && !(item.itemType === 'action' && item.isOpenAction)) return false
+    if (defectsOnly && !item.hasDefect) return false
+    if (incidentsOnly && !item.isIncident) return false
+    return true
+  })
+}
+
+function useHighlightRecord(highlightRecordId, onClearHighlight, deps = []) {
+  useEffect(() => {
+    if (!highlightRecordId) return undefined
+
+    const timer = window.setTimeout(() => {
+      const el = document.querySelector(`[data-record-id="${highlightRecordId}"]`)
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        el.classList.add('saved-record--highlight')
+        window.setTimeout(() => {
+          el.classList.remove('saved-record--highlight')
+          onClearHighlight?.()
+        }, 2500)
+      } else {
+        onClearHighlight?.()
+      }
+    }, 350)
+
+    return () => window.clearTimeout(timer)
+  }, [highlightRecordId, onClearHighlight, ...deps])
 }
 
 function createRecordId() {
@@ -1410,8 +1576,61 @@ function ActionRegisterView({ onBack, actions, setActions }) {
   )
 }
 
-function RecordsDashboardView({ onBack, onNavigate, savedRecords, actions }) {
+function RecordsDashboardView({
+  onBack,
+  onNavigate,
+  savedRecords,
+  actions,
+  setPrintRecord,
+  onViewRecord,
+}) {
   const stats = getRecordsDashboardStats(savedRecords, actions)
+  const allItems = useMemo(() => buildSearchableItems(savedRecords, actions), [savedRecords, actions])
+
+  const [searchQuery, setSearchQuery] = useState('')
+  const [typeFilter, setTypeFilter] = useState('all')
+  const [dateFilter, setDateFilter] = useState('')
+  const [openActionsOnly, setOpenActionsOnly] = useState(false)
+  const [defectsOnly, setDefectsOnly] = useState(false)
+  const [incidentsOnly, setIncidentsOnly] = useState(false)
+
+  const filteredItems = useMemo(
+    () =>
+      filterSearchItems(allItems, {
+        searchQuery,
+        typeFilter,
+        dateFilter,
+        openActionsOnly,
+        defectsOnly,
+        incidentsOnly,
+      }),
+    [allItems, searchQuery, typeFilter, dateFilter, openActionsOnly, defectsOnly, incidentsOnly],
+  )
+
+  const hasActiveFilters =
+    searchQuery.trim() ||
+    typeFilter !== 'all' ||
+    dateFilter ||
+    openActionsOnly ||
+    defectsOnly ||
+    incidentsOnly
+
+  function clearFilters() {
+    setSearchQuery('')
+    setTypeFilter('all')
+    setDateFilter('')
+    setOpenActionsOnly(false)
+    setDefectsOnly(false)
+    setIncidentsOnly(false)
+  }
+
+  function handleViewItem(item) {
+    if (item.itemType === 'action') {
+      onNavigate('action-register')
+      return
+    }
+    onViewRecord?.(item.record)
+  }
 
   return (
     <>
@@ -1448,6 +1667,156 @@ function RecordsDashboardView({ onBack, onNavigate, savedRecords, actions }) {
             <dd>{stats.incidentCount}</dd>
           </div>
         </dl>
+      </section>
+
+      <section className="records-search" aria-labelledby="records-search-heading">
+        <div className="records-search__header">
+          <h2 id="records-search-heading" className="records-summary__title">
+            Search &amp; filter
+          </h2>
+          {hasActiveFilters && (
+            <button type="button" className="records-search__clear" onClick={clearFilters}>
+              Clear filters
+            </button>
+          )}
+        </div>
+
+        <label className="field records-search__query">
+          <span className="field__label">Search</span>
+          <input
+            type="search"
+            className="field__input"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Job name, site, operator, machine, notes, actions..."
+          />
+        </label>
+
+        <div className="records-search__filters">
+          <label className="field records-search__filter">
+            <span className="field__label">Record type</span>
+            <select
+              className="field__input"
+              value={typeFilter}
+              onChange={(e) => setTypeFilter(e.target.value)}
+            >
+              <option value="all">All</option>
+              <option value="job-start">Job Start</option>
+              <option value="pre-start">Pre-Start</option>
+              <option value="toolbox">Toolbox</option>
+              <option value="incident">Incident</option>
+              <option value="action">Actions</option>
+            </select>
+          </label>
+
+          <label className="field records-search__filter">
+            <span className="field__label">Date</span>
+            <input
+              type="date"
+              className="field__input"
+              value={dateFilter}
+              onChange={(e) => setDateFilter(e.target.value)}
+            />
+          </label>
+        </div>
+
+        <div className="records-search__toggles">
+          <label className="records-search__toggle">
+            <input
+              type="checkbox"
+              checked={openActionsOnly}
+              onChange={(e) => setOpenActionsOnly(e.target.checked)}
+            />
+            <span>Open actions only</span>
+          </label>
+          <label className="records-search__toggle">
+            <input
+              type="checkbox"
+              checked={defectsOnly}
+              onChange={(e) => setDefectsOnly(e.target.checked)}
+            />
+            <span>Machine defects only</span>
+          </label>
+          <label className="records-search__toggle">
+            <input
+              type="checkbox"
+              checked={incidentsOnly}
+              onChange={(e) => setIncidentsOnly(e.target.checked)}
+            />
+            <span>Incidents / near misses only</span>
+          </label>
+        </div>
+
+        <p className="records-search__count" aria-live="polite">
+          {filteredItems.length} result{filteredItems.length === 1 ? '' : 's'}
+          {hasActiveFilters ? ' matching filters' : ''}
+        </p>
+
+        {filteredItems.length === 0 ? (
+          <p className="records-search__empty">
+            No records match your search and filters. Try different keywords or clear filters.
+          </p>
+        ) : (
+          <ul className="records-search__results">
+            {filteredItems.map((item) => (
+              <li
+                key={item.id}
+                className={[
+                  'search-result',
+                  item.itemType === 'action' && item.isOpenAction ? 'search-result--open' : '',
+                  item.hasDefect ? 'search-result--defect' : '',
+                  item.action?.status === 'completed' ? 'search-result--completed' : '',
+                ]
+                  .filter(Boolean)
+                  .join(' ')}
+              >
+                <div className="search-result__header">
+                  <span className="type-badge type-badge--small">{item.typeLabel}</span>
+                  {item.status && (
+                    <span
+                      className={
+                        item.itemType === 'action'
+                          ? `action-status action-status--${item.action.status}`
+                          : 'search-result__status'
+                      }
+                    >
+                      {item.status}
+                    </span>
+                  )}
+                </div>
+                <p className="search-result__title">{item.title}</p>
+                <dl className="search-result__meta">
+                  <div className="search-result__row">
+                    <dt>Date</dt>
+                    <dd>{item.date || (item.submittedAt ? formatSubmittedAt(item.submittedAt) : '—')}</dd>
+                  </div>
+                  <div className="search-result__row">
+                    <dt>Site</dt>
+                    <dd>{item.site || '—'}</dd>
+                  </div>
+                </dl>
+                <div className="search-result__actions">
+                  {item.itemType === 'record' && (
+                    <button
+                      type="button"
+                      className="print-record-btn"
+                      onClick={() => setPrintRecord(item.record)}
+                    >
+                      Print Record
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="records-summary-card__btn"
+                    onClick={() => handleViewItem(item)}
+                  >
+                    View
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
 
       <section className="records-summary" aria-labelledby="records-summary-heading">
@@ -1510,6 +1879,8 @@ function JobStartView({
   savedRecords,
   setSavedRecords,
   setPrintRecord,
+  highlightRecordId,
+  onClearHighlight,
 }) {
   const formConfig = FORM_TYPES['job-start']
   const [draft, setDraft] = useState(() => createEmptyDraft('job-start'))
@@ -1528,6 +1899,8 @@ function JobStartView({
     recordFilter === 'all'
       ? savedRecords
       : savedRecords.filter((record) => record.formType === recordFilter)
+
+  useHighlightRecord(highlightRecordId, onClearHighlight, [filteredRecords])
 
   useEffect(() => {
     if (completedRecord && recordRef.current) {
@@ -1757,7 +2130,7 @@ function JobStartView({
         ) : (
           <ul className="saved-records__list">
             {filteredRecords.map((record) => (
-              <li key={record.id} className="saved-record">
+              <li key={record.id} data-record-id={record.id} className="saved-record">
                 <div className="saved-record__header">
                   <span className="type-badge type-badge--small">{record.formTypeLabel}</span>
                   <p className="saved-record__title">{getRecordTitle(record)}</p>
@@ -1831,6 +2204,8 @@ function PreStartView({
   setSavedRecords,
   setPrintRecord,
   onRecordSaved,
+  highlightRecordId,
+  onClearHighlight,
 }) {
   const formConfig = FORM_TYPES['pre-start']
   const [draft, setDraft] = useState(() => createEmptyDraft('pre-start'))
@@ -1861,6 +2236,8 @@ function PreStartView({
     (defectSeverity === 'critical' || machineOperableSafely === 'no')
 
   const preStartRecords = savedRecords.filter((record) => record.formType === 'pre-start')
+
+  useHighlightRecord(highlightRecordId, onClearHighlight, [preStartRecords])
 
   useEffect(() => {
     if (completedRecord && recordRef.current) {
@@ -2209,7 +2586,7 @@ function PreStartView({
         ) : (
           <ul className="saved-records__list">
             {preStartRecords.map((record) => (
-              <li key={record.id} className="saved-record">
+              <li key={record.id} data-record-id={record.id} className="saved-record">
                 <div className="saved-record__header">
                   <span className="type-badge type-badge--small">{record.formTypeLabel}</span>
                   <p className="saved-record__title">{getRecordTitle(record)}</p>
@@ -2288,6 +2665,8 @@ function ToolboxView({
   setSavedRecords,
   setPrintRecord,
   onRecordSaved,
+  highlightRecordId,
+  onClearHighlight,
 }) {
   const formConfig = FORM_TYPES.toolbox
   const [draft, setDraft] = useState(() => createEmptyDraft('toolbox'))
@@ -2302,6 +2681,8 @@ function ToolboxView({
   const allComplete = completed === total
 
   const toolboxRecords = savedRecords.filter((record) => record.formType === 'toolbox')
+
+  useHighlightRecord(highlightRecordId, onClearHighlight, [toolboxRecords])
 
   useEffect(() => {
     if (completedRecord && recordRef.current) {
@@ -2524,7 +2905,7 @@ function ToolboxView({
         ) : (
           <ul className="saved-records__list">
             {toolboxRecords.map((record) => (
-              <li key={record.id} className="saved-record">
+              <li key={record.id} data-record-id={record.id} className="saved-record">
                 <div className="saved-record__header">
                   <span className="type-badge type-badge--small">{record.formTypeLabel}</span>
                   <p className="saved-record__title">{getRecordTitle(record)}</p>
@@ -2570,6 +2951,8 @@ function IncidentView({
   setSavedRecords,
   setPrintRecord,
   onRecordSaved,
+  highlightRecordId,
+  onClearHighlight,
 }) {
   const formConfig = FORM_TYPES.incident
   const [draft, setDraft] = useState(() => createEmptyDraft('incident'))
@@ -2584,6 +2967,8 @@ function IncidentView({
   const allComplete = completed === total
 
   const incidentRecords = savedRecords.filter((record) => record.formType === 'incident')
+
+  useHighlightRecord(highlightRecordId, onClearHighlight, [incidentRecords])
 
   useEffect(() => {
     if (completedRecord && recordRef.current) {
@@ -2839,7 +3224,7 @@ function IncidentView({
         ) : (
           <ul className="saved-records__list">
             {incidentRecords.map((record) => (
-              <li key={record.id} className="saved-record">
+              <li key={record.id} data-record-id={record.id} className="saved-record">
                 <div className="saved-record__header">
                   <span className="type-badge type-badge--small">{record.formTypeLabel}</span>
                   <p className="saved-record__title">{getRecordTitle(record)}</p>
@@ -2884,8 +3269,23 @@ function App() {
   const [savedRecords, setSavedRecords] = useState(() => loadSavedRecords())
   const [actions, setActions] = useState(() => loadActions())
   const [printRecord, setPrintRecord] = useState(null)
+  const [highlightRecordId, setHighlightRecordId] = useState(null)
 
   const openActionCount = actions.filter((action) => action.status !== 'completed').length
+
+  function goToDashboard() {
+    setHighlightRecordId(null)
+    setCurrentView('dashboard')
+  }
+
+  function handleViewRecord(record) {
+    setHighlightRecordId(record.id)
+    setCurrentView(record.formType)
+  }
+
+  function handleClearHighlight() {
+    setHighlightRecordId(null)
+  }
 
   function handleRecordSaved(record) {
     setActions((prev) => {
@@ -2932,7 +3332,7 @@ function App() {
 
       {currentView === 'action-register' && (
         <ActionRegisterView
-          onBack={() => setCurrentView('dashboard')}
+          onBack={goToDashboard}
           actions={actions}
           setActions={setActions}
         />
@@ -2940,49 +3340,59 @@ function App() {
 
       {currentView === 'records-dashboard' && (
         <RecordsDashboardView
-          onBack={() => setCurrentView('dashboard')}
+          onBack={goToDashboard}
           onNavigate={setCurrentView}
           savedRecords={savedRecords}
           actions={actions}
+          setPrintRecord={setPrintRecord}
+          onViewRecord={handleViewRecord}
         />
       )}
 
       {currentView === 'job-start' && (
         <JobStartView
-          onBack={() => setCurrentView('dashboard')}
+          onBack={goToDashboard}
           savedRecords={savedRecords}
           setSavedRecords={setSavedRecords}
           setPrintRecord={setPrintRecord}
+          highlightRecordId={highlightRecordId}
+          onClearHighlight={handleClearHighlight}
         />
       )}
 
       {currentView === 'pre-start' && (
         <PreStartView
-          onBack={() => setCurrentView('dashboard')}
+          onBack={goToDashboard}
           savedRecords={savedRecords}
           setSavedRecords={setSavedRecords}
           setPrintRecord={setPrintRecord}
           onRecordSaved={handleRecordSaved}
+          highlightRecordId={highlightRecordId}
+          onClearHighlight={handleClearHighlight}
         />
       )}
 
       {currentView === 'toolbox' && (
         <ToolboxView
-          onBack={() => setCurrentView('dashboard')}
+          onBack={goToDashboard}
           savedRecords={savedRecords}
           setSavedRecords={setSavedRecords}
           setPrintRecord={setPrintRecord}
           onRecordSaved={handleRecordSaved}
+          highlightRecordId={highlightRecordId}
+          onClearHighlight={handleClearHighlight}
         />
       )}
 
       {currentView === 'incident' && (
         <IncidentView
-          onBack={() => setCurrentView('dashboard')}
+          onBack={goToDashboard}
           savedRecords={savedRecords}
           setSavedRecords={setSavedRecords}
           setPrintRecord={setPrintRecord}
           onRecordSaved={handleRecordSaved}
+          highlightRecordId={highlightRecordId}
+          onClearHighlight={handleClearHighlight}
         />
       )}
     </div>
