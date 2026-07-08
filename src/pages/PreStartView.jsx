@@ -48,6 +48,8 @@ export function PreStartView({
   onRecordSaved,
   highlightRecordId,
   onClearHighlight,
+  recordFocus,
+  onClearRecordFocus,
   settings,
   user,
   profile,
@@ -137,6 +139,14 @@ export function PreStartView({
   }, [user?.id, isAdmin, setCloudPreStarts])
 
   useHighlightRecord(highlightRecordId, onClearHighlight, [preStartRecords])
+
+  useEffect(() => {
+    if (recordFocus !== 'defects') return undefined
+    const timer = window.setTimeout(() => {
+      onClearRecordFocus?.()
+    }, 8000)
+    return () => window.clearTimeout(timer)
+  }, [recordFocus, onClearRecordFocus])
 
   useEffect(() => {
     if (completedRecord && recordRef.current) {
@@ -527,6 +537,12 @@ export function PreStartView({
             </button>
           )}
         </div>
+
+        {recordFocus === 'defects' && (
+          <p className="form-hint safety-alerts-focus-hint" role="status">
+            Showing machine pre-starts — scroll to the highlighted defect record if listed below.
+          </p>
+        )}
 
         {cloudLoadWarning && (
           <p className="backup-warning" role="alert">

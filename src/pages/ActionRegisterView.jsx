@@ -26,6 +26,7 @@ import {
   filterActionsByRegisterFilter,
   sortActiveActions,
 } from '../utils/safetyAlerts.js'
+import { useHighlightAction } from '../hooks/useHighlightAction.js'
 
 export function ActionRegisterView({
   onBack,
@@ -35,16 +36,30 @@ export function ActionRegisterView({
   profile,
   cloudActions,
   setCloudActions,
+  highlightActionId,
+  onClearActionHighlight,
+  initialActionFilter,
 }) {
   const [showAddForm, setShowAddForm] = useState(false)
   const [manualDraft, setManualDraft] = useState(createEmptyManualAction)
   const [validationError, setValidationError] = useState(null)
-  const [statusFilter, setStatusFilter] = useState('all')
+  const [statusFilter, setStatusFilter] = useState(() => {
+    const allowed = ACTION_REGISTER_FILTERS.some((filter) => filter.id === initialActionFilter)
+    return allowed ? initialActionFilter : 'all'
+  })
   const [printAction, setPrintAction] = useState(null)
   const [cloudLoading, setCloudLoading] = useState(false)
   const [cloudError, setCloudError] = useState('')
 
   const isAdmin = isAdminProfile(profile)
+
+  useEffect(() => {
+    if (!initialActionFilter) return
+    const allowed = ACTION_REGISTER_FILTERS.some((filter) => filter.id === initialActionFilter)
+    if (allowed) setStatusFilter(initialActionFilter)
+  }, [initialActionFilter])
+
+  useHighlightAction(highlightActionId, onClearActionHighlight, [statusFilter, actions, cloudActions])
 
   useEffect(() => {
     if (!user?.id) {

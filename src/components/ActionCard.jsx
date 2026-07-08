@@ -25,7 +25,7 @@ export function ActionCard({ action, onUpdate, onComplete, onPrint }) {
     .join(' ')
 
   return (
-    <li className={cardClass}>
+    <li className={cardClass} data-action-id={action.id}>
       <div className="action-card__header">
         <span className="type-badge type-badge--small">
           {SOURCE_TYPE_LABELS[action.sourceType] ?? action.sourceType}

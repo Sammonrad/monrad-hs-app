@@ -40,6 +40,8 @@ export function IncidentView({
   onRecordSaved,
   highlightRecordId,
   onClearHighlight,
+  recordFocus,
+  onClearRecordFocus,
   settings,
   user,
   profile,
@@ -112,6 +114,14 @@ export function IncidentView({
   }, [user?.id, isAdmin, setCloudIncidents])
 
   useHighlightRecord(highlightRecordId, onClearHighlight, [incidentRecords])
+
+  useEffect(() => {
+    if (recordFocus !== 'corrective') return undefined
+    const timer = window.setTimeout(() => {
+      onClearRecordFocus?.()
+    }, 8000)
+    return () => window.clearTimeout(timer)
+  }, [recordFocus, onClearRecordFocus])
 
   useEffect(() => {
     if (completedRecord && recordRef.current) {
@@ -409,6 +419,15 @@ export function IncidentView({
             </button>
           )}
         </div>
+
+        {recordFocus === 'corrective' && (
+          <p className="form-hint safety-alerts-focus-hint" role="status">
+            Opened from an unresolved corrective action
+            {highlightRecordId
+              ? ' — the related incident is highlighted below if present.'
+              : ' — review incident records and follow up on corrective actions.'}
+          </p>
+        )}
 
         {cloudLoadWarning && (
           <p className="backup-warning" role="alert">

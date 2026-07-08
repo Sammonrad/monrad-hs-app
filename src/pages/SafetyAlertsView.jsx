@@ -41,7 +41,7 @@ function defectLabel(record) {
   return [machine, severity, description].filter(Boolean).join(' · ')
 }
 
-export function SafetyAlertsView({ onBack, savedRecords, actions }) {
+export function SafetyAlertsView({ onBack, onNavigate, savedRecords, actions }) {
   const records = savedRecords ?? []
   const actionList = actions ?? []
   const alerts = getSafetyAlerts(records, actionList)
@@ -59,10 +59,16 @@ export function SafetyAlertsView({ onBack, savedRecords, actions }) {
         title: 'Open actions',
         count: alerts.openActions,
         alertWhenPositive: false,
+        linkLabel: 'View action',
         items: openActions.map((action) => ({
           id: action.id,
           primary: actionLabel(action),
           secondary: actionMeta(action),
+          onClick: () =>
+            onNavigate?.('action-register', {
+              highlightActionId: action.id,
+              actionFilter: 'all',
+            }),
         })),
       },
       {
@@ -70,10 +76,16 @@ export function SafetyAlertsView({ onBack, savedRecords, actions }) {
         title: 'Overdue actions',
         count: alerts.overdueActions,
         alertWhenPositive: true,
+        linkLabel: 'View action',
         items: overdueActions.map((action) => ({
           id: action.id,
           primary: actionLabel(action),
           secondary: actionMeta(action),
+          onClick: () =>
+            onNavigate?.('action-register', {
+              highlightActionId: action.id,
+              actionFilter: 'overdue',
+            }),
         })),
       },
       {
@@ -81,10 +93,16 @@ export function SafetyAlertsView({ onBack, savedRecords, actions }) {
         title: 'Critical actions',
         count: alerts.criticalActions,
         alertWhenPositive: true,
+        linkLabel: 'View action',
         items: criticalActions.map((action) => ({
           id: action.id,
           primary: actionLabel(action),
           secondary: actionMeta(action),
+          onClick: () =>
+            onNavigate?.('action-register', {
+              highlightActionId: action.id,
+              actionFilter: 'critical',
+            }),
         })),
       },
       {
@@ -92,12 +110,18 @@ export function SafetyAlertsView({ onBack, savedRecords, actions }) {
         title: 'Unresolved machine defects',
         count: alerts.unresolvedMachineDefects,
         alertWhenPositive: true,
+        linkLabel: 'View defect',
         items: machineDefects.map((record) => ({
           id: record.id,
           primary: defectLabel(record),
           secondary: [record.date, record.siteLocation || record.operatorName]
             .filter(Boolean)
             .join(' · '),
+          onClick: () =>
+            onNavigate?.('pre-start', {
+              highlightRecordId: record.id,
+              recordFocus: 'defects',
+            }),
         })),
       },
       {
@@ -105,14 +129,20 @@ export function SafetyAlertsView({ onBack, savedRecords, actions }) {
         title: 'Unresolved incident corrective actions',
         count: alerts.unresolvedIncidentActions,
         alertWhenPositive: true,
+        linkLabel: 'View incident',
         items: incidentActions.map((action) => ({
           id: action.id,
           primary: actionLabel(action),
           secondary: actionMeta(action),
+          onClick: () =>
+            onNavigate?.('incident', {
+              highlightRecordId: action.sourceRecordId || undefined,
+              recordFocus: 'corrective',
+            }),
         })),
       },
     ]
-  }, [actionList, alerts, records])
+  }, [actionList, alerts, onNavigate, records])
 
   return (
     <>
@@ -153,10 +183,17 @@ export function SafetyAlertsView({ onBack, savedRecords, actions }) {
                 <ul className="safety-alert-card__list">
                   {section.items.map((item) => (
                     <li key={item.id} className="safety-alert-card__item">
-                      <span className="safety-alert-card__item-primary">{item.primary}</span>
-                      {item.secondary ? (
-                        <span className="safety-alert-card__item-secondary">{item.secondary}</span>
-                      ) : null}
+                      <button
+                        type="button"
+                        className="safety-alert-card__link"
+                        onClick={item.onClick}
+                      >
+                        <span className="safety-alert-card__item-primary">{item.primary}</span>
+                        {item.secondary ? (
+                          <span className="safety-alert-card__item-secondary">{item.secondary}</span>
+                        ) : null}
+                        <span className="safety-alert-card__item-action">{section.linkLabel}</span>
+                      </button>
                     </li>
                   ))}
                 </ul>

@@ -52,6 +52,9 @@ function App() {
   const [settings, setSettings] = useState(() => loadSettings())
   const [printRecord, setPrintRecord] = useState(null)
   const [highlightRecordId, setHighlightRecordId] = useState(null)
+  const [highlightActionId, setHighlightActionId] = useState(null)
+  const [actionFilter, setActionFilter] = useState(null)
+  const [recordFocus, setRecordFocus] = useState(null)
   const [session, setSession] = useState(null)
   const [authReady, setAuthReady] = useState(false)
   const [authLoading, setAuthLoading] = useState(false)
@@ -67,18 +70,44 @@ function App() {
 
   const openActionCount = actions.filter((action) => action.status !== 'completed').length
 
-  function goToDashboard() {
+  function clearNavFocus() {
     setHighlightRecordId(null)
+    setHighlightActionId(null)
+    setActionFilter(null)
+    setRecordFocus(null)
+  }
+
+  function goToDashboard() {
+    clearNavFocus()
     setCurrentView('dashboard')
   }
 
+  function handleNavigate(viewId, options = {}) {
+    setHighlightRecordId(options.highlightRecordId ?? null)
+    setHighlightActionId(options.highlightActionId ?? null)
+    setActionFilter(options.actionFilter ?? null)
+    setRecordFocus(options.recordFocus ?? null)
+    setCurrentView(viewId)
+  }
+
   function handleViewRecord(record) {
+    setHighlightActionId(null)
+    setActionFilter(null)
+    setRecordFocus(null)
     setHighlightRecordId(record.id)
     setCurrentView(record.formType)
   }
 
   function handleClearHighlight() {
     setHighlightRecordId(null)
+  }
+
+  function handleClearActionHighlight() {
+    setHighlightActionId(null)
+  }
+
+  function handleClearRecordFocus() {
+    setRecordFocus(null)
   }
 
   function handleRecordSaved(record) {
@@ -421,7 +450,7 @@ function App() {
 
       {currentView === 'dashboard' && (
         <Dashboard
-          onNavigate={setCurrentView}
+          onNavigate={handleNavigate}
           recordCount={savedRecords.length}
           openActionCount={openActionCount}
           userEmail={userEmail}
@@ -438,12 +467,16 @@ function App() {
           profile={profile}
           cloudActions={cloudActions}
           setCloudActions={setCloudActions}
+          highlightActionId={highlightActionId}
+          onClearActionHighlight={handleClearActionHighlight}
+          initialActionFilter={actionFilter}
         />
       )}
 
       {currentView === 'safety-alerts' && (
         <SafetyAlertsView
           onBack={goToDashboard}
+          onNavigate={handleNavigate}
           savedRecords={savedRecords}
           actions={actions}
         />
@@ -452,7 +485,7 @@ function App() {
       {currentView === 'records-dashboard' && (
         <RecordsDashboardView
           onBack={goToDashboard}
-          onNavigate={setCurrentView}
+          onNavigate={handleNavigate}
           savedRecords={savedRecords}
           actions={actions}
           setPrintRecord={setPrintRecord}
@@ -505,6 +538,8 @@ function App() {
           onRecordSaved={handleRecordSaved}
           highlightRecordId={highlightRecordId}
           onClearHighlight={handleClearHighlight}
+          recordFocus={recordFocus}
+          onClearRecordFocus={handleClearRecordFocus}
           settings={settings}
           user={session?.user ?? null}
           profile={profile}
@@ -565,6 +600,8 @@ function App() {
           onRecordSaved={handleRecordSaved}
           highlightRecordId={highlightRecordId}
           onClearHighlight={handleClearHighlight}
+          recordFocus={recordFocus}
+          onClearRecordFocus={handleClearRecordFocus}
           settings={settings}
           user={session?.user ?? null}
           profile={profile}
