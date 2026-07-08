@@ -8,7 +8,7 @@ export function isCriticalAction(action) {
   return action.priority === 'critical' && isOpenAction(action)
 }
 
-export function getUnresolvedMachineDefects(savedRecords, actions) {
+export function listUnresolvedMachineDefects(savedRecords, actions) {
   const defectRecords = savedRecords.filter(
     (record) => record.formType === 'pre-start' && record.defectsFound === 'found',
   )
@@ -20,13 +20,21 @@ export function getUnresolvedMachineDefects(savedRecords, actions) {
         action.sourceType === 'pre-start',
     )
     return !linked || linked.status !== 'completed'
-  }).length
+  })
+}
+
+export function getUnresolvedMachineDefects(savedRecords, actions) {
+  return listUnresolvedMachineDefects(savedRecords, actions).length
+}
+
+export function listUnresolvedIncidentActions(actions) {
+  return actions.filter(
+    (action) => action.sourceType === 'incident' && action.status !== 'completed',
+  )
 }
 
 export function getUnresolvedIncidentActions(actions) {
-  return actions.filter(
-    (action) => action.sourceType === 'incident' && action.status !== 'completed',
-  ).length
+  return listUnresolvedIncidentActions(actions).length
 }
 
 export function getSafetyAlerts(savedRecords, actions) {

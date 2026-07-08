@@ -309,7 +309,7 @@ export const DASHBOARD_GROUPS = [
   {
     id: 'records-actions',
     title: 'Records & Actions',
-    cardIds: ['action-register', 'records-dashboard'],
+    cardIds: ['action-register', 'safety-alerts', 'records-dashboard'],
   },
   {
     id: 'timesheets',
@@ -351,6 +351,12 @@ export const DASHBOARD_CARDS = [
   {
     id: 'action-register',
     title: 'Action Register',
+    group: 'records-actions',
+    available: true,
+  },
+  {
+    id: 'safety-alerts',
+    title: 'Safety Alerts',
     group: 'records-actions',
     available: true,
   },

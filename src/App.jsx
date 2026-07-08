@@ -9,6 +9,7 @@ import { BackupRestoreView } from './pages/BackupRestoreView.jsx'
 import { AccessBlockedView } from './pages/AccessBlockedView.jsx'
 import { StaffManagementView } from './pages/StaffManagementView.jsx'
 import { HelpAppSetupView } from './pages/HelpAppSetupView.jsx'
+import { SafetyAlertsView } from './pages/SafetyAlertsView.jsx'
 import { JobStartView } from './pages/JobStartView.jsx'
 import { PreStartView } from './pages/PreStartView.jsx'
 import { ToolboxView } from './pages/ToolboxView.jsx'
@@ -423,8 +424,6 @@ function App() {
           onNavigate={setCurrentView}
           recordCount={savedRecords.length}
           openActionCount={openActionCount}
-          savedRecords={savedRecords}
-          actions={actions}
           userEmail={userEmail}
           profile={profile}
         />
@@ -439,6 +438,14 @@ function App() {
           profile={profile}
           cloudActions={cloudActions}
           setCloudActions={setCloudActions}
+        />
+      )}
+
+      {currentView === 'safety-alerts' && (
+        <SafetyAlertsView
+          onBack={goToDashboard}
+          savedRecords={savedRecords}
+          actions={actions}
         />
       )}
 
