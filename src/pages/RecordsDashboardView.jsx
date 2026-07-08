@@ -12,6 +12,7 @@ import {
 import {
   fetchAllCloudRecords,
   mergeAllDashboardRecords,
+  mergeDashboardActions,
   isCloudBackedRecord,
   isLocalOnlyRecord,
 } from '../utils/recordsDashboardCloud.js'
@@ -63,15 +64,24 @@ export function RecordsDashboardView({
     return mergeAllDashboardRecords(savedRecords, cloudRecords)
   }, [savedRecords, cloudRecords, user?.id])
 
-  const stats = getRecordsDashboardStats(mergedRecords, actions)
+  const mergedActions = useMemo(() => {
+    if (!user?.id || cloudRecords === null) {
+      return actions
+    }
+    return mergeDashboardActions(actions, cloudRecords.actions)
+  }, [actions, cloudRecords, user?.id])
+
+  const stats = getRecordsDashboardStats(mergedRecords, mergedActions)
   const timesheetCount = getTimesheetRecords(mergedRecords).length
   const allItems = useMemo(
-    () => buildSearchableItems(mergedRecords, actions),
-    [mergedRecords, actions],
+    () => buildSearchableItems(mergedRecords, mergedActions),
+    [mergedRecords, mergedActions],
   )
 
   const cloudRecordCount = mergedRecords.filter(isCloudBackedRecord).length
   const localOnlyRecordCount = mergedRecords.filter(isLocalOnlyRecord).length
+  const cloudActionCount = mergedActions.filter(isCloudBackedRecord).length
+  const localOnlyActionCount = mergedActions.filter(isLocalOnlyRecord).length
 
   const [searchQuery, setSearchQuery] = useState('')
   const [typeFilter, setTypeFilter] = useState('all')
@@ -163,12 +173,13 @@ export function RecordsDashboardView({
           {user?.id && !cloudLoading && (
             <>
               {' '}
-              · {cloudRecordCount} cloud · {localOnlyRecordCount} local only
+              · {cloudRecordCount + cloudActionCount} cloud ·{' '}
+              {localOnlyRecordCount + localOnlyActionCount} local only
             </>
           )}
           {cloudLoading && ' · Loading cloud records…'}
           {' · '}
-          {actions.length} action{actions.length === 1 ? '' : 's'}
+          {mergedActions.length} action{mergedActions.length === 1 ? '' : 's'}
         </p>
         {cloudError && (
           <p className="records-search__empty" role="alert">
@@ -388,7 +399,7 @@ export function RecordsDashboardView({
                     <CloudSyncBadge record={item.record} size="small" />
                   )}
                   {item.itemType === 'action' && (
-                    <CloudSyncBadge syncStatus="local-only" size="small" />
+                    <CloudSyncBadge record={item.action} size="small" />
                   )}
                   {item.status && (
                     <span

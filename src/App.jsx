@@ -14,7 +14,7 @@ import { WeeklyTimesheetSummaryView } from './pages/WeeklyTimesheetSummaryView.j
 import { IncidentView } from './pages/IncidentView.jsx'
 import { PrintableRecord } from './components/PrintableRecord.jsx'
 import { loadSavedRecords } from './utils/storage/recordsStorage.js'
-import { loadActions, persistActions, syncActionsFromRecord } from './utils/storage/actionsStorage.js'
+import { loadActions, persistActions, syncActionsFromRecord, patchAction } from './utils/storage/actionsStorage.js'
 import { loadSettings } from './utils/storage/settingsStorage.js'
 import { APP_VERSION } from './constants/index.js'
 import { isSupabaseConfigured, supabase } from './utils/supabaseClient.js'
@@ -23,6 +23,14 @@ import { fetchJobStartRecords } from './utils/storage/jobStartCloudStorage.js'
 import { fetchPreStartRecords } from './utils/storage/preStartCloudStorage.js'
 import { fetchToolboxRecords } from './utils/storage/toolboxCloudStorage.js'
 import { fetchIncidentRecords } from './utils/storage/incidentCloudStorage.js'
+import {
+  fetchActionRecords,
+  saveActionRecord,
+  getMergedActions,
+  SYNC_STATUS,
+  isCloudSaveUnavailable,
+  getUnavailableSyncStatus,
+} from './utils/storage/actionCloudStorage.js'
 import { getRoleLabel, isAdminProfile, loadOrCreateProfile } from './utils/storage/userProfileStorage.js'
 
 function App() {
@@ -41,6 +49,7 @@ function App() {
   const [cloudPreStarts, setCloudPreStarts] = useState([])
   const [cloudToolboxRecords, setCloudToolboxRecords] = useState([])
   const [cloudIncidents, setCloudIncidents] = useState([])
+  const [cloudActions, setCloudActions] = useState([])
   const [profile, setProfile] = useState(null)
 
   const openActionCount = actions.filter((action) => action.status !== 'completed').length
@@ -63,8 +72,64 @@ function App() {
     setActions((prev) => {
       const next = syncActionsFromRecord(record, prev)
       if (next.length === prev.length) return prev
-      return persistActions(next) ? next : prev
+      if (!persistActions(next)) return prev
+
+      const newAction = next.find(
+        (action) =>
+          !prev.some((existing) => existing.id === action.id) &&
+          action.autoCreated &&
+          action.sourceRecordId === record.id &&
+          action.sourceType === record.formType,
+      )
+
+      if (newAction) {
+        pushActionToCloud(newAction)
+      }
+
+      return next
     })
+  }
+
+  async function pushActionToCloud(action) {
+    if (isCloudSaveUnavailable(session?.user)) {
+      setActions((prev) => {
+        const syncStatus = getUnavailableSyncStatus(session?.user)
+        const next = patchAction(prev, action.id, { syncStatus })
+        persistActions(next)
+        return next
+      })
+      return
+    }
+
+    const { record: cloudRecord, error } = await saveActionRecord(session.user, action)
+
+    if (error) {
+      setActions((prev) => {
+        const next = patchAction(prev, action.id, { syncStatus: SYNC_STATUS.CLOUD_FAILED })
+        persistActions(next)
+        return next
+      })
+      return
+    }
+
+    if (cloudRecord) {
+      setActions((prev) => {
+        const next = patchAction(prev, action.id, {
+          syncStatus: SYNC_STATUS.CLOUD,
+          cloudId: cloudRecord.cloudId,
+          cloudUserId: cloudRecord.cloudUserId,
+          storageSource: 'both',
+        })
+        persistActions(next)
+        return next
+      })
+      setCloudActions((prev) => {
+        const withoutDup = prev.filter(
+          (item) => item.cloudId !== cloudRecord.cloudId && item.id !== action.id,
+        )
+        return [cloudRecord, ...withoutDup]
+      })
+    }
   }
 
   useEffect(() => {
@@ -130,6 +195,7 @@ function App() {
       setCloudPreStarts([])
       setCloudToolboxRecords([])
       setCloudIncidents([])
+      setCloudActions([])
       return undefined
     }
 
@@ -154,6 +220,7 @@ function App() {
       setCloudPreStarts([])
       setCloudToolboxRecords([])
       setCloudIncidents([])
+      setCloudActions([])
       return undefined
     }
 
@@ -185,16 +252,41 @@ function App() {
       if (isMounted) setCloudIncidents(records)
     }
 
+    async function loadCloudActionRecords() {
+      const { records } = await fetchActionRecords(session.user.id, { isAdmin })
+      if (isMounted) setCloudActions(records)
+    }
+
     loadCloudTimesheets()
     loadCloudJobStarts()
     loadCloudPreStarts()
     loadCloudToolboxRecords()
     loadCloudIncidents()
+    loadCloudActionRecords()
 
     return () => {
       isMounted = false
     }
   }, [session?.user?.id, profile?.role])
+
+  useEffect(() => {
+    if (!session?.user?.id) return undefined
+
+    setActions((prev) => {
+      const merged = getMergedActions(prev, cloudActions)
+      const changed =
+        merged.length !== prev.length ||
+        merged.some(
+          (action, index) =>
+            action.cloudId !== prev[index]?.cloudId || action.id !== prev[index]?.id,
+        )
+      if (changed) {
+        persistActions(merged)
+        return merged
+      }
+      return prev
+    })
+  }, [cloudActions, session?.user?.id])
 
   async function signIn(email, password) {
     if (!supabase) return
@@ -284,6 +376,10 @@ function App() {
           onBack={goToDashboard}
           actions={actions}
           setActions={setActions}
+          user={session?.user ?? null}
+          profile={profile}
+          cloudActions={cloudActions}
+          setCloudActions={setCloudActions}
         />
       )}
 

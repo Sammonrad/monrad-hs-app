@@ -18,7 +18,8 @@ export function priorityFromDefectSeverity(severity) {
 }
 
 export function normalizeAction(action) {
-  return {
+  const status = action.status ?? 'open'
+  const normalized = {
     id: action.id ?? createRecordId(),
     sourceType: action.sourceType ?? 'manual',
     sourceRecordId: action.sourceRecordId ?? null,
@@ -27,13 +28,27 @@ export function normalizeAction(action) {
     description: action.description ?? '',
     personResponsible: action.personResponsible ?? '',
     dueDate: action.dueDate ?? '',
-    status: action.status ?? 'open',
+    status,
     priority: normalizePriority(action.priority),
     notes: action.notes ?? '',
     createdAt: action.createdAt ?? new Date().toISOString(),
     autoCreated: action.autoCreated ?? false,
     serious: action.serious ?? false,
+    cloudId: action.cloudId ?? null,
+    cloudUserId: action.cloudUserId ?? null,
+    storageSource: action.storageSource ?? (action.cloudId ? 'cloud' : 'local'),
+    syncStatus: action.syncStatus ?? null,
+    completedAt:
+      action.completedAt ??
+      (status === 'completed' ? action.updatedAt ?? null : null),
   }
+  return normalized
+}
+
+export function patchAction(actions, actionId, patch) {
+  return actions.map((action) =>
+    action.id === actionId ? normalizeAction({ ...action, ...patch }) : action,
+  )
 }
 
 export function loadActions() {

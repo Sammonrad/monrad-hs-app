@@ -10,26 +10,95 @@ import {
   normalizeAction,
   createEmptyManualAction,
   isOverdue,
+  patchAction,
 } from '../utils/storage/actionsStorage.js'
+import {
+  fetchActionRecords,
+  getMergedActions,
+  saveActionRecord,
+  updateActionRecord,
+  SYNC_STATUS,
+  isCloudSaveUnavailable,
+  getUnavailableSyncStatus,
+} from '../utils/storage/actionCloudStorage.js'
+import { isAdminProfile } from '../utils/storage/userProfileStorage.js'
 import {
   filterActionsByRegisterFilter,
   sortActiveActions,
 } from '../utils/safetyAlerts.js'
 
-export function ActionRegisterView({ onBack, actions, setActions }) {
+export function ActionRegisterView({
+  onBack,
+  actions,
+  setActions,
+  user,
+  profile,
+  cloudActions,
+  setCloudActions,
+}) {
   const [showAddForm, setShowAddForm] = useState(false)
   const [manualDraft, setManualDraft] = useState(createEmptyManualAction)
   const [validationError, setValidationError] = useState(null)
   const [statusFilter, setStatusFilter] = useState('all')
   const [printAction, setPrintAction] = useState(null)
+  const [cloudLoading, setCloudLoading] = useState(false)
+  const [cloudError, setCloudError] = useState('')
+
+  const isAdmin = isAdminProfile(profile)
+
+  useEffect(() => {
+    if (!user?.id) {
+      setCloudError('')
+      return undefined
+    }
+
+    let isMounted = true
+    setCloudLoading(true)
+    setCloudError('')
+
+    fetchActionRecords(user.id, { isAdmin }).then(({ records, error }) => {
+      if (!isMounted) return
+      setCloudLoading(false)
+      if (error) {
+        setCloudError(error.message || 'Could not load cloud actions.')
+        return
+      }
+
+      setCloudActions(records)
+      setActions((prev) => {
+        const merged = getMergedActions(prev, records)
+        const changed =
+          merged.length !== prev.length ||
+          merged.some(
+            (action, index) =>
+              action.cloudId !== prev[index]?.cloudId ||
+              action.id !== prev[index]?.id,
+          )
+        if (changed) {
+          persistActions(merged)
+          return merged
+        }
+        return prev
+      })
+    })
+
+    return () => {
+      isMounted = false
+    }
+  }, [user?.id, isAdmin, setActions, setCloudActions])
+
+  const displayActions = useMemo(() => {
+    if (!user?.id || !cloudActions?.length) return actions
+    return getMergedActions(actions, cloudActions)
+  }, [actions, cloudActions, user?.id])
 
   const activeActions = useMemo(
-    () => sortActiveActions(actions.filter((action) => action.status !== 'completed')),
-    [actions],
+    () => sortActiveActions(displayActions.filter((action) => action.status !== 'completed')),
+    [displayActions],
   )
   const completedActions = useMemo(
-    () => actions.filter((action) => action.status === 'completed'),
-    [actions],
+    () => displayActions.filter((action) => action.status === 'completed'),
+    [displayActions],
   )
 
   const filteredActive = useMemo(() => {
@@ -52,11 +121,65 @@ export function ActionRegisterView({ onBack, actions, setActions }) {
     return true
   }
 
+  async function syncActionToCloud(action, isNew = false) {
+    if (isCloudSaveUnavailable(user)) {
+      const syncStatus = getUnavailableSyncStatus(user)
+      setActions((prev) => {
+        const next = patchAction(prev, action.id, { syncStatus })
+        persistActions(next)
+        return next
+      })
+      return
+    }
+
+    const { record: cloudRecord, error } = isNew || !action.cloudId
+      ? await saveActionRecord(user, action)
+      : await updateActionRecord(user, action)
+
+    if (error) {
+      setActions((prev) => {
+        const next = patchAction(prev, action.id, { syncStatus: SYNC_STATUS.CLOUD_FAILED })
+        persistActions(next)
+        return next
+      })
+      return
+    }
+
+    if (cloudRecord) {
+      const cloudPatch = {
+        syncStatus: SYNC_STATUS.CLOUD,
+        cloudId: cloudRecord.cloudId,
+        cloudUserId: cloudRecord.cloudUserId,
+        storageSource: 'both',
+        completedAt: cloudRecord.completedAt,
+      }
+      setActions((prev) => {
+        const next = patchAction(prev, action.id, cloudPatch)
+        persistActions(next)
+        return next
+      })
+      setCloudActions((prev) => {
+        const withoutDup = prev.filter(
+          (item) => item.cloudId !== cloudRecord.cloudId && item.id !== action.id,
+        )
+        return [cloudRecord, ...withoutDup]
+      })
+    }
+  }
+
   function handleUpdateAction(actionId, updates) {
-    const next = actions.map((action) =>
-      action.id === actionId ? normalizeAction({ ...action, ...updates }) : action,
-    )
-    updateActions(next)
+    const existing = actions.find((action) => action.id === actionId)
+    if (!existing) return
+
+    const withCompleted =
+      updates.status === 'completed'
+        ? { ...updates, completedAt: new Date().toISOString() }
+        : updates
+
+    const updated = normalizeAction({ ...existing, ...withCompleted })
+    const next = actions.map((action) => (action.id === actionId ? updated : action))
+    if (!updateActions(next)) return
+    syncActionToCloud(updated)
   }
 
   function handleCompleteAction(actionId) {
@@ -85,12 +208,14 @@ export function ActionRegisterView({ onBack, actions, setActions }) {
       createdAt: new Date().toISOString(),
       autoCreated: false,
       serious: false,
+      storageSource: 'local',
     })
 
     if (!updateActions([newAction, ...actions])) return
     setManualDraft(createEmptyManualAction())
     setShowAddForm(false)
     setValidationError(null)
+    syncActionToCloud(newAction, true)
   }
 
   useEffect(() => {
@@ -131,7 +256,13 @@ export function ActionRegisterView({ onBack, actions, setActions }) {
         <p className="progress" aria-live="polite">
           {activeActions.length} open · {completedActions.length} completed
           {overdueCount > 0 ? ` · ${overdueCount} overdue` : ''}
+          {cloudLoading && ' · Loading cloud actions…'}
         </p>
+        {cloudError && (
+          <p className="validation-message" role="alert">
+            {cloudError} Showing local actions only.
+          </p>
+        )}
       </header>
 
       <section className="actions-register no-print" aria-labelledby="actions-open-heading">

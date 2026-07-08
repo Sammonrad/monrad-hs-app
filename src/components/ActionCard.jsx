@@ -7,6 +7,7 @@ import {
 import { isOverdue } from '../utils/storage/actionsStorage.js'
 import { isCriticalAction } from '../utils/safetyAlerts.js'
 import { SummaryRow } from './FormFields.jsx'
+import { CloudSyncBadge } from './CloudSyncBadge.jsx'
 import { exportActionJson, exportActionText } from '../utils/export.js'
 
 export function ActionCard({ action, onUpdate, onComplete, onPrint }) {
@@ -29,6 +30,7 @@ export function ActionCard({ action, onUpdate, onComplete, onPrint }) {
         <span className="type-badge type-badge--small">
           {SOURCE_TYPE_LABELS[action.sourceType] ?? action.sourceType}
         </span>
+        <CloudSyncBadge record={action} size="small" />
         <span
           className={`action-priority action-priority--${action.priority}${
             critical ? ' action-priority--critical-open' : ''

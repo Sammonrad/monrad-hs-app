@@ -218,7 +218,7 @@ function actionToSearchItem(action) {
   if (overdue) statusParts.push('Overdue')
 
   return {
-    id: `action-${action.id}`,
+    id: `action-${action.cloudId ?? action.id}`,
     itemType: 'action',
     resultType: 'action',
     typeLabel: 'Action Register',
@@ -235,8 +235,8 @@ function actionToSearchItem(action) {
     isOpenAction: action.status !== 'completed',
     isOverdue: overdue,
     isCritical: action.priority === 'critical' && action.status !== 'completed',
-    isLocalOnly: true,
-    isCloudBacked: false,
+    isLocalOnly: isLocalOnlyRecord(action),
+    isCloudBacked: isCloudBackedRecord(action),
   }
 }
 

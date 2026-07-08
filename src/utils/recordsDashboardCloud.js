@@ -3,11 +3,13 @@ import { fetchJobStartRecords } from './storage/jobStartCloudStorage.js'
 import { fetchPreStartRecords } from './storage/preStartCloudStorage.js'
 import { fetchToolboxRecords } from './storage/toolboxCloudStorage.js'
 import { fetchIncidentRecords } from './storage/incidentCloudStorage.js'
+import { fetchActionRecords } from './storage/actionCloudStorage.js'
 import { getMergedTimesheetRecords } from './storage/timesheetCloudStorage.js'
 import { getMergedJobStartRecords } from './storage/jobStartCloudStorage.js'
 import { getMergedPreStartRecords } from './storage/preStartCloudStorage.js'
 import { getMergedToolboxRecords } from './storage/toolboxCloudStorage.js'
 import { getMergedIncidentRecords } from './storage/incidentCloudStorage.js'
+import { getMergedActions } from './storage/actionCloudStorage.js'
 
 export async function fetchAllCloudRecords(userId, { isAdmin = false } = {}) {
   if (!userId) {
@@ -17,18 +19,26 @@ export async function fetchAllCloudRecords(userId, { isAdmin = false } = {}) {
       preStarts: [],
       toolbox: [],
       incidents: [],
+      actions: [],
       error: null,
     }
   }
 
-  const [timesheetResult, jobStartResult, preStartResult, toolboxResult, incidentResult] =
-    await Promise.all([
-      fetchTimesheetRecords(userId, { isAdmin }),
-      fetchJobStartRecords(userId, { isAdmin }),
-      fetchPreStartRecords(userId, { isAdmin }),
-      fetchToolboxRecords(userId, { isAdmin }),
-      fetchIncidentRecords(userId, { isAdmin }),
-    ])
+  const [
+    timesheetResult,
+    jobStartResult,
+    preStartResult,
+    toolboxResult,
+    incidentResult,
+    actionResult,
+  ] = await Promise.all([
+    fetchTimesheetRecords(userId, { isAdmin }),
+    fetchJobStartRecords(userId, { isAdmin }),
+    fetchPreStartRecords(userId, { isAdmin }),
+    fetchToolboxRecords(userId, { isAdmin }),
+    fetchIncidentRecords(userId, { isAdmin }),
+    fetchActionRecords(userId, { isAdmin }),
+  ])
 
   const error =
     timesheetResult.error ||
@@ -36,6 +46,7 @@ export async function fetchAllCloudRecords(userId, { isAdmin = false } = {}) {
     preStartResult.error ||
     toolboxResult.error ||
     incidentResult.error ||
+    actionResult.error ||
     null
 
   return {
@@ -44,6 +55,7 @@ export async function fetchAllCloudRecords(userId, { isAdmin = false } = {}) {
     preStarts: preStartResult.records ?? [],
     toolbox: toolboxResult.records ?? [],
     incidents: incidentResult.records ?? [],
+    actions: actionResult.records ?? [],
     error,
   }
 }
@@ -68,4 +80,8 @@ export function isLocalOnlyRecord(record) {
 
 export function isCloudBackedRecord(record) {
   return record.storageSource === 'cloud' || record.storageSource === 'both' || Boolean(record.cloudId)
+}
+
+export function mergeDashboardActions(localActions, cloudActions) {
+  return getMergedActions(localActions, cloudActions)
 }
