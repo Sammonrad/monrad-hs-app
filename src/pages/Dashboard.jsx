@@ -46,89 +46,93 @@ export function Dashboard({ onNavigate, recordCount, openActionCount, savedRecor
         <p className="dashboard__tagline">Health &amp; Safety App</p>
       </header>
 
-      <section className="safety-alerts" aria-labelledby="dashboard-safety-heading">
-        <div className="safety-alerts__header">
-          <h2 id="dashboard-safety-heading" className="safety-alerts__title">
-            Safety alerts
-          </h2>
-          <button
-            type="button"
-            className="safety-alerts__link"
-            onClick={() => onNavigate('action-register')}
-          >
-            View action register
-          </button>
-        </div>
-        <dl className="safety-alerts__grid">
-          <div className="safety-alerts__item">
-            <dt>Open actions</dt>
-            <dd>{alerts.openActions}</dd>
-          </div>
-          <div
-            className={`safety-alerts__item${
-              alerts.overdueActions > 0 ? ' safety-alerts__item--alert' : ''
-            }`}
-          >
-            <dt>Overdue actions</dt>
-            <dd>{alerts.overdueActions}</dd>
-          </div>
-          <div
-            className={`safety-alerts__item${
-              alerts.criticalActions > 0 ? ' safety-alerts__item--alert' : ''
-            }`}
-          >
-            <dt>Critical actions</dt>
-            <dd>{alerts.criticalActions}</dd>
-          </div>
-          <div
-            className={`safety-alerts__item${
-              alerts.unresolvedMachineDefects > 0 ? ' safety-alerts__item--alert' : ''
-            }`}
-          >
-            <dt>Unresolved machine defects</dt>
-            <dd>{alerts.unresolvedMachineDefects}</dd>
-          </div>
-          <div
-            className={`safety-alerts__item${
-              alerts.unresolvedIncidentActions > 0 ? ' safety-alerts__item--alert' : ''
-            }`}
-          >
-            <dt>Unresolved incident actions</dt>
-            <dd>{alerts.unresolvedIncidentActions}</dd>
-          </div>
-        </dl>
-      </section>
-
       <nav className="dashboard__nav" aria-label="Form types">
         {DASHBOARD_GROUPS.map((group) => (
-          <section key={group.id} className="dashboard-group" aria-labelledby={`group-${group.id}`}>
-            <h2 id={`group-${group.id}`} className="dashboard-group__title">
-              {group.title}
-            </h2>
-            <div className="dashboard-group__grid">
-              {group.cardIds.map((cardId) => {
-                const card = cardsById[cardId]
-                if (!card) return null
+          <div key={group.id} className="dashboard-group-block">
+            <section className="dashboard-group" aria-labelledby={`group-${group.id}`}>
+              <h2 id={`group-${group.id}`} className="dashboard-group__title">
+                {group.title}
+              </h2>
+              <div className="dashboard-group__grid">
+                {group.cardIds.map((cardId) => {
+                  const card = cardsById[cardId]
+                  if (!card) return null
 
-                return (
+                  return (
+                    <button
+                      key={card.id}
+                      type="button"
+                      className={getDashboardCardClass(card.id)}
+                      onClick={() => onNavigate(card.id)}
+                    >
+                      <span className="dashboard-card__title">{card.title}</span>
+                      {!card.available && (
+                        <span className="dashboard-card__badge">Coming soon</span>
+                      )}
+                      {card.id === 'action-register' && openActionCount > 0 && (
+                        <span className="dashboard-card__count">{openActionCount} open</span>
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+            </section>
+
+            {group.id === 'site-safety' && (
+              <section className="safety-alerts" aria-labelledby="dashboard-safety-heading">
+                <div className="safety-alerts__header">
+                  <h2 id="dashboard-safety-heading" className="safety-alerts__title">
+                    Safety alerts
+                  </h2>
                   <button
-                    key={card.id}
                     type="button"
-                    className={getDashboardCardClass(card.id)}
-                    onClick={() => onNavigate(card.id)}
+                    className="safety-alerts__link"
+                    onClick={() => onNavigate('action-register')}
                   >
-                    <span className="dashboard-card__title">{card.title}</span>
-                    {!card.available && (
-                      <span className="dashboard-card__badge">Coming soon</span>
-                    )}
-                    {card.id === 'action-register' && openActionCount > 0 && (
-                      <span className="dashboard-card__count">{openActionCount} open</span>
-                    )}
+                    View action register
                   </button>
-                )
-              })}
-            </div>
-          </section>
+                </div>
+                <dl className="safety-alerts__grid">
+                  <div className="safety-alerts__item">
+                    <dt>Open actions</dt>
+                    <dd>{alerts.openActions}</dd>
+                  </div>
+                  <div
+                    className={`safety-alerts__item${
+                      alerts.overdueActions > 0 ? ' safety-alerts__item--alert' : ''
+                    }`}
+                  >
+                    <dt>Overdue actions</dt>
+                    <dd>{alerts.overdueActions}</dd>
+                  </div>
+                  <div
+                    className={`safety-alerts__item${
+                      alerts.criticalActions > 0 ? ' safety-alerts__item--alert' : ''
+                    }`}
+                  >
+                    <dt>Critical actions</dt>
+                    <dd>{alerts.criticalActions}</dd>
+                  </div>
+                  <div
+                    className={`safety-alerts__item${
+                      alerts.unresolvedMachineDefects > 0 ? ' safety-alerts__item--alert' : ''
+                    }`}
+                  >
+                    <dt>Unresolved machine defects</dt>
+                    <dd>{alerts.unresolvedMachineDefects}</dd>
+                  </div>
+                  <div
+                    className={`safety-alerts__item${
+                      alerts.unresolvedIncidentActions > 0 ? ' safety-alerts__item--alert' : ''
+                    }`}
+                  >
+                    <dt>Unresolved incident actions</dt>
+                    <dd>{alerts.unresolvedIncidentActions}</dd>
+                  </div>
+                </dl>
+              </section>
+            )}
+          </div>
         ))}
       </nav>
 
