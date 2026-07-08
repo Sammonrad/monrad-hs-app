@@ -6,6 +6,7 @@ import { ActionRegisterView } from './pages/ActionRegisterView.jsx'
 import { RecordsDashboardView } from './pages/RecordsDashboardView.jsx'
 import { SettingsView } from './pages/SettingsView.jsx'
 import { BackupRestoreView } from './pages/BackupRestoreView.jsx'
+import { AccessBlockedView } from './pages/AccessBlockedView.jsx'
 import { StaffManagementView } from './pages/StaffManagementView.jsx'
 import { JobStartView } from './pages/JobStartView.jsx'
 import { PreStartView } from './pages/PreStartView.jsx'
@@ -32,7 +33,15 @@ import {
   isCloudSaveUnavailable,
   getUnavailableSyncStatus,
 } from './utils/storage/actionCloudStorage.js'
-import { getRoleLabel, isAdminProfile, loadOrCreateProfile } from './utils/storage/userProfileStorage.js'
+import {
+  getRoleLabel,
+  getStatusLabel,
+  getProfileStatus,
+  isAdminProfile,
+  isProfileAccessAllowed,
+  loadOrCreateProfile,
+  STATUS,
+} from './utils/storage/userProfileStorage.js'
 
 function App() {
   const [currentView, setCurrentView] = useState('dashboard')
@@ -52,6 +61,7 @@ function App() {
   const [cloudIncidents, setCloudIncidents] = useState([])
   const [cloudActions, setCloudActions] = useState([])
   const [profile, setProfile] = useState(null)
+  const [profileLoading, setProfileLoading] = useState(false)
 
   const openActionCount = actions.filter((action) => action.status !== 'completed').length
 
@@ -191,6 +201,7 @@ function App() {
   useEffect(() => {
     if (!session?.user?.id) {
       setProfile(null)
+      setProfileLoading(false)
       setCloudTimesheets([])
       setCloudJobStarts([])
       setCloudPreStarts([])
@@ -201,10 +212,14 @@ function App() {
     }
 
     let isMounted = true
+    setProfileLoading(true)
 
     async function loadProfile() {
       const { profile: nextProfile } = await loadOrCreateProfile(session.user)
-      if (isMounted) setProfile(nextProfile)
+      if (isMounted) {
+        setProfile(nextProfile)
+        setProfileLoading(false)
+      }
     }
 
     loadProfile()
@@ -322,7 +337,16 @@ function App() {
 
   const userEmail = session?.user?.email ?? ''
   const roleLabel = profile ? getRoleLabel(profile) : ''
+  const statusLabel = profile ? getStatusLabel(profile) : ''
+  const profileStatus = profile ? getProfileStatus(profile) : null
+  const hasAppAccess = profile ? isProfileAccessAllowed(profile) : false
   const showAuthView = authReady && (!isSupabaseConfigured || !session)
+  const showProfileLoading = authReady && session && profileLoading
+  const showPendingView =
+    authReady && session && !profileLoading && profile && !hasAppAccess && profileStatus === STATUS.PENDING
+  const showDisabledView =
+    authReady && session && !profileLoading && profile && !hasAppAccess && profileStatus === STATUS.DISABLED
+  const showMainApp = authReady && session && !profileLoading && hasAppAccess
 
   return (
     <div className="app">
@@ -342,12 +366,45 @@ function App() {
         />
       )}
 
-      {authReady && session && (
+      {showProfileLoading && (
+        <section className="auth-card" aria-live="polite">
+          <p className="progress">Loading your profile…</p>
+        </section>
+      )}
+
+      {showPendingView && (
+        <AccessBlockedView
+          title="Account pending approval"
+          message="Your account is pending approval. Please contact Sam Monrad."
+          onSignOut={signOut}
+          isLoading={authLoading}
+        />
+      )}
+
+      {showDisabledView && (
+        <AccessBlockedView
+          title="Account disabled"
+          message="Your account has been disabled. Please contact Sam Monrad."
+          onSignOut={signOut}
+          isLoading={authLoading}
+        />
+      )}
+
+      {showMainApp && (
         <>
           <div className="app-auth-meta no-print">
             <div className="app-auth-meta__identity">
               <p className="app-auth-meta__email">{userEmail}</p>
-              {roleLabel && <span className="app-auth-meta__role">{roleLabel}</span>}
+              <div className="app-auth-meta__badges">
+                {roleLabel && <span className="app-auth-meta__role">{roleLabel}</span>}
+                {statusLabel && (
+                  <span
+                    className={`profile-status profile-status--${profileStatus} profile-status--small`}
+                  >
+                    {statusLabel}
+                  </span>
+                )}
+              </div>
             </div>
             <button type="button" className="action-btn" onClick={signOut} disabled={authLoading}>
               Sign out
@@ -509,6 +566,7 @@ function App() {
           <p className="app-version app-version--secondary">
             Signed in as {userEmail}
             {roleLabel ? ` · ${roleLabel}` : ''}
+            {statusLabel ? ` · ${statusLabel}` : ''}
           </p>
           <p className="app-version">Monrad Earthworx H&amp;S v{APP_VERSION}</p>
         </footer>

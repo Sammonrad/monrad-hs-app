@@ -221,6 +221,82 @@ body {
   margin-top: 2rem;
 }
 
+.dashboard__profile-badges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  margin-bottom: 0.5rem;
+}
+
+.profile-status {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.5rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  border-radius: 4px;
+  border: 1px solid transparent;
+}
+
+.profile-status--small {
+  font-size: 0.62rem;
+  padding: 0.1rem 0.45rem;
+}
+
+.profile-status--pending {
+  color: #7a5c00;
+  background: #fff8e1;
+  border-color: #f9a825;
+}
+
+.profile-status--active {
+  color: #1b5e20;
+  background: #e8f5e9;
+  border-color: #2e7d32;
+}
+
+.profile-status--disabled {
+  color: #666;
+  background: #f0f0f0;
+  border-color: #bbb;
+}
+
+.access-blocked-view {
+  margin-top: 1rem;
+}
+
+.access-blocked-card {
+  margin-top: 1.25rem;
+  padding: 1.25rem 1rem;
+  text-align: center;
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+}
+
+.access-blocked-card__title {
+  margin: 0 0 0.75rem;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #1a1a1a;
+}
+
+.access-blocked-card__message {
+  margin: 0 0 1.25rem;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  color: #666;
+}
+
+.access-blocked-card__sign-out {
+  max-width: 16rem;
+  margin: 0 auto;
+}
+
 .app-footer {
   margin-top: 2rem;
   padding-top: 1rem;
@@ -257,6 +333,13 @@ body {
   flex-direction: column;
   gap: 0.25rem;
   min-width: 0;
+}
+
+.app-auth-meta__badges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
 }
 
 .app-auth-meta__email {
@@ -1609,6 +1692,17 @@ body {
   border-radius: 8px;
 }
 
+.staff-management__filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.staff-management__table td .profile-status {
+  margin-top: 0.35rem;
+}
+
 .staff-management__table-wrap {
   overflow-x: auto;
   margin-bottom: 1.5rem;
@@ -1657,7 +1751,8 @@ body {
 }
 
 .staff-management__input,
-.staff-management__select {
+.staff-management__select,
+.staff-management__textarea {
   width: 100%;
   min-width: 0;
   padding: 0.5rem 0.625rem;
@@ -1669,8 +1764,15 @@ body {
   border-radius: 4px;
 }
 
+.staff-management__textarea {
+  resize: vertical;
+  min-height: 3rem;
+  line-height: 1.4;
+}
+
 .staff-management__input:focus,
-.staff-management__select:focus {
+.staff-management__select:focus,
+.staff-management__textarea:focus {
   outline: 2px solid #c41e3a;
   outline-offset: 1px;
   border-color: #c41e3a;

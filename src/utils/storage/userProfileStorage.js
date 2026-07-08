@@ -5,6 +5,12 @@ export const ROLES = {
   STAFF: 'staff',
 }
 
+export const STATUS = {
+  PENDING: 'pending',
+  ACTIVE: 'active',
+  DISABLED: 'disabled',
+}
+
 export function getProfileRole(profile) {
   if (profile?.role === ROLES.ADMIN) return ROLES.ADMIN
   return ROLES.STAFF
@@ -16,6 +22,24 @@ export function isAdminProfile(profile) {
 
 export function getRoleLabel(profile) {
   return isAdminProfile(profile) ? 'Admin' : 'Staff'
+}
+
+export function getProfileStatus(profile) {
+  if (profile?.status === STATUS.ACTIVE) return STATUS.ACTIVE
+  if (profile?.status === STATUS.DISABLED) return STATUS.DISABLED
+  return STATUS.PENDING
+}
+
+export function getStatusLabel(profile) {
+  const status = getProfileStatus(profile)
+  if (status === STATUS.ACTIVE) return 'Active'
+  if (status === STATUS.DISABLED) return 'Disabled'
+  return 'Pending'
+}
+
+export function isProfileAccessAllowed(profile) {
+  if (isAdminProfile(profile)) return true
+  return getProfileStatus(profile) === STATUS.ACTIVE
 }
 
 function defaultFullNameFromEmail(email) {
@@ -48,6 +72,9 @@ export async function loadOrCreateProfile(user) {
     email: user.email ?? '',
     full_name: defaultFullNameFromEmail(user.email) || '',
     role: ROLES.STAFF,
+    status: STATUS.PENDING,
+    phone: '',
+    notes: '',
   }
 
   const { data: created, error: createError } = await supabase
@@ -88,6 +115,9 @@ export async function updateProfile(userId, updates) {
   const payload = {}
   if (updates.full_name !== undefined) payload.full_name = updates.full_name.trim()
   if (updates.role !== undefined) payload.role = updates.role
+  if (updates.status !== undefined) payload.status = updates.status
+  if (updates.phone !== undefined) payload.phone = updates.phone.trim()
+  if (updates.notes !== undefined) payload.notes = updates.notes.trim()
 
   const { data, error } = await supabase
     .from('user_profiles')

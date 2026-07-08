@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { DASHBOARD_GROUPS, DASHBOARD_CARDS, APP_VERSION } from '../constants/index.js'
 import { getSafetyAlerts } from '../utils/safetyAlerts.js'
 import { MonradLogo } from '../components/MonradLogo.jsx'
-import { getRoleLabel, isAdminProfile } from '../utils/storage/userProfileStorage.js'
+import { getRoleLabel, getStatusLabel, getProfileStatus, isAdminProfile } from '../utils/storage/userProfileStorage.js'
 
 function getDashboardCardClass(cardId) {
   switch (cardId) {
@@ -26,6 +26,8 @@ function getDashboardCardClass(cardId) {
 export function Dashboard({ onNavigate, recordCount, openActionCount, savedRecords, actions, userEmail, profile }) {
   const alerts = getSafetyAlerts(savedRecords ?? [], actions ?? [])
   const roleLabel = profile ? getRoleLabel(profile) : ''
+  const statusLabel = profile ? getStatusLabel(profile) : ''
+  const profileStatus = profile ? getProfileStatus(profile) : null
   const isAdmin = isAdminProfile(profile)
   const cardsById = useMemo(
     () =>
@@ -145,7 +147,18 @@ export function Dashboard({ onNavigate, recordCount, openActionCount, savedRecor
           <p className="app-version app-version--secondary">
             Signed in as {userEmail}
             {roleLabel ? ` · ${roleLabel}` : ''}
+            {statusLabel ? ` · ${statusLabel}` : ''}
           </p>
+        )}
+        {profile && (
+          <div className="dashboard__profile-badges">
+            {roleLabel && <span className="app-auth-meta__role">{roleLabel}</span>}
+            {statusLabel && (
+              <span className={`profile-status profile-status--${profileStatus} profile-status--small`}>
+                {statusLabel}
+              </span>
+            )}
+          </div>
         )}
         <p className="dashboard__cloud-note">Cloud records are linked to the signed-in user.</p>
         <p className="app-version">Monrad Earthworx H&amp;S v{APP_VERSION}</p>
