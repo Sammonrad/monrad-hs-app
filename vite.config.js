@@ -12,8 +12,9 @@ export default defineConfig({
       includeAssets: [
         'favicon.svg',
         'manifest.webmanifest',
-        'pwa-192.svg',
-        'pwa-512.svg',
+        'monrad-icon-192.png',
+        'monrad-icon-512.png',
+        'apple-touch-icon.png',
         'icons.svg',
       ],
       workbox: {
