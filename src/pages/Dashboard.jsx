@@ -82,7 +82,7 @@ export function Dashboard({ onNavigate, recordCount, openActionCount, savedRecor
               <section className="safety-alerts" aria-labelledby="dashboard-safety-heading">
                 <div className="safety-alerts__header">
                   <h2 id="dashboard-safety-heading" className="safety-alerts__title">
-                    Safety alerts
+                    Safety Alerts
                   </h2>
                   <button
                     type="button"
@@ -126,7 +126,7 @@ export function Dashboard({ onNavigate, recordCount, openActionCount, savedRecor
                       alerts.unresolvedIncidentActions > 0 ? ' safety-alerts__item--alert' : ''
                     }`}
                   >
-                    <dt>Unresolved incident actions</dt>
+                    <dt>Unresolved incident corrective actions</dt>
                     <dd>{alerts.unresolvedIncidentActions}</dd>
                   </div>
                 </dl>
