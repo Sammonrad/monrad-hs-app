@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
-import { DASHBOARD_GROUPS, DASHBOARD_CARDS, APP_VERSION } from '../constants/index.js'
+import { DASHBOARD_GROUPS, DASHBOARD_CARDS } from '../constants/index.js'
 import { MonradLogo } from '../components/MonradLogo.jsx'
-import { getRoleLabel, getStatusLabel, getProfileStatus, isAdminProfile } from '../utils/storage/userProfileStorage.js'
+import { isAdminProfile } from '../utils/storage/userProfileStorage.js'
 
 function getDashboardCardClass(cardId) {
   switch (cardId) {
@@ -26,10 +26,7 @@ function getDashboardCardClass(cardId) {
   }
 }
 
-export function Dashboard({ onNavigate, recordCount, openActionCount, userEmail, profile }) {
-  const roleLabel = profile ? getRoleLabel(profile) : ''
-  const statusLabel = profile ? getStatusLabel(profile) : ''
-  const profileStatus = profile ? getProfileStatus(profile) : null
+export function Dashboard({ onNavigate, recordCount, openActionCount, profile }) {
   const isAdmin = isAdminProfile(profile)
   const cardsById = useMemo(
     () =>
@@ -93,27 +90,7 @@ export function Dashboard({ onNavigate, recordCount, openActionCount, userEmail,
         </p>
       )}
 
-      <footer className="dashboard__footer">
-        {userEmail && (
-          <p className="app-version app-version--secondary">
-            Signed in as {userEmail}
-            {roleLabel ? ` · ${roleLabel}` : ''}
-            {statusLabel ? ` · ${statusLabel}` : ''}
-          </p>
-        )}
-        {profile && (
-          <div className="dashboard__profile-badges">
-            {roleLabel && <span className="app-auth-meta__role">{roleLabel}</span>}
-            {statusLabel && (
-              <span className={`profile-status profile-status--${profileStatus} profile-status--small`}>
-                {statusLabel}
-              </span>
-            )}
-          </div>
-        )}
-        <p className="dashboard__cloud-note">Cloud records are linked to the signed-in user.</p>
-        <p className="app-version">Monrad Earthworx H&amp;S v{APP_VERSION}</p>
-      </footer>
+      <p className="dashboard__cloud-note">Cloud records are linked to the signed-in user.</p>
     </div>
   )
 }

@@ -423,25 +423,6 @@ function App() {
 
       {showMainApp && (
         <>
-          <div className="app-auth-meta no-print">
-            <div className="app-auth-meta__identity">
-              <p className="app-auth-meta__email">{userEmail}</p>
-              <div className="app-auth-meta__badges">
-                {roleLabel && <span className="app-auth-meta__role">{roleLabel}</span>}
-                {statusLabel && (
-                  <span
-                    className={`profile-status profile-status--${profileStatus} profile-status--small`}
-                  >
-                    {statusLabel}
-                  </span>
-                )}
-              </div>
-            </div>
-            <button type="button" className="action-btn" onClick={signOut} disabled={authLoading}>
-              Sign out
-            </button>
-          </div>
-
       {printRecord && (
         <div className="print-area" aria-hidden="true">
           <PrintableRecord record={printRecord} />
@@ -453,7 +434,6 @@ function App() {
           onNavigate={handleNavigate}
           recordCount={savedRecords.length}
           openActionCount={openActionCount}
-          userEmail={userEmail}
           profile={profile}
         />
       )}
@@ -610,16 +590,41 @@ function App() {
         />
       )}
 
-      {currentView !== 'dashboard' && (
-        <footer className="app-footer no-print">
-          <p className="app-version app-version--secondary">
-            Signed in as {userEmail}
-            {roleLabel ? ` · ${roleLabel}` : ''}
-            {statusLabel ? ` · ${statusLabel}` : ''}
-          </p>
-          <p className="app-version">Monrad Earthworx H&amp;S v{APP_VERSION}</p>
-        </footer>
-      )}
+      <footer className="app-footer no-print" aria-label="Account">
+        <div className="app-footer__account">
+          {userEmail && (
+            <p className="app-footer__line">
+              <span className="app-footer__label">Signed in as</span>{' '}
+              <span className="app-footer__value">{userEmail}</span>
+            </p>
+          )}
+          {roleLabel && (
+            <p className="app-footer__line">
+              <span className="app-footer__label">Role</span>{' '}
+              <span className="app-footer__value">{roleLabel}</span>
+            </p>
+          )}
+          {statusLabel && (
+            <p className="app-footer__line">
+              <span className="app-footer__label">Status</span>{' '}
+              <span
+                className={`profile-status profile-status--${profileStatus} profile-status--small`}
+              >
+                {statusLabel}
+              </span>
+            </p>
+          )}
+          <button
+            type="button"
+            className="app-footer__sign-out"
+            onClick={signOut}
+            disabled={authLoading}
+          >
+            {authLoading ? 'Signing out…' : 'Sign out'}
+          </button>
+        </div>
+        <p className="app-version">Monrad Earthworx H&amp;S v{APP_VERSION}</p>
+      </footer>
         </>
       )}
     </div>
