@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { DASHBOARD_GROUPS, DASHBOARD_CARDS, APP_VERSION } from '../constants/index.js'
 import { getSafetyAlerts } from '../utils/safetyAlerts.js'
 import { MonradLogo } from '../components/MonradLogo.jsx'
-import { getRoleLabel } from '../utils/storage/userProfileStorage.js'
+import { getRoleLabel, isAdminProfile } from '../utils/storage/userProfileStorage.js'
 
 function getDashboardCardClass(cardId) {
   switch (cardId) {
@@ -14,6 +14,8 @@ function getDashboardCardClass(cardId) {
       return 'dashboard-card dashboard-card--settings'
     case 'backup-restore':
       return 'dashboard-card dashboard-card--backup'
+    case 'staff-management':
+      return 'dashboard-card dashboard-card--staff'
     case 'weekly-timesheet-summary':
       return 'dashboard-card dashboard-card--weekly'
     default:
@@ -24,9 +26,13 @@ function getDashboardCardClass(cardId) {
 export function Dashboard({ onNavigate, recordCount, openActionCount, savedRecords, actions, userEmail, profile }) {
   const alerts = getSafetyAlerts(savedRecords ?? [], actions ?? [])
   const roleLabel = profile ? getRoleLabel(profile) : ''
+  const isAdmin = isAdminProfile(profile)
   const cardsById = useMemo(
-    () => Object.fromEntries(DASHBOARD_CARDS.map((card) => [card.id, card])),
-    [],
+    () =>
+      Object.fromEntries(
+        DASHBOARD_CARDS.filter((card) => !card.adminOnly || isAdmin).map((card) => [card.id, card]),
+      ),
+    [isAdmin],
   )
 
   return (

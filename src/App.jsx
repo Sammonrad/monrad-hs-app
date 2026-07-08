@@ -6,6 +6,7 @@ import { ActionRegisterView } from './pages/ActionRegisterView.jsx'
 import { RecordsDashboardView } from './pages/RecordsDashboardView.jsx'
 import { SettingsView } from './pages/SettingsView.jsx'
 import { BackupRestoreView } from './pages/BackupRestoreView.jsx'
+import { StaffManagementView } from './pages/StaffManagementView.jsx'
 import { JobStartView } from './pages/JobStartView.jsx'
 import { PreStartView } from './pages/PreStartView.jsx'
 import { ToolboxView } from './pages/ToolboxView.jsx'
@@ -401,6 +402,14 @@ function App() {
       )}
 
       {currentView === 'backup-restore' && <BackupRestoreView onBack={goToDashboard} />}
+
+      {currentView === 'staff-management' && (
+        <StaffManagementView
+          onBack={goToDashboard}
+          profile={profile}
+          onProfileUpdated={setProfile}
+        />
+      )}
 
       {currentView === 'job-start' && (
         <JobStartView

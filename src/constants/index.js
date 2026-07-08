@@ -319,7 +319,7 @@ export const DASHBOARD_GROUPS = [
   {
     id: 'setup-backup',
     title: 'Setup & Backup',
-    cardIds: ['settings', 'backup-restore'],
+    cardIds: ['settings', 'staff-management', 'backup-restore'],
   },
 ]
 
@@ -377,6 +377,13 @@ export const DASHBOARD_CARDS = [
     title: 'Settings',
     group: 'setup-backup',
     available: true,
+  },
+  {
+    id: 'staff-management',
+    title: 'Staff Management',
+    group: 'setup-backup',
+    available: true,
+    adminOnly: true,
   },
   {
     id: 'backup-restore',
