@@ -8,6 +8,7 @@ import { SettingsView } from './pages/SettingsView.jsx'
 import { BackupRestoreView } from './pages/BackupRestoreView.jsx'
 import { AccessBlockedView } from './pages/AccessBlockedView.jsx'
 import { StaffManagementView } from './pages/StaffManagementView.jsx'
+import { HelpAppSetupView } from './pages/HelpAppSetupView.jsx'
 import { JobStartView } from './pages/JobStartView.jsx'
 import { PreStartView } from './pages/PreStartView.jsx'
 import { ToolboxView } from './pages/ToolboxView.jsx'
@@ -459,6 +460,10 @@ function App() {
       )}
 
       {currentView === 'backup-restore' && <BackupRestoreView onBack={goToDashboard} />}
+
+      {currentView === 'help-app-setup' && (
+        <HelpAppSetupView onBack={goToDashboard} profile={profile} />
+      )}
 
       {currentView === 'staff-management' && (
         <StaffManagementView
