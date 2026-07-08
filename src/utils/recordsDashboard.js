@@ -7,6 +7,7 @@ import { formatSubmittedAt, formatReportType, formatDefectSeverity } from './for
 import { getRecordTitle, getFormTypeLabel } from './records.js'
 import { isOverdue } from './storage/actionsStorage.js'
 import { getSafetyAlerts } from './safetyAlerts.js'
+import { isCloudBackedRecord, isLocalOnlyRecord } from './recordsDashboardCloud.js'
 
 export function getMostRecentRecordDate(records) {
   if (!records.length) return null
@@ -91,6 +92,24 @@ function collectSearchableText(parts) {
     .toLowerCase()
 }
 
+export function getMainPerson(record) {
+  const fields = record.fields ?? {}
+  switch (record.formType) {
+    case 'timesheet':
+      return fields.employeeName || ''
+    case 'job-start':
+      return fields.employeeName || ''
+    case 'pre-start':
+      return fields.operatorName || fields.operator || ''
+    case 'toolbox':
+      return fields.meetingLedBy || fields.facilitator || ''
+    case 'incident':
+      return fields.reportedBy || ''
+    default:
+      return fields.employeeName || fields.operatorName || fields.reportedBy || ''
+  }
+}
+
 function getRecordSearchHaystack(record) {
   const fields = record.fields ?? {}
   return collectSearchableText([
@@ -164,12 +183,13 @@ function getActionSearchHaystack(action) {
 
 function recordToSearchItem(record) {
   return {
-    id: `record-${record.id}`,
+    id: `record-${record.cloudId ?? record.id}`,
     itemType: 'record',
     resultType: record.formType,
     typeLabel: record.formTypeLabel || getFormTypeLabel(record.formType),
     date: record.fields?.date || '',
     site: record.fields?.siteLocation || '',
+    mainPerson: getMainPerson(record),
     title: getRecordTitle(record),
     status:
       record.completedCount != null
@@ -184,6 +204,8 @@ function recordToSearchItem(record) {
     hasDefect: record.formType === 'pre-start' && record.defectsFound === 'found',
     isIncident: record.formType === 'incident',
     isOpenAction: false,
+    isLocalOnly: isLocalOnlyRecord(record),
+    isCloudBacked: isCloudBackedRecord(record),
   }
 }
 
@@ -213,6 +235,8 @@ function actionToSearchItem(action) {
     isOpenAction: action.status !== 'completed',
     isOverdue: overdue,
     isCritical: action.priority === 'critical' && action.status !== 'completed',
+    isLocalOnly: true,
+    isCloudBacked: false,
   }
 }
 
@@ -227,27 +251,50 @@ export function buildSearchableItems(savedRecords, actionList) {
   })
 }
 
-function itemMatchesDate(item, dateFilter) {
-  if (!dateFilter) return true
+function getItemDateValue(item) {
   const candidates = [
     item.date,
     item.submittedAt?.slice(0, 10),
     item.record?.fields?.date,
     item.action?.createdAt?.slice(0, 10),
   ].filter(Boolean)
-  return candidates.some((value) => value === dateFilter || value.startsWith(dateFilter))
+  return candidates[0] ?? ''
 }
 
-export function filterSearchItems(items, { searchQuery, typeFilter, dateFilter, openActionsOnly, defectsOnly, incidentsOnly }) {
+function itemMatchesDateRange(item, dateFrom, dateTo) {
+  if (!dateFrom && !dateTo) return true
+  const value = getItemDateValue(item)
+  if (!value) return false
+  if (dateFrom && value < dateFrom) return false
+  if (dateTo && value > dateTo) return false
+  return true
+}
+
+export function filterSearchItems(
+  items,
+  {
+    searchQuery,
+    typeFilter,
+    dateFrom,
+    dateTo,
+    openActionsOnly,
+    defectsOnly,
+    incidentsOnly,
+    cloudOnly,
+    localOnly,
+  },
+) {
   const query = searchQuery.trim().toLowerCase()
 
   return items.filter((item) => {
     if (query && !item.searchText.includes(query)) return false
     if (typeFilter !== 'all' && item.resultType !== typeFilter) return false
-    if (!itemMatchesDate(item, dateFilter)) return false
+    if (!itemMatchesDateRange(item, dateFrom, dateTo)) return false
     if (openActionsOnly && !(item.itemType === 'action' && item.isOpenAction)) return false
     if (defectsOnly && !item.hasDefect) return false
     if (incidentsOnly && !item.isIncident) return false
+    if (cloudOnly && !item.isCloudBacked) return false
+    if (localOnly && !item.isLocalOnly) return false
     return true
   })
 }

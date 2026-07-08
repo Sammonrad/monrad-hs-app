@@ -295,6 +295,8 @@ function App() {
           actions={actions}
           setPrintRecord={setPrintRecord}
           onViewRecord={handleViewRecord}
+          user={session?.user ?? null}
+          profile={profile}
         />
       )}
 
