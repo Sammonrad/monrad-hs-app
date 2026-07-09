@@ -12,7 +12,7 @@ export function CloudSyncBadge({ record, syncStatus, size = 'default', className
 
   return (
     <span
-      className={`cloud-sync-status ${modifier} ${sizeClass} ${className}`.trim()}
+      className={['cloud-sync-status', modifier, sizeClass, className].filter(Boolean).join(' ')}
       role="status"
     >
       {label}

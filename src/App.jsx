@@ -610,7 +610,11 @@ function App() {
           {roleLabel && (
             <p className="app-footer__line">
               <span className="app-footer__label">Role</span>{' '}
-              <span className="app-footer__value">{roleLabel}</span>
+              <span
+                className={`type-badge type-badge--small type-badge--role-${profile?.role ?? 'staff'}`}
+              >
+                {roleLabel}
+              </span>
             </p>
           )}
           {statusLabel && (
