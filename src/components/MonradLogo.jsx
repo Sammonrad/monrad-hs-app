@@ -11,7 +11,7 @@ export function MonradLogo({ variant = 'default', className = '' }) {
   const classes = ['monrad-logo', `monrad-logo--${variant}`, className].filter(Boolean).join(' ')
   const src = LOGO_SRC_BY_VARIANT[variant] ?? MONRAD_LOGO_SRC
 
-  return (
+  const img = (
     <img
       src={src}
       alt="Monrad Earthworx"
@@ -20,4 +20,10 @@ export function MonradLogo({ variant = 'default', className = '' }) {
       height={variant === 'header' ? 120 : 48}
     />
   )
+
+  if (variant === 'header') {
+    return <div className="monrad-logo-container">{img}</div>
+  }
+
+  return img
 }
