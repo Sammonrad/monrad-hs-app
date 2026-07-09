@@ -21,9 +21,5 @@ export function MonradLogo({ variant = 'default', className = '' }) {
     />
   )
 
-  if (variant === 'header') {
-    return <div className="monrad-logo-container">{img}</div>
-  }
-
   return img
 }
