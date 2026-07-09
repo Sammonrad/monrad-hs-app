@@ -17,6 +17,8 @@ function getDashboardCardClass(cardId) {
       return 'dashboard-card dashboard-card--backup'
     case 'staff-management':
       return 'dashboard-card dashboard-card--staff'
+    case 'admin-reports':
+      return 'dashboard-card dashboard-card--admin-reports'
     case 'help-app-setup':
       return 'dashboard-card dashboard-card--help'
     case 'weekly-timesheet-summary':

@@ -8,6 +8,7 @@ import { SettingsView } from './pages/SettingsView.jsx'
 import { BackupRestoreView } from './pages/BackupRestoreView.jsx'
 import { AccessBlockedView } from './pages/AccessBlockedView.jsx'
 import { StaffManagementView } from './pages/StaffManagementView.jsx'
+import { AdminReportsView } from './pages/AdminReportsView.jsx'
 import { HelpAppSetupView } from './pages/HelpAppSetupView.jsx'
 import { SafetyAlertsView } from './pages/SafetyAlertsView.jsx'
 import { JobStartView } from './pages/JobStartView.jsx'
@@ -490,6 +491,14 @@ function App() {
           onBack={goToDashboard}
           profile={profile}
           onProfileUpdated={setProfile}
+        />
+      )}
+
+      {currentView === 'admin-reports' && (
+        <AdminReportsView
+          onBack={goToDashboard}
+          user={session?.user ?? null}
+          profile={profile}
         />
       )}
 
