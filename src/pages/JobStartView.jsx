@@ -15,6 +15,7 @@ import {
   SummaryRow,
 } from '../components/FormFields.jsx'
 import { useHighlightRecord } from '../hooks/useHighlightRecord.js'
+import { useDefaultFormDate } from '../hooks/useDefaultFormDate.js'
 import { createRecordId } from '../utils/ids.js'
 import { formatSubmittedAt, formatReportType } from '../utils/formatting.js'
 import { createEmptyDraft, getRecordTitle } from '../utils/records.js'
@@ -46,6 +47,7 @@ export function JobStartView({
 }) {
   const formConfig = FORM_TYPES['job-start']
   const [draft, setDraft] = useState(() => createEmptyDraft('job-start'))
+  useDefaultFormDate(setDraft)
   const [completedRecord, setCompletedRecord] = useState(null)
   const [validationError, setValidationError] = useState(null)
   const [completedSyncStatus, setCompletedSyncStatus] = useState(null)

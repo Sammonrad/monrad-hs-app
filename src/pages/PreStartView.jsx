@@ -18,6 +18,7 @@ import {
   SummaryRow,
 } from '../components/FormFields.jsx'
 import { useHighlightRecord } from '../hooks/useHighlightRecord.js'
+import { useDefaultFormDate } from '../hooks/useDefaultFormDate.js'
 import { createRecordId } from '../utils/ids.js'
 import {
   formatSubmittedAt,
@@ -58,6 +59,7 @@ export function PreStartView({
 }) {
   const formConfig = FORM_TYPES['pre-start']
   const [draft, setDraft] = useState(() => createEmptyDraft('pre-start'))
+  useDefaultFormDate(setDraft)
   const [completedRecord, setCompletedRecord] = useState(null)
   const [validationError, setValidationError] = useState(null)
   const [completedSyncStatus, setCompletedSyncStatus] = useState(null)

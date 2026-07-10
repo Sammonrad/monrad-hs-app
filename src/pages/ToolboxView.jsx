@@ -15,6 +15,7 @@ import {
   SummaryRow,
 } from '../components/FormFields.jsx'
 import { useHighlightRecord } from '../hooks/useHighlightRecord.js'
+import { useDefaultFormDate } from '../hooks/useDefaultFormDate.js'
 import { createRecordId } from '../utils/ids.js'
 import { formatSubmittedAt } from '../utils/formatting.js'
 import { createEmptyDraft, getRecordTitle } from '../utils/records.js'
@@ -47,6 +48,7 @@ export function ToolboxView({
 }) {
   const formConfig = FORM_TYPES.toolbox
   const [draft, setDraft] = useState(() => createEmptyDraft('toolbox'))
+  useDefaultFormDate(setDraft)
   const [completedRecord, setCompletedRecord] = useState(null)
   const [validationError, setValidationError] = useState(null)
   const [completedSyncStatus, setCompletedSyncStatus] = useState(null)

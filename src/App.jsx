@@ -436,6 +436,12 @@ function App() {
           recordCount={savedRecords.length}
           openActionCount={openActionCount}
           profile={profile}
+          userEmail={userEmail}
+          actions={actions}
+          savedRecords={savedRecords}
+          cloudJobStarts={cloudJobStarts}
+          cloudPreStarts={cloudPreStarts}
+          cloudTimesheets={cloudTimesheets}
         />
       )}
 

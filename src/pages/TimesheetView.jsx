@@ -15,6 +15,7 @@ import {
   SummaryRow,
 } from '../components/FormFields.jsx'
 import { useHighlightRecord } from '../hooks/useHighlightRecord.js'
+import { useDefaultFormDate } from '../hooks/useDefaultFormDate.js'
 import { createRecordId } from '../utils/ids.js'
 import { formatSubmittedAt, formatDecimalHoursDisplay } from '../utils/formatting.js'
 import { createEmptyDraft, getRecordTitle } from '../utils/records.js'
@@ -51,6 +52,7 @@ export function TimesheetView({
 }) {
   const formConfig = FORM_TYPES.timesheet
   const [draft, setDraft] = useState(() => createEmptyDraft('timesheet'))
+  useDefaultFormDate(setDraft)
   const [completedRecord, setCompletedRecord] = useState(null)
   const [validationError, setValidationError] = useState(null)
   const [completedSyncStatus, setCompletedSyncStatus] = useState(null)

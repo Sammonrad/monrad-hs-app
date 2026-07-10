@@ -16,6 +16,7 @@ import {
   SummaryRow,
 } from '../components/FormFields.jsx'
 import { useHighlightRecord } from '../hooks/useHighlightRecord.js'
+import { useDefaultFormDate } from '../hooks/useDefaultFormDate.js'
 import { createRecordId } from '../utils/ids.js'
 import { formatSubmittedAt, formatReportType } from '../utils/formatting.js'
 import { createEmptyDraft, getRecordTitle } from '../utils/records.js'
@@ -50,6 +51,7 @@ export function IncidentView({
 }) {
   const formConfig = FORM_TYPES.incident
   const [draft, setDraft] = useState(() => createEmptyDraft('incident'))
+  useDefaultFormDate(setDraft)
   const [completedRecord, setCompletedRecord] = useState(null)
   const [validationError, setValidationError] = useState(null)
   const [completedSyncStatus, setCompletedSyncStatus] = useState(null)
