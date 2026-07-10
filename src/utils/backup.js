@@ -6,6 +6,11 @@ import {
 import { loadSavedRecords, persistSavedRecords } from './storage/recordsStorage.js'
 import { loadActions, persistActions, normalizeAction } from './storage/actionsStorage.js'
 import {
+  loadVisitorRecords,
+  persistVisitorRecords,
+  normalizeVisitorRecord,
+} from './storage/visitorSignInStorage.js'
+import {
   loadSettings,
   persistSettings,
   normalizeSettings,
@@ -21,6 +26,7 @@ export function collectBackupData() {
     jobRecords: loadSavedRecords(),
     actions: loadActions(),
     settings: loadSettings(),
+    visitorSignInRecords: loadVisitorRecords(),
   }
 }
 
@@ -53,12 +59,15 @@ export function validateBackupPayload(parsed) {
   if (!parsed.data || typeof parsed.data !== 'object') {
     return { valid: false, error: 'Invalid backup file — missing data section.' }
   }
-  const { jobRecords, actions, settings } = parsed.data
+  const { jobRecords, actions, settings, visitorSignInRecords } = parsed.data
   if (jobRecords != null && !Array.isArray(jobRecords)) {
     return { valid: false, error: 'Invalid backup file — job records must be an array.' }
   }
   if (actions != null && !Array.isArray(actions)) {
     return { valid: false, error: 'Invalid backup file — actions must be an array.' }
+  }
+  if (visitorSignInRecords != null && !Array.isArray(visitorSignInRecords)) {
+    return { valid: false, error: 'Invalid backup file — visitor sign-in records must be an array.' }
   }
   if (settings != null && (typeof settings !== 'object' || Array.isArray(settings))) {
     return { valid: false, error: 'Invalid backup file — settings must be an object.' }
@@ -74,6 +83,9 @@ export function restoreBackupPayload(parsed) {
     const data = parsed.data
     const jobRecords = Array.isArray(data.jobRecords) ? data.jobRecords.map(normalizeRecord) : []
     const actionList = Array.isArray(data.actions) ? data.actions.map(normalizeAction) : []
+    const visitorRecords = Array.isArray(data.visitorSignInRecords)
+      ? data.visitorSignInRecords.map(normalizeVisitorRecord)
+      : []
     const settingsData = normalizeSettings(data.settings ?? createEmptySettings())
 
     if (!persistSavedRecords(jobRecords)) {
@@ -81,6 +93,9 @@ export function restoreBackupPayload(parsed) {
     }
     if (!persistActions(actionList)) {
       return { valid: false, error: 'Could not write actions to this device.' }
+    }
+    if (!persistVisitorRecords(visitorRecords)) {
+      return { valid: false, error: 'Could not write visitor sign-in records to this device.' }
     }
     if (!persistSettings(settingsData)) {
       return { valid: false, error: 'Could not write settings to this device.' }

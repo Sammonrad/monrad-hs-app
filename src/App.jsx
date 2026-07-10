@@ -18,10 +18,12 @@ import { TimesheetView } from './pages/TimesheetView.jsx'
 import { WeeklyTimesheetSummaryView } from './pages/WeeklyTimesheetSummaryView.jsx'
 import { IncidentView } from './pages/IncidentView.jsx'
 import { CriticalRisksView } from './pages/CriticalRisksView.jsx'
+import { VisitorSignInView } from './pages/VisitorSignInView.jsx'
 import { PrintableRecord } from './components/PrintableRecord.jsx'
 import { loadSavedRecords } from './utils/storage/recordsStorage.js'
 import { loadActions, persistActions, syncActionsFromRecord, patchAction } from './utils/storage/actionsStorage.js'
 import { loadSettings } from './utils/storage/settingsStorage.js'
+import { loadVisitorRecords, persistVisitorRecords } from './utils/storage/visitorSignInStorage.js'
 import { APP_VERSION } from './constants/index.js'
 import { isSupabaseConfigured, supabase } from './utils/supabaseClient.js'
 import { fetchTimesheetRecords } from './utils/storage/timesheetCloudStorage.js'
@@ -38,6 +40,10 @@ import {
   getUnavailableSyncStatus,
 } from './utils/storage/actionCloudStorage.js'
 import {
+  fetchVisitorSignInRecords,
+  getMergedVisitorRecords,
+} from './utils/storage/visitorSignInCloudStorage.js'
+import {
   getRoleLabel,
   getStatusLabel,
   getProfileStatus,
@@ -49,8 +55,10 @@ import {
 
 function App() {
   const [currentView, setCurrentView] = useState('dashboard')
+  const [returnView, setReturnView] = useState(null)
   const [savedRecords, setSavedRecords] = useState(() => loadSavedRecords())
   const [actions, setActions] = useState(() => loadActions())
+  const [visitorRecords, setVisitorRecords] = useState(() => loadVisitorRecords())
   const [settings, setSettings] = useState(() => loadSettings())
   const [printRecord, setPrintRecord] = useState(null)
   const [highlightRecordId, setHighlightRecordId] = useState(null)
@@ -67,6 +75,7 @@ function App() {
   const [cloudToolboxRecords, setCloudToolboxRecords] = useState([])
   const [cloudIncidents, setCloudIncidents] = useState([])
   const [cloudActions, setCloudActions] = useState([])
+  const [cloudVisitorRecords, setCloudVisitorRecords] = useState([])
   const [profile, setProfile] = useState(null)
   const [profileLoading, setProfileLoading] = useState(false)
 
@@ -81,6 +90,7 @@ function App() {
 
   function goToDashboard() {
     clearNavFocus()
+    setReturnView(null)
     setCurrentView('dashboard')
   }
 
@@ -89,7 +99,17 @@ function App() {
     setHighlightActionId(options.highlightActionId ?? null)
     setActionFilter(options.actionFilter ?? null)
     setRecordFocus(options.recordFocus ?? null)
+    setReturnView(options.returnView ?? null)
     setCurrentView(viewId)
+  }
+
+  function handleCriticalRisksBack() {
+    if (returnView) {
+      setCurrentView(returnView)
+      setReturnView(null)
+      return
+    }
+    goToDashboard()
   }
 
   function handleViewRecord(record) {
@@ -241,6 +261,7 @@ function App() {
       setCloudToolboxRecords([])
       setCloudIncidents([])
       setCloudActions([])
+      setCloudVisitorRecords([])
       return undefined
     }
 
@@ -270,6 +291,7 @@ function App() {
       setCloudToolboxRecords([])
       setCloudIncidents([])
       setCloudActions([])
+      setCloudVisitorRecords([])
       return undefined
     }
 
@@ -306,12 +328,18 @@ function App() {
       if (isMounted) setCloudActions(records)
     }
 
+    async function loadCloudVisitorRecords() {
+      const { records } = await fetchVisitorSignInRecords(session.user.id)
+      if (isMounted) setCloudVisitorRecords(records)
+    }
+
     loadCloudTimesheets()
     loadCloudJobStarts()
     loadCloudPreStarts()
     loadCloudToolboxRecords()
     loadCloudIncidents()
     loadCloudActionRecords()
+    loadCloudVisitorRecords()
 
     return () => {
       isMounted = false
@@ -336,6 +364,25 @@ function App() {
       return prev
     })
   }, [cloudActions, session?.user?.id])
+
+  useEffect(() => {
+    if (!session?.user?.id) return undefined
+
+    setVisitorRecords((prev) => {
+      const merged = getMergedVisitorRecords(prev, cloudVisitorRecords)
+      const changed =
+        merged.length !== prev.length ||
+        merged.some(
+          (record, index) =>
+            record.cloudId !== prev[index]?.cloudId || record.id !== prev[index]?.id,
+        )
+      if (changed) {
+        persistVisitorRecords(merged)
+        return merged
+      }
+      return prev
+    })
+  }, [cloudVisitorRecords, session?.user?.id])
 
   async function signIn(email, password) {
     if (!supabase) return
@@ -443,6 +490,8 @@ function App() {
           cloudJobStarts={cloudJobStarts}
           cloudPreStarts={cloudPreStarts}
           cloudTimesheets={cloudTimesheets}
+          visitorRecords={visitorRecords}
+          cloudVisitorRecords={cloudVisitorRecords}
         />
       )}
 
@@ -588,7 +637,20 @@ function App() {
       )}
 
       {currentView === 'critical-risks' && (
-        <CriticalRisksView onBack={goToDashboard} />
+        <CriticalRisksView onBack={handleCriticalRisksBack} />
+      )}
+
+      {currentView === 'visitor-sign-in' && (
+        <VisitorSignInView
+          onBack={goToDashboard}
+          onNavigate={handleNavigate}
+          visitorRecords={visitorRecords}
+          setVisitorRecords={setVisitorRecords}
+          settings={settings}
+          user={session?.user ?? null}
+          cloudVisitorRecords={cloudVisitorRecords}
+          setCloudVisitorRecords={setCloudVisitorRecords}
+        />
       )}
 
       {currentView === 'incident' && (

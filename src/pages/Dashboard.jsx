@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import {
   BriefcaseBusiness,
   ClipboardCheck,
+  ClipboardSignature,
   Clock,
   HelpCircle,
   OctagonAlert,
@@ -19,6 +20,8 @@ import {
   getFirstName,
   getTimeGreeting,
 } from '../utils/dashboardOverview.js'
+import { getMergedVisitorRecords } from '../utils/storage/visitorSignInCloudStorage.js'
+import { countVisitorsOnSite } from '../utils/storage/visitorSignInStorage.js'
 
 const CARD_ICONS = {
   'job-start': ClipboardCheck,
@@ -26,6 +29,7 @@ const CARD_ICONS = {
   toolbox: BriefcaseBusiness,
   incident: TriangleAlert,
   'critical-risks': OctagonAlert,
+  'visitor-sign-in': ClipboardSignature,
   timesheet: Clock,
   'safety-alerts': ShieldAlert,
   'help-app-setup': HelpCircle,
@@ -43,6 +47,9 @@ function getDashboardCardClass(card) {
       break
     case 'critical-risks':
       classes.push('dashboard-card--critical-risks')
+      break
+    case 'visitor-sign-in':
+      classes.push('dashboard-card--visitor-sign-in')
       break
     default:
       break
@@ -70,6 +77,8 @@ export function Dashboard({
   cloudJobStarts,
   cloudPreStarts,
   cloudTimesheets,
+  visitorRecords,
+  cloudVisitorRecords,
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const isAdmin = isAdminProfile(profile)
@@ -95,6 +104,11 @@ export function Dashboard({
       }),
     [savedRecords, actions, cloudJobStarts, cloudPreStarts, cloudTimesheets],
   )
+
+  const visitorsOnSiteCount = useMemo(() => {
+    const merged = getMergedVisitorRecords(visitorRecords, cloudVisitorRecords)
+    return countVisitorsOnSite(merged)
+  }, [visitorRecords, cloudVisitorRecords])
 
   const firstName = getFirstName(profile, userEmail)
   const greeting = getTimeGreeting()
@@ -188,6 +202,8 @@ export function Dashboard({
                     const Icon = CARD_ICONS[card.id]
                     const showAlertBadge =
                       card.id === 'safety-alerts' && overview.safetyAlertCount > 0
+                    const showVisitorBadge =
+                      card.id === 'visitor-sign-in' && visitorsOnSiteCount > 0
 
                     return (
                       <button
@@ -208,6 +224,14 @@ export function Dashboard({
                         {showAlertBadge ? (
                           <span className="dashboard-card__count" aria-label={`${overview.safetyAlertCount} alerts`}>
                             {overview.safetyAlertCount}
+                          </span>
+                        ) : null}
+                        {showVisitorBadge ? (
+                          <span
+                            className="dashboard-card__visitor-badge"
+                            aria-label={`${visitorsOnSiteCount} visitor${visitorsOnSiteCount === 1 ? '' : 's'} currently on site`}
+                          >
+                            {visitorsOnSiteCount} visitor{visitorsOnSiteCount === 1 ? '' : 's'} on site
                           </span>
                         ) : null}
                         {!card.available && (

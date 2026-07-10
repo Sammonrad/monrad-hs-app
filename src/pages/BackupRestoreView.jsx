@@ -24,7 +24,7 @@ export function BackupRestoreView({ onBack }) {
     try {
       const payload = exportAppBackup()
       showStatus(
-        `Backup downloaded — ${payload.data.jobRecords.length} record${payload.data.jobRecords.length === 1 ? '' : 's'}, ${payload.data.actions.length} action${payload.data.actions.length === 1 ? '' : 's'}, and settings saved to ${getBackupFilename()}.`,
+        `Backup downloaded — ${payload.data.jobRecords.length} record${payload.data.jobRecords.length === 1 ? '' : 's'}, ${payload.data.actions.length} action${payload.data.actions.length === 1 ? '' : 's'}, ${payload.data.visitorSignInRecords.length} visitor record${payload.data.visitorSignInRecords.length === 1 ? '' : 's'}, and settings saved to ${getBackupFilename()}.`,
       )
     } catch {
       showStatus('Export failed. Please try again.', 'error')
@@ -95,6 +95,8 @@ export function BackupRestoreView({ onBack }) {
           Current data: {backupData.jobRecords.length} record
           {backupData.jobRecords.length === 1 ? '' : 's'},{' '}
           {backupData.actions.length} action{backupData.actions.length === 1 ? '' : 's'},{' '}
+          {backupData.visitorSignInRecords.length} visitor record
+          {backupData.visitorSignInRecords.length === 1 ? '' : 's'},{' '}
           {backupData.settings.operators.length} operator
           {backupData.settings.operators.length === 1 ? '' : 's'},{' '}
           {backupData.settings.machines.length} machine

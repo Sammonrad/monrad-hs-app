@@ -2,6 +2,8 @@ export {
   STORAGE_KEY,
   ACTIONS_STORAGE_KEY,
   SETTINGS_STORAGE_KEY,
+  VISITOR_SIGN_IN_STORAGE_KEY,
+  VISITOR_SIGN_IN_DRAFT_KEY,
   MAX_PHOTOS,
 } from './storageKeys.js'
 
@@ -9,6 +11,7 @@ import {
   STORAGE_KEY,
   ACTIONS_STORAGE_KEY,
   SETTINGS_STORAGE_KEY,
+  VISITOR_SIGN_IN_STORAGE_KEY,
 } from './storageKeys.js'
 
 export const MACHINE_TYPES = ['Excavator', 'Truck', 'Loader', 'Roller', 'Other']
@@ -211,10 +214,40 @@ export const SOURCE_TYPE_LABELS = {
 export const BACKUP_APP_NAME = 'Monrad Earthworx H&S App'
 export const BACKUP_VERSION = 1
 
+export const VISITOR_ACKNOWLEDGEMENT_ITEMS = [
+  {
+    key: 'siteRules',
+    label: 'I have read and understand the site safety rules and will follow all instructions.',
+  },
+  {
+    key: 'ppeRequired',
+    label: 'I will wear all required PPE at all times while on site.',
+  },
+  {
+    key: 'emergencyProcedures',
+    label: 'I know the emergency procedures and assembly point for this site.',
+  },
+  {
+    key: 'criticalRisksReviewed',
+    label: 'I have reviewed (or been briefed on) the critical site risks before entering.',
+  },
+]
+
+export const VISITOR_DECLARATION_TEXT =
+  'I confirm the information provided is accurate and I accept responsibility for my safety and the safety of others while on site.'
+
+export const VISITOR_PRIVACY_NOTE =
+  'Visitor details are stored securely for health and safety purposes and may be shared with site management in an emergency.'
+
 export const APP_STORAGE_KEYS = [
   { key: STORAGE_KEY, label: 'Job records (all forms including timesheet)', dataKey: 'jobRecords' },
   { key: ACTIONS_STORAGE_KEY, label: 'Action register', dataKey: 'actions' },
   { key: SETTINGS_STORAGE_KEY, label: 'Settings (operators, machines, sites)', dataKey: 'settings' },
+  {
+    key: VISITOR_SIGN_IN_STORAGE_KEY,
+    label: 'Visitor sign-in records',
+    dataKey: 'visitorSignInRecords',
+  },
 ]
 
 export const FIELD_LABELS = {
@@ -304,7 +337,7 @@ export const DASHBOARD_GROUPS = [
   {
     id: 'site-safety',
     title: 'Site Safety',
-    cardIds: ['job-start', 'pre-start', 'toolbox', 'incident', 'critical-risks'],
+    cardIds: ['job-start', 'pre-start', 'toolbox', 'incident', 'critical-risks', 'visitor-sign-in'],
   },
   {
     id: 'daily',
@@ -358,6 +391,14 @@ export const DASHBOARD_CARDS = [
   {
     id: 'critical-risks',
     title: 'Critical Risks',
+    group: 'site-safety',
+    placement: 'mainDashboard',
+    available: true,
+    fullWidth: true,
+  },
+  {
+    id: 'visitor-sign-in',
+    title: 'Visitor Sign-In',
     group: 'site-safety',
     placement: 'mainDashboard',
     available: true,

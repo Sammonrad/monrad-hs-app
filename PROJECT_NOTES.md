@@ -172,7 +172,7 @@ When a logged-in user submits or updates cloud-backed data:
 3. Show sync badge: `Saved to cloud` / `Saved locally only — cloud save failed` / `Offline/local save only`
 4. On page open, fetch cloud rows, merge with local (dedupe by `id`, `cloudId`, and form-specific keys)
 
-Cloud-backed entities: all five form types, action register, user profiles.
+Cloud-backed entities: all five form types, action register, visitor sign-in, user profiles.
 
 **Settings** and **backup data** remain local only. Backup does not include cloud rows.
 
@@ -220,10 +220,11 @@ Defined in `src/constants/storageKeys.js`:
 | `monrad-earthworx-job-records` | **All** form records (job-start, pre-start, toolbox, incident, timesheet) in one JSON array |
 | `monrad-earthworx-actions` | Action Register items |
 | `monrad-earthworx-settings` | `{ operators, machines, sites }` |
+| `monrad-earthworx-visitor-sign-in-records` | Visitor sign-in / sign-out records |
 
-Backup file format: `monrad-earthworx-backup-YYYY-MM-DD.json` (`BACKUP_VERSION: 1`).
+Backup file format: `monrad-earthworx-backup-YYYY-MM-DD.json` (`BACKUP_VERSION: 1`). Backup `data` object may include `visitorSignInRecords` (optional for older backups).
 
-**Do not rename these keys** — backup/restore and existing user data depend on them.
+**Do not rename the three original keys** — backup/restore and existing user data depend on them.
 
 ### Admin-only dashboard cards
 
@@ -297,8 +298,9 @@ All record tables follow a similar pattern: `id`, `user_id`, `record_data` (full
 | `toolbox_meeting_records` | `toolboxCloudStorage.js` | Meeting fields + checklist_completed |
 | `incident_near_miss_records` | `incidentCloudStorage.js` | Incident fields + checklist_completed |
 | `action_register_records` | `actionCloudStorage.js` | Supports insert + update; `source_type`, `status`, `priority`, … |
+| `visitor_sign_in_records` | `visitorSignInCloudStorage.js` | Insert on sign-in, update on sign-out; shared read for all active users |
 
-Form cloud modules generally **insert** on new save; actions also **update** on edit/complete.
+Form cloud modules generally **insert** on new save; actions and visitor sign-in also **update** on edit/sign-out.
 
 ### RLS notes
 
@@ -313,6 +315,34 @@ Form cloud modules generally **insert** on new save; actions also **update** on 
 **Caveat from development:** Sample SQL for action-register admin policies once referenced `public.profiles` — the app uses **`public.user_profiles`**. Any hand-written policies must use the correct table name.
 
 **Testing without RLS:** Cloud save/fetch will fail or return empty; sync badges will show local-only / failed states.
+
+### `visitor_sign_in_records` (create if not exists)
+
+```sql
+CREATE TABLE IF NOT EXISTS public.visitor_sign_in_records (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL REFERENCES auth.users(id),
+  record_data jsonb NOT NULL,
+  visitor_name text,
+  site_name text,
+  purpose text,
+  company text,
+  phone text,
+  person_visited text,
+  vehicle_reg text,
+  arrival_time timestamptz NOT NULL,
+  departure_time timestamptz,
+  signed_out_by uuid REFERENCES auth.users(id),
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now()
+);
+
+-- RLS: all authenticated active users SELECT all rows (roll call);
+-- INSERT with user_id = auth.uid(); UPDATE for sign-out (departure_time, signed_out_by).
+-- Tie to user_profiles.status = 'active' in policies as per other tables.
+```
+
+Client fetch loads **all** visitor rows (no `user_id` filter) so any active staff member sees the full on-site list. RLS must allow this.
 
 ### Admin cloud reads
 
