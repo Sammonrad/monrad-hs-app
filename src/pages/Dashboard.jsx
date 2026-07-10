@@ -1,39 +1,29 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { DASHBOARD_GROUPS, DASHBOARD_CARDS } from '../constants/index.js'
 import { MonradLogo } from '../components/MonradLogo.jsx'
+import { SideMenu } from '../components/SideMenu.jsx'
 import { isAdminProfile } from '../utils/storage/userProfileStorage.js'
 
 function getDashboardCardClass(cardId) {
   switch (cardId) {
-    case 'action-register':
-      return 'dashboard-card dashboard-card--register'
     case 'safety-alerts':
       return 'dashboard-card dashboard-card--alerts'
-    case 'records-dashboard':
-      return 'dashboard-card dashboard-card--records'
-    case 'settings':
-      return 'dashboard-card dashboard-card--settings'
-    case 'backup-restore':
-      return 'dashboard-card dashboard-card--backup'
-    case 'staff-management':
-      return 'dashboard-card dashboard-card--staff'
-    case 'admin-reports':
-      return 'dashboard-card dashboard-card--admin-reports'
     case 'help-app-setup':
       return 'dashboard-card dashboard-card--help'
-    case 'weekly-timesheet-summary':
-      return 'dashboard-card dashboard-card--weekly'
     default:
       return 'dashboard-card'
   }
 }
 
 export function Dashboard({ onNavigate, recordCount, openActionCount, profile }) {
+  const [menuOpen, setMenuOpen] = useState(false)
   const isAdmin = isAdminProfile(profile)
   const cardsById = useMemo(
     () =>
       Object.fromEntries(
-        DASHBOARD_CARDS.filter((card) => !card.adminOnly || isAdmin).map((card) => [card.id, card]),
+        DASHBOARD_CARDS.filter((card) => card.placement === 'mainDashboard')
+          .filter((card) => !card.adminOnly || isAdmin)
+          .map((card) => [card.id, card]),
       ),
     [isAdmin],
   )
@@ -41,23 +31,53 @@ export function Dashboard({ onNavigate, recordCount, openActionCount, profile })
   return (
     <div className="dashboard">
       <header className="dashboard__header">
-        <MonradLogo variant="header" />
-        <p className="dashboard__tagline">Health &amp; Safety App</p>
+        <div className="dashboard__header-bar">
+          <button
+            type="button"
+            className="dashboard__menu-btn"
+            onClick={() => setMenuOpen(true)}
+            aria-label="Open menu"
+            aria-expanded={menuOpen}
+            aria-controls="app-side-menu"
+          >
+            <span className="dashboard__menu-icon" aria-hidden="true">
+              <span />
+              <span />
+              <span />
+            </span>
+          </button>
+
+          <div className="dashboard__header-brand">
+            <MonradLogo variant="header" />
+            <p className="dashboard__tagline">Health &amp; Safety App</p>
+          </div>
+
+          <div className="dashboard__header-spacer" aria-hidden="true" />
+        </div>
       </header>
 
-      <nav className="dashboard__nav" aria-label="Form types">
-        {DASHBOARD_GROUPS.map((group) => (
-          <div key={group.id} className="dashboard-group-block">
-            <section className="dashboard-group" aria-labelledby={`group-${group.id}`}>
-              <h2 id={`group-${group.id}`} className="dashboard-group__title">
-                {group.title}
-              </h2>
-              <div className="dashboard-group__grid">
-                {group.cardIds.map((cardId) => {
-                  const card = cardsById[cardId]
-                  if (!card) return null
+      <SideMenu
+        isOpen={menuOpen}
+        onClose={() => setMenuOpen(false)}
+        onNavigate={onNavigate}
+        profile={profile}
+        openActionCount={openActionCount}
+      />
 
-                  return (
+      <nav className="dashboard__nav" aria-label="Form types">
+        {DASHBOARD_GROUPS.map((group) => {
+          const visibleCards = group.cardIds.map((cardId) => cardsById[cardId]).filter(Boolean)
+
+          if (visibleCards.length === 0) return null
+
+          return (
+            <div key={group.id} className="dashboard-group-block">
+              <section className="dashboard-group" aria-labelledby={`group-${group.id}`}>
+                <h2 id={`group-${group.id}`} className="dashboard-group__title">
+                  {group.title}
+                </h2>
+                <div className="dashboard-group__grid">
+                  {visibleCards.map((card) => (
                     <button
                       key={card.id}
                       type="button"
@@ -68,16 +88,13 @@ export function Dashboard({ onNavigate, recordCount, openActionCount, profile })
                       {!card.available && (
                         <span className="dashboard-card__badge">Coming soon</span>
                       )}
-                      {card.id === 'action-register' && openActionCount > 0 && (
-                        <span className="dashboard-card__count">{openActionCount} open</span>
-                      )}
                     </button>
-                  )
-                })}
-              </div>
-            </section>
-          </div>
-        ))}
+                  ))}
+                </div>
+              </section>
+            </div>
+          )
+        })}
       </nav>
 
       {recordCount > 0 && (
@@ -88,7 +105,7 @@ export function Dashboard({ onNavigate, recordCount, openActionCount, profile })
 
       {openActionCount > 0 && (
         <p className="dashboard__actions-hint">
-          {openActionCount} open action{openActionCount === 1 ? '' : 's'} in the register
+          {openActionCount} open action{openActionCount === 1 ? '' : 's'} — see Action Register in menu
         </p>
       )}
 
