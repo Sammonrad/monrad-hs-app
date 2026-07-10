@@ -7,6 +7,11 @@ import { RecordDetails } from '../components/RecordDetails.jsx'
 import { RecordActions } from '../components/RecordActions.jsx'
 import { SavedRecordSignature } from '../components/SavedRecordSignature.jsx'
 import { CloudSyncBadge } from '../components/CloudSyncBadge.jsx'
+import { FormSection } from '../components/forms/FormSection.jsx'
+import { FormField } from '../components/forms/FormField.jsx'
+import { FormActions } from '../components/forms/FormActions.jsx'
+import { FormPageHeader } from '../components/forms/FormPageHeader.jsx'
+import { ValidationMessage } from '../components/forms/ValidationMessage.jsx'
 import {
   ComboField,
   TextField,
@@ -32,6 +37,11 @@ import {
   SYNC_STATUS,
 } from '../utils/storage/incidentCloudStorage.js'
 import { isAdminProfile } from '../utils/storage/userProfileStorage.js'
+import {
+  scrollToFirstInvalid,
+  hasValidationErrors,
+  getValidationSummary,
+} from '../utils/formValidation.js'
 
 export function IncidentView({
   onBack,
@@ -53,7 +63,7 @@ export function IncidentView({
   const [draft, setDraft] = useState(() => createEmptyDraft('incident'))
   useDefaultFormDate(setDraft)
   const [completedRecord, setCompletedRecord] = useState(null)
-  const [validationError, setValidationError] = useState(null)
+  const [fieldErrors, setFieldErrors] = useState({})
   const [completedSyncStatus, setCompletedSyncStatus] = useState(null)
   const [cloudLoadWarning, setCloudLoadWarning] = useState(null)
   const [cloudSaving, setCloudSaving] = useState(false)
@@ -135,9 +145,24 @@ export function IncidentView({
     setDraft((prev) => ({ ...prev, ...updates }))
   }
 
+  const isSeriousType = ['incident', 'injury', 'property-damage'].includes(fields.reportType)
+
   function updateField(field, value) {
-    setValidationError(null)
+    setFieldErrors((prev) => ({ ...prev, [field]: undefined }))
     updateDraft({ fields: { ...fields, [field]: value } })
+  }
+
+  function validateForm() {
+    const errors = {}
+    if (!fields.date.trim()) errors.date = 'Date is required.'
+    if (!fields.reportedBy.trim()) errors.reportedBy = 'Reported by is required.'
+    if (!fields.siteLocation.trim()) errors.siteLocation = 'Site / job location is required.'
+    if (!fields.reportType) errors.reportType = 'Type of report is required.'
+    if (!fields.whatHappened.trim()) errors.whatHappened = 'Description of what happened is required.'
+    if (!signatureConfirmation.trim()) {
+      errors.signatureConfirmation = 'Signature / name confirmation is required.'
+    }
+    return errors
   }
 
   function toggleItem(index) {
@@ -150,25 +175,14 @@ export function IncidentView({
   async function handleSubmit(event) {
     event.preventDefault()
 
-    if (
-      !fields.date.trim() ||
-      !fields.reportedBy.trim() ||
-      !fields.siteLocation.trim() ||
-      !fields.reportType ||
-      !fields.whatHappened.trim()
-    ) {
-      setValidationError(
-        'Date, reported by, site / job location, type of report, and what happened are required before saving.',
-      )
+    const errors = validateForm()
+    if (hasValidationErrors(errors)) {
+      setFieldErrors(errors)
+      scrollToFirstInvalid(errors)
       return
     }
 
-    if (!signatureConfirmation.trim()) {
-      setValidationError('Signature / Name Confirmation is required before saving.')
-      return
-    }
-
-    setValidationError(null)
+    setFieldErrors({})
     const completedItems = checklist.filter((_, index) => checked.has(index))
     const submittedAt = new Date().toISOString()
     const record = {
@@ -229,7 +243,7 @@ export function IncidentView({
   function handleReset() {
     setDraft(createEmptyDraft('incident'))
     setCompletedRecord(null)
-    setValidationError(null)
+    setFieldErrors({})
     setCompletedSyncStatus(null)
   }
 
@@ -250,38 +264,46 @@ export function IncidentView({
     <>
       <BackButton onClick={onBack} />
 
-      <header className="header no-print">
-        <p className="company">Monrad Earthworx</p>
-        <h1 className="title">{formConfig.title}</h1>
-        <p className="progress" aria-live="polite">
-          {completed} of {total} completed
-        </p>
-      </header>
+      <FormPageHeader
+        title={formConfig.title}
+        subtitle="Record incidents, near misses, and follow-up actions"
+        progress={`${completed} of ${total} completed`}
+      />
 
       <form className="job-form no-print" onSubmit={handleSubmit} noValidate>
-        <fieldset className="job-form__fieldset">
-          <legend className="job-form__legend">1. Report details</legend>
-          <DateField value={fields.date} onChange={updateField} />
+        <FormSection
+          title="Event"
+          id="incident-event"
+          variant={isSeriousType ? 'urgent' : undefined}
+          description="When and where did this occur?"
+        >
+          <FormField label="Date" fieldId="date" required error={fieldErrors.date}>
+            <DateField label="" value={fields.date} onChange={updateField} />
+          </FormField>
           <TextField label="Time" field="time" value={fields.time} onChange={updateField} placeholder="e.g. 14:30" />
-          <ComboField label="Reported by" field="reportedBy" value={fields.reportedBy} onChange={updateField} placeholder="Your name" options={comboOptions.operators} listId="incident-operators" />
-          <ComboField label="Site / job location" field="siteLocation" value={fields.siteLocation} onChange={updateField} placeholder="Where it occurred" options={comboOptions.sites} listId="incident-sites" />
-          <SelectField
-            label="Type of report"
-            field="reportType"
-            value={fields.reportType}
-            onChange={updateField}
-            options={[
-              { value: '', label: 'Select type...' },
-              { value: 'incident', label: 'Incident' },
-              { value: 'near-miss', label: 'Near Miss' },
-              { value: 'property-damage', label: 'Property Damage' },
-              { value: 'injury', label: 'Injury' },
-              { value: 'environmental', label: 'Environmental' },
-            ]}
-          />
-          <TextField label="Person involved" field="personInvolved" value={fields.personInvolved} onChange={updateField} placeholder="Names or roles" />
-          <label className="field">
-            <span className="field__label">What happened?</span>
+          <FormField label="Site / job location" fieldId="siteLocation" required error={fieldErrors.siteLocation}>
+            <ComboField label="" field="siteLocation" value={fields.siteLocation} onChange={updateField} placeholder="Where it occurred" options={comboOptions.sites} listId="incident-sites" />
+          </FormField>
+          <FormField label="Type of report" fieldId="reportType" required error={fieldErrors.reportType}>
+            <SelectField
+              label=""
+              field="reportType"
+              value={fields.reportType}
+              onChange={updateField}
+              options={[
+                { value: '', label: 'Select type...' },
+                { value: 'incident', label: 'Incident' },
+                { value: 'near-miss', label: 'Near Miss' },
+                { value: 'property-damage', label: 'Property Damage' },
+                { value: 'injury', label: 'Injury' },
+                { value: 'environmental', label: 'Environmental' },
+              ]}
+            />
+          </FormField>
+        </FormSection>
+
+        <FormSection title="Injury / Damage" id="incident-injury">
+          <FormField label="What happened?" fieldId="whatHappened" required error={fieldErrors.whatHappened}>
             <textarea
               className="field__input field__textarea"
               value={fields.whatHappened}
@@ -289,17 +311,29 @@ export function IncidentView({
               placeholder="Describe what happened..."
               rows={4}
             />
-          </label>
-          <TextField label="Immediate action taken" field="immediateActionTaken" value={fields.immediateActionTaken} onChange={updateField} placeholder="Actions taken immediately" />
+          </FormField>
           <TextField label="Possible cause" field="possibleCause" value={fields.possibleCause} onChange={updateField} placeholder="What may have caused this?" />
-          <TextField label="Corrective action required" field="correctiveActionRequired" value={fields.correctiveActionRequired} onChange={updateField} placeholder="Required corrective actions" />
+        </FormSection>
+
+        <FormSection title="Immediate Actions" id="incident-actions">
+          <TextField label="Immediate action taken" field="immediateActionTaken" value={fields.immediateActionTaken} onChange={updateField} placeholder="Actions taken immediately" />
+        </FormSection>
+
+        <FormSection title="People" id="incident-people">
+          <FormField label="Reported by" fieldId="reportedBy" required error={fieldErrors.reportedBy}>
+            <ComboField label="" field="reportedBy" value={fields.reportedBy} onChange={updateField} placeholder="Your name" options={comboOptions.operators} listId="incident-operators" />
+          </FormField>
+          <TextField label="Person involved" field="personInvolved" value={fields.personInvolved} onChange={updateField} placeholder="Names or roles" />
           <TextField label="Person responsible for corrective action" field="correctiveActionPerson" value={fields.correctiveActionPerson} onChange={updateField} placeholder="Who will follow up?" />
+        </FormSection>
+
+        <FormSection title="Follow-Up" id="incident-followup">
+          <TextField label="Corrective action required" field="correctiveActionRequired" value={fields.correctiveActionRequired} onChange={updateField} placeholder="Required corrective actions" />
           <DateField label="Follow-up date" field="followUpDate" value={fields.followUpDate} onChange={updateField} />
           <NotesField value={fields.notes} onChange={updateField} />
-        </fieldset>
+        </FormSection>
 
-        <fieldset className="job-form__fieldset">
-          <legend className="job-form__legend">2. Incident checklist</legend>
+        <FormSection title="Incident Checklist" id="incident-checklist">
           <ul className="checklist" role="list">
             {checklist.map((label, index) => {
               const isChecked = checked.has(index)
@@ -318,19 +352,25 @@ export function IncidentView({
               )
             })}
           </ul>
-        </fieldset>
+        </FormSection>
 
-        <fieldset className="job-form__fieldset">
-          <legend className="job-form__legend">3. Name confirmation &amp; photos</legend>
-          <SignatureConfirmationField
-            value={signatureConfirmation}
-            onChange={(value) => {
-              setValidationError(null)
-              updateDraft({ signatureConfirmation: value })
-            }}
-          />
+        <FormSection title="Confirmation & Photos" id="incident-confirmation">
+          <FormField
+            label="Signature / name confirmation"
+            fieldId="signatureConfirmation"
+            required
+            error={fieldErrors.signatureConfirmation}
+          >
+            <SignatureConfirmationField
+              value={signatureConfirmation}
+              onChange={(value) => {
+                setFieldErrors((prev) => ({ ...prev, signatureConfirmation: undefined }))
+                updateDraft({ signatureConfirmation: value })
+              }}
+            />
+          </FormField>
           <PhotoUpload photos={photos} onChange={(value) => updateDraft({ photos: value })} />
-        </fieldset>
+        </FormSection>
 
         {allComplete && (
           <p className="complete-message" role="status">
@@ -338,19 +378,15 @@ export function IncidentView({
           </p>
         )}
 
-        {validationError && (
-          <p className="validation-message" role="alert">
-            {validationError}
-          </p>
-        )}
-
-        <p className="form-hint">
-          Record incident details, complete the checklist, attach photos if available, then save.
-        </p>
-
-        <button type="submit" className="submit-btn" disabled={cloudSaving}>
-          {cloudSaving ? 'Saving…' : 'Save completed record'}
-        </button>
+        <FormActions>
+          {hasValidationErrors(fieldErrors) && (
+            <ValidationMessage variant="summary" messages={getValidationSummary(fieldErrors)} />
+          )}
+          <p className="form-hint">Record incident details, complete the checklist, then submit your report.</p>
+          <button type="submit" className="submit-btn" disabled={cloudSaving}>
+            {cloudSaving ? 'Saving…' : 'Submit Record'}
+          </button>
+        </FormActions>
       </form>
 
       {completedRecord && (

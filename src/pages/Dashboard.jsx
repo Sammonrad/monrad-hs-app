@@ -4,6 +4,7 @@ import {
   ClipboardCheck,
   Clock,
   HelpCircle,
+  OctagonAlert,
   ShieldAlert,
   TriangleAlert,
   Wrench,
@@ -24,20 +25,29 @@ const CARD_ICONS = {
   'pre-start': Wrench,
   toolbox: BriefcaseBusiness,
   incident: TriangleAlert,
+  'critical-risks': OctagonAlert,
   timesheet: Clock,
   'safety-alerts': ShieldAlert,
   'help-app-setup': HelpCircle,
 }
 
-function getDashboardCardClass(cardId) {
-  switch (cardId) {
+function getDashboardCardClass(card) {
+  const classes = ['dashboard-card']
+  if (card.fullWidth) classes.push('dashboard-card--full-width')
+  switch (card.id) {
     case 'safety-alerts':
-      return 'dashboard-card dashboard-card--alerts'
+      classes.push('dashboard-card--alerts')
+      break
     case 'help-app-setup':
-      return 'dashboard-card dashboard-card--help'
+      classes.push('dashboard-card--help')
+      break
+    case 'critical-risks':
+      classes.push('dashboard-card--critical-risks')
+      break
     default:
-      return 'dashboard-card'
+      break
   }
+  return classes.join(' ')
 }
 
 function OverviewStat({ label, value, variant }) {
@@ -183,7 +193,7 @@ export function Dashboard({
                       <button
                         key={card.id}
                         type="button"
-                        className={getDashboardCardClass(card.id)}
+                        className={getDashboardCardClass(card)}
                         onClick={() => onNavigate(card.id)}
                       >
                         {Icon ? (

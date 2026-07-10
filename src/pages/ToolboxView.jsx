@@ -7,6 +7,11 @@ import { RecordDetails } from '../components/RecordDetails.jsx'
 import { RecordActions } from '../components/RecordActions.jsx'
 import { SavedRecordSignature } from '../components/SavedRecordSignature.jsx'
 import { CloudSyncBadge } from '../components/CloudSyncBadge.jsx'
+import { FormSection } from '../components/forms/FormSection.jsx'
+import { FormField } from '../components/forms/FormField.jsx'
+import { FormActions } from '../components/forms/FormActions.jsx'
+import { FormPageHeader } from '../components/forms/FormPageHeader.jsx'
+import { ValidationMessage } from '../components/forms/ValidationMessage.jsx'
 import {
   ComboField,
   TextField,
@@ -31,6 +36,11 @@ import {
   SYNC_STATUS,
 } from '../utils/storage/toolboxCloudStorage.js'
 import { isAdminProfile } from '../utils/storage/userProfileStorage.js'
+import {
+  scrollToFirstInvalid,
+  hasValidationErrors,
+  getValidationSummary,
+} from '../utils/formValidation.js'
 
 export function ToolboxView({
   onBack,
@@ -50,7 +60,7 @@ export function ToolboxView({
   const [draft, setDraft] = useState(() => createEmptyDraft('toolbox'))
   useDefaultFormDate(setDraft)
   const [completedRecord, setCompletedRecord] = useState(null)
-  const [validationError, setValidationError] = useState(null)
+  const [fieldErrors, setFieldErrors] = useState({})
   const [completedSyncStatus, setCompletedSyncStatus] = useState(null)
   const [cloudLoadWarning, setCloudLoadWarning] = useState(null)
   const [cloudSaving, setCloudSaving] = useState(false)
@@ -125,8 +135,25 @@ export function ToolboxView({
   }
 
   function updateField(field, value) {
-    setValidationError(null)
+    setFieldErrors((prev) => ({ ...prev, [field]: undefined }))
     updateDraft({ fields: { ...fields, [field]: value } })
+  }
+
+  function validateForm() {
+    const errors = {}
+    if (!fields.jobProjectName.trim()) {
+      errors.jobProjectName = 'Job / project name is required.'
+    }
+    if (!fields.siteLocation.trim()) {
+      errors.siteLocation = 'Site location is required.'
+    }
+    if (!fields.meetingLedBy.trim()) {
+      errors.meetingLedBy = 'Meeting led by is required.'
+    }
+    if (!signatureConfirmation.trim()) {
+      errors.signatureConfirmation = 'Signature / name confirmation is required.'
+    }
+    return errors
   }
 
   function toggleItem(index) {
@@ -139,17 +166,14 @@ export function ToolboxView({
   async function handleSubmit(event) {
     event.preventDefault()
 
-    if (!fields.jobProjectName.trim() || !fields.siteLocation.trim() || !fields.meetingLedBy.trim()) {
-      setValidationError('Job / project name, site location, and meeting led by are required before saving.')
+    const errors = validateForm()
+    if (hasValidationErrors(errors)) {
+      setFieldErrors(errors)
+      scrollToFirstInvalid(errors)
       return
     }
 
-    if (!signatureConfirmation.trim()) {
-      setValidationError('Signature / Name Confirmation is required before saving.')
-      return
-    }
-
-    setValidationError(null)
+    setFieldErrors({})
     const completedItems = checklist.filter((_, index) => checked.has(index))
     const submittedAt = new Date().toISOString()
     const record = {
@@ -210,7 +234,7 @@ export function ToolboxView({
   function handleReset() {
     setDraft(createEmptyDraft('toolbox'))
     setCompletedRecord(null)
-    setValidationError(null)
+    setFieldErrors({})
     setCompletedSyncStatus(null)
   }
 
@@ -231,31 +255,36 @@ export function ToolboxView({
     <>
       <BackButton onClick={onBack} />
 
-      <header className="header no-print">
-        <p className="company">Monrad Earthworx</p>
-        <h1 className="title">{formConfig.title}</h1>
-        <p className="progress" aria-live="polite">
-          {completed} of {total} completed
-        </p>
-      </header>
+      <FormPageHeader
+        title={formConfig.title}
+        subtitle="Brief the team on hazards and controls"
+        progress={`${completed} of ${total} completed`}
+      />
 
       <form className="job-form no-print" onSubmit={handleSubmit} noValidate>
-        <fieldset className="job-form__fieldset">
-          <legend className="job-form__legend">1. Meeting details</legend>
+        <FormSection title="Meeting Details" id="toolbox-details">
           <DateField value={fields.date} onChange={updateField} />
-          <TextField label="Job / project name" field="jobProjectName" value={fields.jobProjectName} onChange={updateField} placeholder="e.g. Riverside subdivision" />
-          <ComboField label="Site location" field="siteLocation" value={fields.siteLocation} onChange={updateField} placeholder="Address or site name" options={comboOptions.sites} listId="toolbox-sites" />
-          <ComboField label="Meeting led by" field="meetingLedBy" value={fields.meetingLedBy} onChange={updateField} placeholder="Facilitator name" options={comboOptions.operators} listId="toolbox-operators" />
+          <FormField label="Job / project name" fieldId="jobProjectName" required error={fieldErrors.jobProjectName}>
+            <TextField label="" field="jobProjectName" value={fields.jobProjectName} onChange={updateField} placeholder="e.g. Riverside subdivision" />
+          </FormField>
+          <FormField label="Site location" fieldId="siteLocation" required error={fieldErrors.siteLocation}>
+            <ComboField label="" field="siteLocation" value={fields.siteLocation} onChange={updateField} placeholder="Address or site name" options={comboOptions.sites} listId="toolbox-sites" />
+          </FormField>
+          <FormField label="Meeting led by" fieldId="meetingLedBy" required error={fieldErrors.meetingLedBy}>
+            <ComboField label="" field="meetingLedBy" value={fields.meetingLedBy} onChange={updateField} placeholder="Facilitator name" options={comboOptions.operators} listId="toolbox-operators" />
+          </FormField>
           <TextField label="Attendees" field="attendees" value={fields.attendees} onChange={updateField} placeholder="Names or crew count" />
           <TextField label="Work planned today" field="workPlannedToday" value={fields.workPlannedToday} onChange={updateField} placeholder="Tasks planned for today" />
+        </FormSection>
+
+        <FormSection title="Hazards and Controls" id="toolbox-hazards">
           <TextField label="Main hazards discussed" field="mainHazardsDiscussed" value={fields.mainHazardsDiscussed} onChange={updateField} placeholder="Key hazards covered" />
           <TextField label="Controls agreed" field="controlsAgreed" value={fields.controlsAgreed} onChange={updateField} placeholder="Agreed control measures" />
           <TextField label="Weather / ground conditions" field="weatherGroundConditions" value={fields.weatherGroundConditions} onChange={updateField} placeholder="e.g. Dry, firm ground" />
           <NotesField value={fields.notes} onChange={updateField} />
-        </fieldset>
+        </FormSection>
 
-        <fieldset className="job-form__fieldset">
-          <legend className="job-form__legend">2. Toolbox checklist</legend>
+        <FormSection title="Toolbox Checklist" id="toolbox-checklist">
           <ul className="checklist" role="list">
             {checklist.map((label, index) => {
               const isChecked = checked.has(index)
@@ -274,19 +303,25 @@ export function ToolboxView({
               )
             })}
           </ul>
-        </fieldset>
+        </FormSection>
 
-        <fieldset className="job-form__fieldset">
-          <legend className="job-form__legend">3. Name confirmation &amp; photos</legend>
-          <SignatureConfirmationField
-            value={signatureConfirmation}
-            onChange={(value) => {
-              setValidationError(null)
-              updateDraft({ signatureConfirmation: value })
-            }}
-          />
+        <FormSection title="Confirmation & Photos" id="toolbox-confirmation">
+          <FormField
+            label="Signature / name confirmation"
+            fieldId="signatureConfirmation"
+            required
+            error={fieldErrors.signatureConfirmation}
+          >
+            <SignatureConfirmationField
+              value={signatureConfirmation}
+              onChange={(value) => {
+                setFieldErrors((prev) => ({ ...prev, signatureConfirmation: undefined }))
+                updateDraft({ signatureConfirmation: value })
+              }}
+            />
+          </FormField>
           <PhotoUpload photos={photos} onChange={(value) => updateDraft({ photos: value })} />
-        </fieldset>
+        </FormSection>
 
         {allComplete && (
           <p className="complete-message" role="status">
@@ -294,19 +329,15 @@ export function ToolboxView({
           </p>
         )}
 
-        {validationError && (
-          <p className="validation-message" role="alert">
-            {validationError}
-          </p>
-        )}
-
-        <p className="form-hint">
-          Record meeting details, complete the checklist, then save your toolbox record.
-        </p>
-
-        <button type="submit" className="submit-btn" disabled={cloudSaving}>
-          {cloudSaving ? 'Saving…' : 'Save completed record'}
-        </button>
+        <FormActions>
+          {hasValidationErrors(fieldErrors) && (
+            <ValidationMessage variant="summary" messages={getValidationSummary(fieldErrors)} />
+          )}
+          <p className="form-hint">Record meeting details, complete the checklist, then submit your record.</p>
+          <button type="submit" className="submit-btn" disabled={cloudSaving}>
+            {cloudSaving ? 'Saving…' : 'Submit Record'}
+          </button>
+        </FormActions>
       </form>
 
       {completedRecord && (

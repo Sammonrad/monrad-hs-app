@@ -3,12 +3,17 @@ import { FORM_TYPES, MAX_PHOTOS } from '../constants/index.js'
 import { BackButton } from '../components/BackButton.jsx'
 import { SignatureConfirmationField } from '../components/SignatureConfirmationField.jsx'
 import { PhotoUpload } from '../components/PhotoUpload.jsx'
-import { RadioFieldGroup } from '../components/RadioFieldGroup.jsx'
 import { DefectWarning } from '../components/DefectWarning.jsx'
 import { RecordDetails } from '../components/RecordDetails.jsx'
 import { RecordActions } from '../components/RecordActions.jsx'
 import { SavedRecordSignature } from '../components/SavedRecordSignature.jsx'
 import { CloudSyncBadge } from '../components/CloudSyncBadge.jsx'
+import { FormSection } from '../components/forms/FormSection.jsx'
+import { FormField } from '../components/forms/FormField.jsx'
+import { FormActions } from '../components/forms/FormActions.jsx'
+import { FormPageHeader } from '../components/forms/FormPageHeader.jsx'
+import { SegmentedChoice } from '../components/forms/SegmentedChoice.jsx'
+import { ValidationMessage } from '../components/forms/ValidationMessage.jsx'
 import {
   ComboField,
   TextField,
@@ -40,6 +45,11 @@ import {
   SYNC_STATUS,
 } from '../utils/storage/preStartCloudStorage.js'
 import { isAdminProfile } from '../utils/storage/userProfileStorage.js'
+import {
+  scrollToFirstInvalid,
+  hasValidationErrors,
+  getValidationSummary,
+} from '../utils/formValidation.js'
 
 export function PreStartView({
   onBack,
@@ -61,7 +71,7 @@ export function PreStartView({
   const [draft, setDraft] = useState(() => createEmptyDraft('pre-start'))
   useDefaultFormDate(setDraft)
   const [completedRecord, setCompletedRecord] = useState(null)
-  const [validationError, setValidationError] = useState(null)
+  const [fieldErrors, setFieldErrors] = useState({})
   const [completedSyncStatus, setCompletedSyncStatus] = useState(null)
   const [cloudLoadWarning, setCloudLoadWarning] = useState(null)
   const [cloudSaving, setCloudSaving] = useState(false)
@@ -161,8 +171,34 @@ export function PreStartView({
   }
 
   function updateField(field, value) {
-    setValidationError(null)
+    setFieldErrors((prev) => ({ ...prev, [field]: undefined }))
     updateDraft({ fields: { ...fields, [field]: value } })
+  }
+
+  function validateForm() {
+    const errors = {}
+    if (!fields.operatorName.trim()) {
+      errors.operatorName = 'Operator name is required.'
+    }
+    if (!fields.machineNameId.trim()) {
+      errors.machineNameId = 'Machine name / ID is required.'
+    }
+    if (!signatureConfirmation.trim()) {
+      errors.signatureConfirmation = 'Signature / name confirmation is required.'
+    }
+    if (defectsSelected) {
+      if (!defectDescription.trim()) {
+        errors.defectDescription = 'Defect description is required when defects are found.'
+      }
+      if (!defectSeverity) {
+        errors.defectSeverity = 'Defect severity is required when defects are found.'
+      }
+      if (!machineOperableSafely) {
+        errors.machineOperableSafely =
+          'Please indicate whether the machine can still be operated safely.'
+      }
+    }
+    return errors
   }
 
   function toggleItem(index) {
@@ -175,34 +211,14 @@ export function PreStartView({
   async function handleSubmit(event) {
     event.preventDefault()
 
-    if (!fields.operatorName.trim() || !fields.machineNameId.trim()) {
-      setValidationError('Operator name and machine name / ID are required before saving.')
+    const errors = validateForm()
+    if (hasValidationErrors(errors)) {
+      setFieldErrors(errors)
+      scrollToFirstInvalid(errors)
       return
     }
 
-    if (!signatureConfirmation.trim()) {
-      setValidationError('Signature / Name Confirmation is required before saving.')
-      return
-    }
-
-    if (defectsSelected) {
-      if (!defectDescription.trim()) {
-        setValidationError('Defect description is required when defects are found.')
-        return
-      }
-      if (!defectSeverity) {
-        setValidationError('Defect severity is required when defects are found.')
-        return
-      }
-      if (!machineOperableSafely) {
-        setValidationError(
-          'Please indicate whether the machine can still be operated safely.',
-        )
-        return
-      }
-    }
-
-    setValidationError(null)
+    setFieldErrors({})
     const completedItems = checklist.filter((_, index) => checked.has(index))
     const submittedAt = new Date().toISOString()
     const record = {
@@ -274,7 +290,7 @@ export function PreStartView({
   function handleReset() {
     setDraft(createEmptyDraft('pre-start'))
     setCompletedRecord(null)
-    setValidationError(null)
+    setFieldErrors({})
     setCompletedSyncStatus(null)
   }
 
@@ -295,27 +311,27 @@ export function PreStartView({
     <>
       <BackButton onClick={onBack} />
 
-      <header className="header no-print">
-        <p className="company">Monrad Earthworx</p>
-        <h1 className="title">{formConfig.title}</h1>
-        <p className="progress" aria-live="polite">
-          {completed} of {total} completed
-        </p>
-      </header>
+      <FormPageHeader
+        title={formConfig.title}
+        subtitle="Check machine condition before operating"
+        progress={`${completed} of ${total} completed`}
+      />
 
       <form className="job-form no-print" onSubmit={handleSubmit} noValidate>
-        <fieldset className="job-form__fieldset">
-          <legend className="job-form__legend">1. Pre-start details</legend>
+        <FormSection title="People and Equipment" id="prestart-details">
           <DateField value={fields.date} onChange={updateField} />
-          <ComboField label="Operator name" field="operatorName" value={fields.operatorName} onChange={updateField} placeholder="Your name" options={comboOptions.operators} listId="pre-start-operators" />
-          <ComboField label="Machine name / ID" field="machineNameId" value={fields.machineNameId} onChange={updateField} placeholder="e.g. EX-01 or 5T excavator" options={comboOptions.machines} listId="pre-start-machines" />
+          <FormField label="Operator name" fieldId="operatorName" required error={fieldErrors.operatorName}>
+            <ComboField label="" field="operatorName" value={fields.operatorName} onChange={updateField} placeholder="Your name" options={comboOptions.operators} listId="pre-start-operators" />
+          </FormField>
+          <FormField label="Machine name / ID" fieldId="machineNameId" required error={fieldErrors.machineNameId}>
+            <ComboField label="" field="machineNameId" value={fields.machineNameId} onChange={updateField} placeholder="e.g. EX-01 or 5T excavator" options={comboOptions.machines} listId="pre-start-machines" />
+          </FormField>
           <TextField label="Machine hours" field="machineHours" value={fields.machineHours} onChange={updateField} placeholder="Current hour meter reading" />
           <ComboField label="Site / job location" field="siteLocation" value={fields.siteLocation} onChange={updateField} placeholder="Site or yard" options={comboOptions.sites} listId="pre-start-sites" />
           <NotesField value={fields.notes} onChange={updateField} />
-        </fieldset>
+        </FormSection>
 
-        <fieldset className="job-form__fieldset">
-          <legend className="job-form__legend">2. Pre-start checklist</legend>
+        <FormSection title="Pre-Start Checklist" id="prestart-checklist">
           <ul className="checklist" role="list">
             {checklist.map((label, index) => {
               const isChecked = checked.has(index)
@@ -334,16 +350,26 @@ export function PreStartView({
               )
             })}
           </ul>
-        </fieldset>
+        </FormSection>
 
-        <fieldset className="job-form__fieldset defect-section">
-          <legend className="job-form__legend">3. Defect reporting</legend>
-          <RadioFieldGroup
+        <FormSection
+          title="Defect Reporting"
+          id="defect-reporting"
+          variant={showDefectWarning ? 'defect-fail' : undefined}
+          description="Report any defects found during the pre-start inspection."
+        >
+          <SegmentedChoice
             label="Any defects found?"
             name="defectsFound"
+            fieldId="defectsFound"
             value={defectsFound}
             onChange={(value) => {
-              setValidationError(null)
+              setFieldErrors((prev) => ({
+                ...prev,
+                defectDescription: undefined,
+                defectSeverity: undefined,
+                machineOperableSafely: undefined,
+              }))
               if (value === 'none') {
                 updateDraft({
                   defectsFound: value,
@@ -366,43 +392,52 @@ export function PreStartView({
 
           {defectsSelected && (
             <div className="defect-section__details">
-              <label className="field">
-                <span className="field__label">Defect description</span>
+              <FormField
+                label="Defect description"
+                fieldId="defectDescription"
+                required
+                error={fieldErrors.defectDescription}
+              >
                 <textarea
                   className="field__input field__textarea"
                   value={defectDescription}
                   onChange={(e) => {
-                    setValidationError(null)
+                    setFieldErrors((prev) => ({ ...prev, defectDescription: undefined }))
                     updateDraft({ defectDescription: e.target.value })
                   }}
                   placeholder="Describe the defect..."
                   rows={4}
                 />
-              </label>
+              </FormField>
 
-              <SelectField
-                label="Severity"
-                field="defectSeverity"
-                value={defectSeverity}
-                onChange={(_, value) => {
-                  setValidationError(null)
-                  updateDraft({ defectSeverity: value })
-                }}
-                options={[
-                  { value: '', label: 'Select severity...' },
-                  { value: 'low', label: 'Low' },
-                  { value: 'medium', label: 'Medium' },
-                  { value: 'high', label: 'High' },
-                  { value: 'critical', label: 'Critical' },
-                ]}
-              />
+              <FormField label="Severity" fieldId="defectSeverity" required error={fieldErrors.defectSeverity}>
+                <SelectField
+                  label=""
+                  field="defectSeverity"
+                  value={defectSeverity}
+                  onChange={(_, value) => {
+                    setFieldErrors((prev) => ({ ...prev, defectSeverity: undefined }))
+                    updateDraft({ defectSeverity: value })
+                  }}
+                  options={[
+                    { value: '', label: 'Select severity...' },
+                    { value: 'low', label: 'Low' },
+                    { value: 'medium', label: 'Medium' },
+                    { value: 'high', label: 'High' },
+                    { value: 'critical', label: 'Critical' },
+                  ]}
+                />
+              </FormField>
 
-              <RadioFieldGroup
+              <SegmentedChoice
                 label="Can the machine still be operated safely?"
                 name="machineOperableSafely"
+                fieldId="machineOperableSafely"
+                required
                 value={machineOperableSafely}
+                error={fieldErrors.machineOperableSafely}
                 onChange={(value) => {
-                  setValidationError(null)
+                  setFieldErrors((prev) => ({ ...prev, machineOperableSafely: undefined }))
                   updateDraft({ machineOperableSafely: value })
                 }}
                 options={[
@@ -435,19 +470,25 @@ export function PreStartView({
               {showDefectWarning && <DefectWarning />}
             </div>
           )}
-        </fieldset>
+        </FormSection>
 
-        <fieldset className="job-form__fieldset">
-          <legend className="job-form__legend">4. Name confirmation &amp; photos</legend>
-          <SignatureConfirmationField
-            value={signatureConfirmation}
-            onChange={(value) => {
-              setValidationError(null)
-              updateDraft({ signatureConfirmation: value })
-            }}
-          />
+        <FormSection title="Confirmation & Photos" id="prestart-confirmation">
+          <FormField
+            label="Signature / name confirmation"
+            fieldId="signatureConfirmation"
+            required
+            error={fieldErrors.signatureConfirmation}
+          >
+            <SignatureConfirmationField
+              value={signatureConfirmation}
+              onChange={(value) => {
+                setFieldErrors((prev) => ({ ...prev, signatureConfirmation: undefined }))
+                updateDraft({ signatureConfirmation: value })
+              }}
+            />
+          </FormField>
           <PhotoUpload photos={photos} onChange={(value) => updateDraft({ photos: value })} />
-        </fieldset>
+        </FormSection>
 
         {allComplete && !showDefectWarning && (
           <p className="complete-message" role="status">
@@ -455,20 +496,17 @@ export function PreStartView({
           </p>
         )}
 
-        {validationError && (
-          <p className="validation-message" role="alert">
-            {validationError}
+        <FormActions>
+          {hasValidationErrors(fieldErrors) && (
+            <ValidationMessage variant="summary" messages={getValidationSummary(fieldErrors)} />
+          )}
+          <p className="form-hint">
+            Enter operator and machine details, complete the checklist, report any defects, then submit.
           </p>
-        )}
-
-        <p className="form-hint">
-          Enter operator and machine details, complete the checklist, report any defects, then save
-          your pre-start record.
-        </p>
-
-        <button type="submit" className="submit-btn">
-          Save completed record
-        </button>
+          <button type="submit" className="submit-btn" disabled={cloudSaving}>
+            {cloudSaving ? 'Saving…' : 'Submit Record'}
+          </button>
+        </FormActions>
       </form>
 
       {completedRecord && (

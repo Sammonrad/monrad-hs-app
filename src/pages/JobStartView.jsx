@@ -7,6 +7,11 @@ import { RecordDetails } from '../components/RecordDetails.jsx'
 import { RecordActions } from '../components/RecordActions.jsx'
 import { SavedRecordSignature } from '../components/SavedRecordSignature.jsx'
 import { CloudSyncBadge } from '../components/CloudSyncBadge.jsx'
+import { FormSection } from '../components/forms/FormSection.jsx'
+import { FormField } from '../components/forms/FormField.jsx'
+import { FormActions } from '../components/forms/FormActions.jsx'
+import { FormPageHeader } from '../components/forms/FormPageHeader.jsx'
+import { ValidationMessage } from '../components/forms/ValidationMessage.jsx'
 import {
   ComboField,
   TextField,
@@ -31,6 +36,11 @@ import {
   SYNC_STATUS,
 } from '../utils/storage/jobStartCloudStorage.js'
 import { isAdminProfile } from '../utils/storage/userProfileStorage.js'
+import {
+  scrollToFirstInvalid,
+  hasValidationErrors,
+  getValidationSummary,
+} from '../utils/formValidation.js'
 
 export function JobStartView({
   onBack,
@@ -49,7 +59,7 @@ export function JobStartView({
   const [draft, setDraft] = useState(() => createEmptyDraft('job-start'))
   useDefaultFormDate(setDraft)
   const [completedRecord, setCompletedRecord] = useState(null)
-  const [validationError, setValidationError] = useState(null)
+  const [fieldErrors, setFieldErrors] = useState({})
   const [completedSyncStatus, setCompletedSyncStatus] = useState(null)
   const [cloudLoadWarning, setCloudLoadWarning] = useState(null)
   const [cloudSaving, setCloudSaving] = useState(false)
@@ -136,8 +146,16 @@ export function JobStartView({
   }
 
   function updateField(field, value) {
-    setValidationError(null)
+    setFieldErrors((prev) => ({ ...prev, [field]: undefined }))
     updateDraft({ fields: { ...fields, [field]: value } })
+  }
+
+  function validateForm() {
+    const errors = {}
+    if (!signatureConfirmation.trim()) {
+      errors.signatureConfirmation = 'Signature / name confirmation is required.'
+    }
+    return errors
   }
 
   function toggleItem(index) {
@@ -150,12 +168,14 @@ export function JobStartView({
   async function handleSubmit(event) {
     event.preventDefault()
 
-    if (!signatureConfirmation.trim()) {
-      setValidationError('Signature / Name Confirmation is required before saving.')
+    const errors = validateForm()
+    if (hasValidationErrors(errors)) {
+      setFieldErrors(errors)
+      scrollToFirstInvalid(errors)
       return
     }
 
-    setValidationError(null)
+    setFieldErrors({})
     const completedItems = checklist.filter((_, index) => checked.has(index))
     const submittedAt = new Date().toISOString()
     const record = {
@@ -215,7 +235,7 @@ export function JobStartView({
   function handleReset() {
     setDraft(createEmptyDraft('job-start'))
     setCompletedRecord(null)
-    setValidationError(null)
+    setFieldErrors({})
     setCompletedSyncStatus(null)
   }
 
@@ -233,27 +253,23 @@ export function JobStartView({
     <>
       <BackButton onClick={onBack} />
 
-      <header className="header no-print">
-        <p className="company">Monrad Earthworx</p>
-        <h1 className="title">{formConfig.title}</h1>
-        <p className="progress" aria-live="polite">
-          {completed} of {total} completed
-        </p>
-      </header>
+      <FormPageHeader
+        title={formConfig.title}
+        subtitle="Confirm site readiness before work begins"
+        progress={`${completed} of ${total} completed`}
+      />
 
       <form className="job-form no-print" onSubmit={handleSubmit} noValidate>
-        <fieldset className="job-form__fieldset">
-          <legend className="job-form__legend">1. Job details</legend>
+        <FormSection title="Job Details" id="job-details">
           <TextField label="Job name" field="jobName" value={fields.jobName} onChange={updateField} placeholder="e.g. Driveway excavation" />
           <ComboField label="Site location" field="siteLocation" value={fields.siteLocation} onChange={updateField} placeholder="Address or site name" options={comboOptions.sites} listId="job-start-sites" />
           <ComboField label="Employee / operator name" field="employeeName" value={fields.employeeName} onChange={updateField} placeholder="Your name" options={comboOptions.operators} listId="job-start-operators" />
           <ComboField label="Machine used" field="machineUsed" value={fields.machineUsed} onChange={updateField} placeholder="e.g. 5T excavator" options={comboOptions.machines} listId="job-start-machines" />
           <DateField value={fields.date} onChange={updateField} />
           <NotesField value={fields.notes} onChange={updateField} />
-        </fieldset>
+        </FormSection>
 
-        <fieldset className="job-form__fieldset">
-          <legend className="job-form__legend">2. Safety checklist</legend>
+        <FormSection title="Safety Checklist" id="safety-checklist">
           <ul className="checklist" role="list">
             {checklist.map((label, index) => {
               const isChecked = checked.has(index)
@@ -272,19 +288,25 @@ export function JobStartView({
               )
             })}
           </ul>
-        </fieldset>
+        </FormSection>
 
-        <fieldset className="job-form__fieldset">
-          <legend className="job-form__legend">3. Name confirmation &amp; photos</legend>
-          <SignatureConfirmationField
-            value={signatureConfirmation}
-            onChange={(value) => {
-              setValidationError(null)
-              updateDraft({ signatureConfirmation: value })
-            }}
-          />
+        <FormSection title="Confirmation & Photos" id="confirmation">
+          <FormField
+            label="Signature / name confirmation"
+            fieldId="signatureConfirmation"
+            required
+            error={fieldErrors.signatureConfirmation}
+          >
+            <SignatureConfirmationField
+              value={signatureConfirmation}
+              onChange={(value) => {
+                setFieldErrors((prev) => ({ ...prev, signatureConfirmation: undefined }))
+                updateDraft({ signatureConfirmation: value })
+              }}
+            />
+          </FormField>
           <PhotoUpload photos={photos} onChange={(value) => updateDraft({ photos: value })} />
-        </fieldset>
+        </FormSection>
 
         {allComplete && (
           <p className="complete-message" role="status">
@@ -292,17 +314,15 @@ export function JobStartView({
           </p>
         )}
 
-        {validationError && (
-          <p className="validation-message" role="alert">
-            {validationError}
-          </p>
-        )}
-
-        <p className="form-hint">Fill in job details, tick each safety item, then save your completed record.</p>
-
-        <button type="submit" className="submit-btn">
-          Save completed record
-        </button>
+        <FormActions>
+          {hasValidationErrors(fieldErrors) && (
+            <ValidationMessage variant="summary" messages={getValidationSummary(fieldErrors)} />
+          )}
+          <p className="form-hint">Fill in job details, tick each safety item, then submit your record.</p>
+          <button type="submit" className="submit-btn" disabled={cloudSaving}>
+            {cloudSaving ? 'Saving…' : 'Submit Record'}
+          </button>
+        </FormActions>
       </form>
 
       {completedRecord && (

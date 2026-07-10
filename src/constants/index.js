@@ -304,7 +304,7 @@ export const DASHBOARD_GROUPS = [
   {
     id: 'site-safety',
     title: 'Site Safety',
-    cardIds: ['job-start', 'pre-start', 'toolbox', 'incident'],
+    cardIds: ['job-start', 'pre-start', 'toolbox', 'incident', 'critical-risks'],
   },
   {
     id: 'daily',
@@ -354,6 +354,14 @@ export const DASHBOARD_CARDS = [
     group: 'site-safety',
     placement: 'mainDashboard',
     available: true,
+  },
+  {
+    id: 'critical-risks',
+    title: 'Critical Risks',
+    group: 'site-safety',
+    placement: 'mainDashboard',
+    available: true,
+    fullWidth: true,
   },
   {
     id: 'action-register',

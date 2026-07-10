@@ -4,6 +4,10 @@ import { BackButton } from '../components/BackButton.jsx'
 import { ActionCard } from '../components/ActionCard.jsx'
 import { PrintableAction } from '../components/PrintableAction.jsx'
 import { DateField, TextField, SelectField } from '../components/FormFields.jsx'
+import { FormSection } from '../components/forms/FormSection.jsx'
+import { FormField } from '../components/forms/FormField.jsx'
+import { FormActions } from '../components/forms/FormActions.jsx'
+import { ValidationMessage } from '../components/forms/ValidationMessage.jsx'
 import { createRecordId } from '../utils/ids.js'
 import {
   persistActions,
@@ -27,6 +31,7 @@ import {
   sortActiveActions,
 } from '../utils/safetyAlerts.js'
 import { useHighlightAction } from '../hooks/useHighlightAction.js'
+import { scrollToFirstInvalid } from '../utils/formValidation.js'
 
 export function ActionRegisterView({
   onBack,
@@ -42,7 +47,7 @@ export function ActionRegisterView({
 }) {
   const [showAddForm, setShowAddForm] = useState(false)
   const [manualDraft, setManualDraft] = useState(createEmptyManualAction)
-  const [validationError, setValidationError] = useState(null)
+  const [fieldErrors, setFieldErrors] = useState({})
   const [statusFilter, setStatusFilter] = useState(() => {
     const allowed = ACTION_REGISTER_FILTERS.some((filter) => filter.id === initialActionFilter)
     return allowed ? initialActionFilter : 'all'
@@ -204,7 +209,8 @@ export function ActionRegisterView({
   function handleAddManualAction(event) {
     event.preventDefault()
     if (!manualDraft.description.trim()) {
-      setValidationError('Description is required for a new action.')
+      setFieldErrors({ description: 'Description is required for a new action.' })
+      scrollToFirstInvalid({ description: 'required' })
       return
     }
 
@@ -229,7 +235,7 @@ export function ActionRegisterView({
     if (!updateActions([newAction, ...actions])) return
     setManualDraft(createEmptyManualAction())
     setShowAddForm(false)
-    setValidationError(null)
+    setFieldErrors({})
     syncActionToCloud(newAction, true)
   }
 
@@ -290,7 +296,7 @@ export function ActionRegisterView({
             className="action-btn action-btn--primary"
             onClick={() => {
               setShowAddForm((prev) => !prev)
-              setValidationError(null)
+              setFieldErrors({})
             }}
           >
             {showAddForm ? 'Cancel' : 'Add action'}
@@ -314,8 +320,7 @@ export function ActionRegisterView({
 
         {showAddForm && (
           <form className="action-form" onSubmit={handleAddManualAction} noValidate>
-            <fieldset className="job-form__fieldset">
-              <legend className="job-form__legend">New manual action</legend>
+            <FormSection title="New Manual Action" id="manual-action">
               <DateField
                 label="Date"
                 field="date"
@@ -329,19 +334,18 @@ export function ActionRegisterView({
                 onChange={(_, value) => setManualDraft((prev) => ({ ...prev, site: value }))}
                 placeholder="Site or job name"
               />
-              <label className="field">
-                <span className="field__label">Description</span>
+              <FormField label="Description" fieldId="description" required error={fieldErrors.description}>
                 <textarea
                   className="field__input field__textarea"
                   value={manualDraft.description}
-                  onChange={(e) =>
+                  onChange={(e) => {
+                    setFieldErrors({})
                     setManualDraft((prev) => ({ ...prev, description: e.target.value }))
-                  }
+                  }}
                   placeholder="Describe the action required..."
                   rows={3}
-                  required
                 />
-              </label>
+              </FormField>
               <TextField
                 label="Person responsible"
                 field="personResponsible"
@@ -379,17 +383,16 @@ export function ActionRegisterView({
                   rows={2}
                 />
               </label>
-            </fieldset>
+            </FormSection>
 
-            {validationError && (
-              <p className="validation-message" role="alert">
-                {validationError}
-              </p>
-            )}
-
-            <button type="submit" className="submit-btn">
-              Save action
-            </button>
+            <FormActions>
+              {fieldErrors.description && (
+                <ValidationMessage variant="summary" messages={[fieldErrors.description]} />
+              )}
+              <button type="submit" className="submit-btn">
+                Save action
+              </button>
+            </FormActions>
           </form>
         )}
 

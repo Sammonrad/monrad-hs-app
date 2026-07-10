@@ -17,6 +17,7 @@ import { ToolboxView } from './pages/ToolboxView.jsx'
 import { TimesheetView } from './pages/TimesheetView.jsx'
 import { WeeklyTimesheetSummaryView } from './pages/WeeklyTimesheetSummaryView.jsx'
 import { IncidentView } from './pages/IncidentView.jsx'
+import { CriticalRisksView } from './pages/CriticalRisksView.jsx'
 import { PrintableRecord } from './components/PrintableRecord.jsx'
 import { loadSavedRecords } from './utils/storage/recordsStorage.js'
 import { loadActions, persistActions, syncActionsFromRecord, patchAction } from './utils/storage/actionsStorage.js'
@@ -584,6 +585,10 @@ function App() {
           profile={profile}
           user={session?.user ?? null}
         />
+      )}
+
+      {currentView === 'critical-risks' && (
+        <CriticalRisksView onBack={goToDashboard} />
       )}
 
       {currentView === 'incident' && (

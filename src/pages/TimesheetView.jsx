@@ -6,6 +6,11 @@ import { RecordDetails } from '../components/RecordDetails.jsx'
 import { RecordActions } from '../components/RecordActions.jsx'
 import { SavedRecordSignature } from '../components/SavedRecordSignature.jsx'
 import { TimesheetCloudSyncBadge } from '../components/TimesheetCloudSyncBadge.jsx'
+import { FormSection } from '../components/forms/FormSection.jsx'
+import { FormField } from '../components/forms/FormField.jsx'
+import { FormActions } from '../components/forms/FormActions.jsx'
+import { FormPageHeader } from '../components/forms/FormPageHeader.jsx'
+import { ValidationMessage } from '../components/forms/ValidationMessage.jsx'
 import {
   ComboField,
   TextField,
@@ -36,6 +41,11 @@ import {
   calculateAutoChargeableHours,
   parseDecimalHours,
 } from '../utils/time.js'
+import {
+  scrollToFirstInvalid,
+  hasValidationErrors,
+  getValidationSummary,
+} from '../utils/formValidation.js'
 
 export function TimesheetView({
   onBack,
@@ -54,7 +64,7 @@ export function TimesheetView({
   const [draft, setDraft] = useState(() => createEmptyDraft('timesheet'))
   useDefaultFormDate(setDraft)
   const [completedRecord, setCompletedRecord] = useState(null)
-  const [validationError, setValidationError] = useState(null)
+  const [fieldErrors, setFieldErrors] = useState({})
   const [completedSyncStatus, setCompletedSyncStatus] = useState(null)
   const [cloudLoadWarning, setCloudLoadWarning] = useState(null)
   const [cloudSaving, setCloudSaving] = useState(false)
@@ -138,7 +148,7 @@ export function TimesheetView({
   }
 
   function updateField(field, value) {
-    setValidationError(null)
+    setFieldErrors((prev) => ({ ...prev, [field]: undefined, labourTime: undefined }))
     if (field === 'startTime' || field === 'finishTime' || field === 'breakMinutes' || field === 'nonChargeableHours') {
       setChargeableEdited(false)
     }
@@ -146,46 +156,44 @@ export function TimesheetView({
   }
 
   function handleChargeableChange(value) {
-    setValidationError(null)
+    setFieldErrors((prev) => ({ ...prev, chargeableHours: undefined }))
     setChargeableEdited(true)
     updateDraft({ fields: { ...fields, chargeableHours: value } })
+  }
+
+  function validateForm() {
+    const errors = {}
+    if (!fields.date.trim()) errors.date = 'Date is required.'
+    if (!fields.employeeName.trim()) errors.employeeName = 'Employee / operator is required.'
+    if (!fields.jobProjectName.trim()) errors.jobProjectName = 'Job / project is required.'
+    if (!fields.siteLocation.trim()) errors.siteLocation = 'Site location is required.'
+    if (!fields.startTime) errors.startTime = 'Start time is required.'
+    if (!fields.finishTime) errors.finishTime = 'Finish time is required.'
+    if (!fields.workCompleted.trim()) errors.workCompleted = 'Work completed is required.'
+    if (!signatureConfirmation.trim()) {
+      errors.signatureConfirmation = 'Signature / name confirmation is required.'
+    }
+    if (labourCalc.invalid) {
+      errors.labourTime = 'Finish time must be after start time on the same day.'
+    }
+    const nonChargeable = parseDecimalHours(fields.nonChargeableHours)
+    if (nonChargeable > 0 && !fields.nonChargeableReason.trim()) {
+      errors.nonChargeableReason = 'Reason for non-chargeable time is required.'
+    }
+    return errors
   }
 
   async function handleSubmit(event) {
     event.preventDefault()
 
-    if (
-      !fields.date.trim() ||
-      !fields.employeeName.trim() ||
-      !fields.jobProjectName.trim() ||
-      !fields.siteLocation.trim() ||
-      !fields.startTime ||
-      !fields.finishTime ||
-      !fields.workCompleted.trim()
-    ) {
-      setValidationError(
-        'Date, employee / operator, job / project, site, start time, finish time, and work completed are required before saving.',
-      )
+    const errors = validateForm()
+    if (hasValidationErrors(errors)) {
+      setFieldErrors(errors)
+      scrollToFirstInvalid(errors)
       return
     }
 
-    if (!signatureConfirmation.trim()) {
-      setValidationError('Signature / Name Confirmation is required before saving.')
-      return
-    }
-
-    if (labourCalc.invalid) {
-      setValidationError('Finish time must be after start time on the same day.')
-      return
-    }
-
-    const nonChargeable = parseDecimalHours(fields.nonChargeableHours)
-    if (nonChargeable > 0 && !fields.nonChargeableReason.trim()) {
-      setValidationError('Reason for non-chargeable time is required when non-chargeable hours are entered.')
-      return
-    }
-
-    setValidationError(null)
+    setFieldErrors({})
     const submittedAt = new Date().toISOString()
     const chargeableHours =
       chargeableEdited && fields.chargeableHours.trim()
@@ -269,7 +277,7 @@ export function TimesheetView({
   function handleReset() {
     setDraft(createEmptyDraft('timesheet'))
     setCompletedRecord(null)
-    setValidationError(null)
+    setFieldErrors({})
     setCompletedSyncStatus(null)
     setChargeableEdited(false)
   }
@@ -291,71 +299,37 @@ export function TimesheetView({
     <>
       <BackButton onClick={onBack} />
 
-      <header className="header no-print">
-        <p className="company">Monrad Earthworx</p>
-        <h1 className="title">{formConfig.title}</h1>
-        <p className="progress">Daily work and hours record</p>
-      </header>
+      <FormPageHeader
+        title={formConfig.title}
+        subtitle="Daily work and hours record"
+      />
 
       <form className="job-form no-print" onSubmit={handleSubmit} noValidate>
-        <fieldset className="job-form__fieldset">
-          <legend className="job-form__legend">1. Job details</legend>
-          <DateField value={fields.date} onChange={updateField} />
-          <ComboField
-            label="Employee / operator name"
-            field="employeeName"
-            value={fields.employeeName}
-            onChange={updateField}
-            placeholder="Your name"
-            options={comboOptions.operators}
-            listId="timesheet-operators"
-          />
-          <TextField
-            label="Job / project name"
-            field="jobProjectName"
-            value={fields.jobProjectName}
-            onChange={updateField}
-            placeholder="e.g. Driveway excavation"
-          />
-          <ComboField
-            label="Site location"
-            field="siteLocation"
-            value={fields.siteLocation}
-            onChange={updateField}
-            placeholder="Address or site name"
-            options={comboOptions.sites}
-            listId="timesheet-sites"
-          />
-          <TextField
-            label="Customer / client name"
-            field="customerName"
-            value={fields.customerName}
-            onChange={updateField}
-            placeholder="Client or company name"
-          />
-          <ComboField
-            label="Machine used"
-            field="machineUsed"
-            value={fields.machineUsed}
-            onChange={updateField}
-            placeholder="e.g. EX-01"
-            options={comboOptions.machines}
-            listId="timesheet-machines"
-          />
-        </fieldset>
+        <FormSection title="Date & Employee" id="timesheet-employee">
+          <FormField label="Date" fieldId="date" required error={fieldErrors.date}>
+            <DateField label="" value={fields.date} onChange={updateField} />
+          </FormField>
+          <FormField label="Employee / operator name" fieldId="employeeName" required error={fieldErrors.employeeName}>
+            <ComboField label="" field="employeeName" value={fields.employeeName} onChange={updateField} placeholder="Your name" options={comboOptions.operators} listId="timesheet-operators" />
+          </FormField>
+          <FormField label="Job / project name" fieldId="jobProjectName" required error={fieldErrors.jobProjectName}>
+            <TextField label="" field="jobProjectName" value={fields.jobProjectName} onChange={updateField} placeholder="e.g. Driveway excavation" />
+          </FormField>
+          <FormField label="Site location" fieldId="siteLocation" required error={fieldErrors.siteLocation}>
+            <ComboField label="" field="siteLocation" value={fields.siteLocation} onChange={updateField} placeholder="Address or site name" options={comboOptions.sites} listId="timesheet-sites" />
+          </FormField>
+          <TextField label="Customer / client name" field="customerName" value={fields.customerName} onChange={updateField} placeholder="Client or company name" />
+          <ComboField label="Machine used" field="machineUsed" value={fields.machineUsed} onChange={updateField} placeholder="e.g. EX-01" options={comboOptions.machines} listId="timesheet-machines" />
+        </FormSection>
 
-        <fieldset className="job-form__fieldset">
-          <legend className="job-form__legend">2. Labour time</legend>
-          <TimeField label="Start time" field="startTime" value={fields.startTime} onChange={updateField} />
-          <TimeField label="Finish time" field="finishTime" value={fields.finishTime} onChange={updateField} />
-          <TextField
-            label="Break time (minutes)"
-            field="breakMinutes"
-            value={fields.breakMinutes}
-            onChange={updateField}
-            placeholder="e.g. 30"
-          />
-          <div className="timesheet-calc" aria-live="polite">
+        <FormSection title="Hours" id="timesheet-hours">
+          <FormField label="Start time" fieldId="startTime" required error={fieldErrors.startTime}>
+            <TimeField label="" field="startTime" value={fields.startTime} onChange={updateField} />
+          </FormField>
+          <FormField label="Finish time" fieldId="finishTime" required error={fieldErrors.finishTime}>
+            <TimeField label="" field="finishTime" value={fields.finishTime} onChange={updateField} />
+          </FormField>
+          <div className="timesheet-calc" aria-live="polite" data-field-id="labourTime">
             <span className="timesheet-calc__label">Total hours worked</span>
             <span className="timesheet-calc__value">
               {labourCalc.invalid
@@ -363,15 +337,12 @@ export function TimesheetView({
                 : labourCalc.value || 'Enter start and finish times'}
             </span>
           </div>
-          {labourCalc.invalid && (
-            <p className="validation-message" role="alert">
-              Finish time must be after start time on the same day.
-            </p>
-          )}
+          {fieldErrors.labourTime && <ValidationMessage message={fieldErrors.labourTime} />}
           <label className="field">
             <span className="field__label">Chargeable hours</span>
             <input
               type="text"
+              inputMode="decimal"
               className="field__input"
               value={displayedChargeableHours}
               onChange={(e) => handleChargeableChange(e.target.value)}
@@ -389,20 +360,26 @@ export function TimesheetView({
             value={fields.nonChargeableHours}
             onChange={updateField}
             placeholder="e.g. 1.5"
+            type="text"
           />
-          <TextField
-            label="Reason for non-chargeable time"
-            field="nonChargeableReason"
-            value={fields.nonChargeableReason}
-            onChange={updateField}
-            placeholder="Required if non-chargeable hours entered"
-          />
-        </fieldset>
+        </FormSection>
 
-        <fieldset className="job-form__fieldset">
-          <legend className="job-form__legend">3. Work details</legend>
-          <label className="field">
-            <span className="field__label">Work completed</span>
+        <FormSection title="Breaks" id="timesheet-breaks">
+          <TextField
+            label="Break time (minutes)"
+            field="breakMinutes"
+            value={fields.breakMinutes}
+            onChange={updateField}
+            placeholder="e.g. 30"
+            type="number"
+          />
+          <FormField label="Reason for non-chargeable time" fieldId="nonChargeableReason" error={fieldErrors.nonChargeableReason}>
+            <TextField label="" field="nonChargeableReason" value={fields.nonChargeableReason} onChange={updateField} placeholder="Required if non-chargeable hours entered" />
+          </FormField>
+        </FormSection>
+
+        <FormSection title="Work" id="timesheet-work">
+          <FormField label="Work completed" fieldId="workCompleted" required error={fieldErrors.workCompleted}>
             <textarea
               className="field__input field__textarea"
               value={fields.workCompleted}
@@ -410,62 +387,43 @@ export function TimesheetView({
               placeholder="Describe work completed today..."
               rows={4}
             />
-          </label>
-          <TextField
-            label="Materials used or delivered"
-            field="materialsUsed"
-            value={fields.materialsUsed}
-            onChange={updateField}
-            placeholder="Materials, quantities, deliveries..."
-          />
-          <TextField
-            label="Docket / reference number"
-            field="docketNumber"
-            value={fields.docketNumber}
-            onChange={updateField}
-            placeholder="Docket or job reference"
-          />
-          <TextField
-            label="Delays or issues"
-            field="delaysOrIssues"
-            value={fields.delaysOrIssues}
-            onChange={updateField}
-            placeholder="Any delays or issues encountered"
-          />
-          <TextField
-            label="Safety issues or hazards noticed"
-            field="safetyIssues"
-            value={fields.safetyIssues}
-            onChange={updateField}
-            placeholder="Hazards or safety concerns"
-          />
+          </FormField>
+          <TextField label="Materials used or delivered" field="materialsUsed" value={fields.materialsUsed} onChange={updateField} placeholder="Materials, quantities, deliveries..." />
+          <TextField label="Docket / reference number" field="docketNumber" value={fields.docketNumber} onChange={updateField} placeholder="Docket or job reference" />
+          <TextField label="Delays or issues" field="delaysOrIssues" value={fields.delaysOrIssues} onChange={updateField} placeholder="Any delays or issues encountered" />
+          <TextField label="Safety issues or hazards noticed" field="safetyIssues" value={fields.safetyIssues} onChange={updateField} placeholder="Hazards or safety concerns" />
+        </FormSection>
+
+        <FormSection title="Notes" id="timesheet-notes">
           <NotesField value={fields.notes} onChange={updateField} />
-        </fieldset>
+        </FormSection>
 
-        <fieldset className="job-form__fieldset">
-          <legend className="job-form__legend">4. Name confirmation</legend>
-          <SignatureConfirmationField
-            value={signatureConfirmation}
-            onChange={(value) => {
-              setValidationError(null)
-              updateDraft({ signatureConfirmation: value })
-            }}
-          />
-        </fieldset>
+        <FormSection title="Confirmation" id="timesheet-confirmation">
+          <FormField
+            label="Signature / name confirmation"
+            fieldId="signatureConfirmation"
+            required
+            error={fieldErrors.signatureConfirmation}
+          >
+            <SignatureConfirmationField
+              value={signatureConfirmation}
+              onChange={(value) => {
+                setFieldErrors((prev) => ({ ...prev, signatureConfirmation: undefined }))
+                updateDraft({ signatureConfirmation: value })
+              }}
+            />
+          </FormField>
+        </FormSection>
 
-        {validationError && (
-          <p className="validation-message" role="alert">
-            {validationError}
-          </p>
-        )}
-
-        <p className="form-hint">
-          Complete job and time details, then save your daily work record.
-        </p>
-
-        <button type="submit" className="submit-btn">
-          Save timesheet record
-        </button>
+        <FormActions>
+          {hasValidationErrors(fieldErrors) && (
+            <ValidationMessage variant="summary" messages={getValidationSummary(fieldErrors)} />
+          )}
+          <p className="form-hint">Complete job and time details, then submit your daily work record.</p>
+          <button type="submit" className="submit-btn" disabled={cloudSaving}>
+            {cloudSaving ? 'Saving…' : 'Submit Record'}
+          </button>
+        </FormActions>
       </form>
 
       {completedRecord && (

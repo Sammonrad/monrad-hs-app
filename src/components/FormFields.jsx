@@ -4,7 +4,7 @@ export function ComboField({ label, field, value, onChange, placeholder, options
 
   return (
     <label className="field">
-      <span className="field__label">{label}</span>
+      {label ? <span className="field__label">{label}</span> : null}
       <input
         type="text"
         className="field__input"
@@ -28,12 +28,12 @@ export function ComboField({ label, field, value, onChange, placeholder, options
   )
 }
 
-export function TextField({ label, field, value, onChange, placeholder }) {
+export function TextField({ label, field, value, onChange, placeholder, type = 'text' }) {
   return (
     <label className="field">
-      <span className="field__label">{label}</span>
+      {label ? <span className="field__label">{label}</span> : null}
       <input
-        type="text"
+        type={type}
         className="field__input"
         value={value}
         onChange={(e) => onChange(field, e.target.value)}
@@ -46,7 +46,7 @@ export function TextField({ label, field, value, onChange, placeholder }) {
 export function DateField({ value, onChange, field = 'date', label = 'Date' }) {
   return (
     <label className="field">
-      <span className="field__label">{label}</span>
+      {label ? <span className="field__label">{label}</span> : null}
       <input
         type="date"
         className="field__input"
@@ -60,7 +60,7 @@ export function DateField({ value, onChange, field = 'date', label = 'Date' }) {
 export function TimeField({ value, onChange, field, label }) {
   return (
     <label className="field">
-      <span className="field__label">{label}</span>
+      {label ? <span className="field__label">{label}</span> : null}
       <input
         type="time"
         className="field__input"
@@ -74,7 +74,7 @@ export function TimeField({ value, onChange, field, label }) {
 export function SelectField({ label, field, value, onChange, options }) {
   return (
     <label className="field">
-      <span className="field__label">{label}</span>
+      {label ? <span className="field__label">{label}</span> : null}
       <select
         className="field__input"
         value={value}
