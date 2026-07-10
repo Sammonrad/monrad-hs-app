@@ -607,32 +607,31 @@ function App() {
 
       <footer className="app-footer no-print" aria-label="Account">
         <div className="app-footer__account">
-          {userEmail && (
-            <p className="app-footer__line">
-              <span className="app-footer__label">Signed in as</span>{' '}
-              <span className="app-footer__value">{userEmail}</span>
-            </p>
-          )}
-          {roleLabel && (
-            <p className="app-footer__line">
-              <span className="app-footer__label">Role</span>{' '}
-              <span
-                className={`type-badge type-badge--small type-badge--role-${profile?.role ?? 'staff'}`}
-              >
-                {roleLabel}
-              </span>
-            </p>
-          )}
-          {statusLabel && (
-            <p className="app-footer__line">
-              <span className="app-footer__label">Status</span>{' '}
-              <span
-                className={`profile-status profile-status--${profileStatus} profile-status--small`}
-              >
-                {statusLabel}
-              </span>
-            </p>
-          )}
+          <div className="app-footer__details">
+            {userEmail && (
+              <p className="app-footer__email" title={userEmail}>
+                {userEmail}
+              </p>
+            )}
+            {(roleLabel || statusLabel) && (
+              <div className="app-footer__badges">
+                {roleLabel && (
+                  <span
+                    className={`type-badge type-badge--footer type-badge--role-${profile?.role ?? 'staff'}`}
+                  >
+                    {roleLabel}
+                  </span>
+                )}
+                {statusLabel && (
+                  <span
+                    className={`profile-status profile-status--${profileStatus} profile-status--footer`}
+                  >
+                    {statusLabel}
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
           <button
             type="button"
             className="app-footer__sign-out"

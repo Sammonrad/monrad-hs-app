@@ -229,8 +229,8 @@ body {
 }
 
 .dashboard-greeting {
-  margin: 0 0 var(--spacing-md);
-  padding: var(--spacing-sm) var(--spacing-md);
+  margin: 0 0 var(--spacing-sm);
+  padding: var(--spacing-xs) var(--spacing-sm);
   text-align: center;
   background: var(--color-grey-50);
   border: 1px solid var(--color-grey-150);
@@ -239,7 +239,7 @@ body {
 
 .dashboard-greeting__title {
   margin: 0;
-  font-size: 1.05rem;
+  font-size: 1rem;
   font-weight: 700;
   color: var(--text-primary);
   letter-spacing: -0.02em;
@@ -247,27 +247,30 @@ body {
 }
 
 .dashboard-greeting__date {
-  margin: 0.25rem 0 0;
-  font-size: 0.8rem;
+  margin: 0.2rem 0 0;
+  font-size: 0.75rem;
   font-weight: 500;
   color: var(--color-grey-600);
 }
 
-.dashboard-greeting__status {
-  margin: 0.35rem 0 0;
-  font-size: 0.68rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-}
-
 .dashboard-overview {
-  margin-bottom: var(--spacing-md);
-  padding: var(--spacing-sm);
+  margin-bottom: var(--spacing-sm);
+  padding: var(--spacing-xs) var(--spacing-sm);
   background: var(--bg-card);
   border: 1px solid var(--color-grey-150);
   border-radius: var(--card-radius-sm);
+}
+
+.dashboard-overview__title {
+  margin: 0 0 var(--spacing-xs);
+  padding-bottom: var(--spacing-xs);
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-grey-600);
+  border-bottom: 1px solid var(--color-grey-150);
+  text-align: left;
 }
 
 .dashboard-overview__stats {
@@ -281,8 +284,8 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-height: 2.75rem;
-  padding: 0.35rem 0.25rem;
+  min-height: 2.5rem;
+  padding: 0.3rem 0.2rem;
   text-align: center;
   background: var(--color-grey-50);
   border: 1px solid var(--color-grey-150);
@@ -290,7 +293,7 @@ body {
 }
 
 .dashboard-overview__stat-value {
-  font-size: 1rem;
+  font-size: 0.95rem;
   font-weight: 700;
   line-height: 1.1;
   color: var(--text-primary);
@@ -298,8 +301,8 @@ body {
 }
 
 .dashboard-overview__stat-label {
-  margin-top: 0.15rem;
-  font-size: 0.58rem;
+  margin-top: 0.1rem;
+  font-size: 0.55rem;
   font-weight: 600;
   line-height: 1.2;
   letter-spacing: 0.02em;
@@ -501,8 +504,8 @@ body {
 }
 
 .dashboard__records-hint {
-  margin: var(--spacing-md) 0 0;
-  font-size: 0.8rem;
+  margin: var(--spacing-sm) 0 0;
+  font-size: 0.75rem;
   text-align: center;
   color: var(--text-muted);
 }
@@ -575,53 +578,73 @@ body {
 }
 
 .app-footer {
-  margin-top: var(--spacing-xl);
-  padding: var(--spacing-md) var(--spacing-sm) 0;
+  margin-top: var(--spacing-md);
+  padding: var(--spacing-sm) 0 0;
   border-top: 1px solid var(--color-grey-150);
-  text-align: center;
 }
 
 .app-footer__account {
   display: flex;
-  flex-direction: column;
+  flex-wrap: wrap;
   align-items: center;
-  gap: var(--spacing-xs);
-  margin-bottom: var(--spacing-sm);
-  padding: var(--spacing-sm) var(--spacing-md);
+  justify-content: space-between;
+  gap: var(--spacing-xs) var(--spacing-sm);
+  margin-bottom: var(--spacing-xs);
+  padding: var(--spacing-xs) var(--spacing-sm);
   background: var(--color-grey-50);
   border: 1px solid var(--color-grey-150);
   border-radius: var(--card-radius-sm);
 }
 
-.app-footer__line {
+.app-footer__details {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.app-footer__email {
   margin: 0;
-  font-size: 0.75rem;
-  line-height: 1.4;
-  color: var(--color-grey-600);
-  word-break: break-word;
-}
-
-.app-footer__label {
-  font-weight: 600;
-  color: var(--text-muted);
-}
-
-.app-footer__value {
+  font-size: 0.68rem;
   font-weight: 500;
-  color: var(--text-muted);
+  line-height: 1.3;
+  color: var(--color-grey-600);
+  word-break: break-all;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-footer__badges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.type-badge--footer,
+.profile-status--footer {
+  margin-bottom: 0;
+  padding: 0.08rem 0.35rem;
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  line-height: 1.35;
 }
 
 .app-footer__sign-out {
-  margin-top: 0.35rem;
-  min-height: 40px;
-  padding: 0.45rem 1rem;
-  font-size: 0.8rem;
+  flex-shrink: 0;
+  min-height: var(--tap-min);
+  margin: 0;
+  padding: 0.35rem 0.65rem;
+  font-size: 0.72rem;
   font-weight: 600;
   font-family: inherit;
   color: var(--color-grey-700);
-  background: var(--color-grey-50);
-  border: 1px solid var(--color-grey-700);
-  border-radius: 6px;
+  background: var(--color-white);
+  border: 1px solid var(--color-grey-200);
+  border-radius: 4px;
   cursor: pointer;
   transition:
     color 0.15s ease,
@@ -652,11 +675,13 @@ body {
 
 .app-version {
   margin: 0;
-  font-size: 0.72rem;
+  padding-top: var(--spacing-xs);
+  font-size: 0.62rem;
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--text-muted);
+  text-align: center;
 }
 
 .app-version--secondary {
@@ -667,8 +692,8 @@ body {
 }
 
 .dashboard__cloud-note {
-  margin: var(--spacing-sm) 0 0;
-  font-size: 0.7rem;
+  margin: var(--spacing-xs) 0 0;
+  font-size: 0.65rem;
   text-align: center;
   color: var(--text-muted);
 }
@@ -3632,9 +3657,9 @@ body {
   }
 
   .app-footer__sign-out {
-    min-height: 44px;
-    padding: 0.55rem 1.125rem;
-    font-size: 0.85rem;
+    min-height: var(--tap-min);
+    padding: 0.4rem 0.75rem;
+    font-size: 0.75rem;
   }
 
   .action-btn--primary {
@@ -3939,7 +3964,18 @@ body {
   }
 
   .app-footer__account {
-    padding: var(--spacing-sm);
+    padding: var(--spacing-xs) var(--spacing-sm);
+    gap: var(--spacing-xs);
+  }
+
+  .app-footer__email {
+    font-size: 0.65rem;
+  }
+
+  .type-badge--footer,
+  .profile-status--footer {
+    font-size: 0.55rem;
+    padding: 0.06rem 0.3rem;
   }
 
   .field__input,

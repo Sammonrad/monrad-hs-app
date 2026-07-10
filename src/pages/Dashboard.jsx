@@ -151,40 +151,6 @@ export function Dashboard({
       <section className="dashboard-greeting" aria-label="Greeting">
         <h2 className="dashboard-greeting__title">{greetingLine}</h2>
         <p className="dashboard-greeting__date">{formatDashboardDate()}</p>
-        <p className="dashboard-greeting__status">Today&apos;s site safety overview</p>
-      </section>
-
-      <section className="dashboard-overview" aria-label="Today's overview">
-        <div className="dashboard-overview__stats">
-          <OverviewStat label="Open actions" value={overview.openActions} />
-          <OverviewStat
-            label="Overdue"
-            value={overview.overdueActions}
-            variant={overview.overdueActions > 0 ? 'alert' : undefined}
-          />
-          <OverviewStat
-            label="Critical"
-            value={overview.criticalActions}
-            variant={overview.criticalActions > 0 ? 'alert' : undefined}
-          />
-          <OverviewStat label="Incident follow-up" value={overview.incidentFollowUp} />
-          <OverviewStat label="Timesheets today" value={overview.timesheetsToday} />
-          <OverviewStat label="Job starts today" value={overview.jobStartsToday} />
-          <OverviewStat label="Pre-starts today" value={overview.preStartsToday} />
-        </div>
-
-        {warnings.length > 0 && (
-          <ul className="dashboard-overview__warnings" aria-label="Warnings">
-            {warnings.map((warning) => (
-              <li
-                key={warning.id}
-                className={`dashboard-overview__warning dashboard-overview__warning--${warning.severity}`}
-              >
-                {warning.text}
-              </li>
-            ))}
-          </ul>
-        )}
       </section>
 
       <SideMenu
@@ -246,6 +212,40 @@ export function Dashboard({
           )
         })}
       </nav>
+
+      <section className="dashboard-overview" aria-label="Today's site safety overview">
+        <h2 className="dashboard-overview__title">Today&apos;s site safety overview</h2>
+        <div className="dashboard-overview__stats">
+          <OverviewStat label="Open actions" value={overview.openActions} />
+          <OverviewStat
+            label="Overdue"
+            value={overview.overdueActions}
+            variant={overview.overdueActions > 0 ? 'alert' : undefined}
+          />
+          <OverviewStat
+            label="Critical"
+            value={overview.criticalActions}
+            variant={overview.criticalActions > 0 ? 'alert' : undefined}
+          />
+          <OverviewStat label="Incident follow-up" value={overview.incidentFollowUp} />
+          <OverviewStat label="Timesheets today" value={overview.timesheetsToday} />
+          <OverviewStat label="Job starts today" value={overview.jobStartsToday} />
+          <OverviewStat label="Pre-starts today" value={overview.preStartsToday} />
+        </div>
+
+        {warnings.length > 0 && (
+          <ul className="dashboard-overview__warnings" aria-label="Warnings">
+            {warnings.map((warning) => (
+              <li
+                key={warning.id}
+                className={`dashboard-overview__warning dashboard-overview__warning--${warning.severity}`}
+              >
+                {warning.text}
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
 
       {recordCount > 0 && (
         <p className="dashboard__records-hint">
