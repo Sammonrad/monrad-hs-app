@@ -4,6 +4,7 @@ import {
   ClipboardCheck,
   ClipboardSignature,
   Clock,
+  ShieldCheck,
   HelpCircle,
   OctagonAlert,
   ShieldAlert,
@@ -22,6 +23,7 @@ import {
 } from '../utils/dashboardOverview.js'
 import { getMergedVisitorRecords } from '../utils/storage/visitorSignInCloudStorage.js'
 import { countVisitorsOnSite } from '../utils/storage/visitorSignInStorage.js'
+import { countSsspByStatus } from '../utils/storage/ssspStorage.js'
 
 const CARD_ICONS = {
   'job-start': ClipboardCheck,
@@ -30,6 +32,7 @@ const CARD_ICONS = {
   incident: TriangleAlert,
   'critical-risks': OctagonAlert,
   'visitor-sign-in': ClipboardSignature,
+  sssp: ShieldCheck,
   timesheet: Clock,
   'safety-alerts': ShieldAlert,
   'help-app-setup': HelpCircle,
@@ -50,6 +53,9 @@ function getDashboardCardClass(card) {
       break
     case 'visitor-sign-in':
       classes.push('dashboard-card--visitor-sign-in')
+      break
+    case 'sssp':
+      classes.push('dashboard-card--sssp')
       break
     default:
       break
@@ -79,6 +85,8 @@ export function Dashboard({
   cloudTimesheets,
   visitorRecords,
   cloudVisitorRecords,
+  cloudSsspRecords,
+  ssspLoading,
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const isAdmin = isAdminProfile(profile)
@@ -109,6 +117,11 @@ export function Dashboard({
     const merged = getMergedVisitorRecords(visitorRecords, cloudVisitorRecords)
     return countVisitorsOnSite(merged)
   }, [visitorRecords, cloudVisitorRecords])
+
+  const ssspCounts = useMemo(
+    () => countSsspByStatus(cloudSsspRecords),
+    [cloudSsspRecords],
+  )
 
   const firstName = getFirstName(profile, userEmail)
   const greeting = getTimeGreeting()
@@ -204,6 +217,8 @@ export function Dashboard({
                       card.id === 'safety-alerts' && overview.safetyAlertCount > 0
                     const showVisitorBadge =
                       card.id === 'visitor-sign-in' && visitorsOnSiteCount > 0
+                    const showSsspStatus =
+                      card.id === 'sssp' && !ssspLoading
 
                     return (
                       <button
@@ -221,6 +236,17 @@ export function Dashboard({
                           />
                         ) : null}
                         <span className="dashboard-card__title">{card.title}</span>
+                        {card.subtitle && (
+                          <span className="dashboard-card__subtitle">{card.subtitle}</span>
+                        )}
+                        {showSsspStatus && (
+                          <span className="dashboard-card__sssp-status">
+                            {ssspCounts.active} active
+                            {ssspCounts.awaitingReview > 0
+                              ? ` · ${ssspCounts.awaitingReview} awaiting review`
+                              : ''}
+                          </span>
+                        )}
                         {showAlertBadge ? (
                           <span className="dashboard-card__count" aria-label={`${overview.safetyAlertCount} alerts`}>
                             {overview.safetyAlertCount}

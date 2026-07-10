@@ -3,4 +3,5 @@ export const ACTIONS_STORAGE_KEY = 'monrad-earthworx-actions'
 export const SETTINGS_STORAGE_KEY = 'monrad-earthworx-settings'
 export const VISITOR_SIGN_IN_STORAGE_KEY = 'monrad-earthworx-visitor-sign-in-records'
 export const VISITOR_SIGN_IN_DRAFT_KEY = 'monrad-earthworx-visitor-sign-in-draft'
+export const SSSP_EDITOR_DRAFT_KEY = 'monrad-earthworx-sssp-editor-draft'
 export const MAX_PHOTOS = 3

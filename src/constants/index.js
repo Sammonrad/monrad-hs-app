@@ -4,6 +4,7 @@ export {
   SETTINGS_STORAGE_KEY,
   VISITOR_SIGN_IN_STORAGE_KEY,
   VISITOR_SIGN_IN_DRAFT_KEY,
+  SSSP_EDITOR_DRAFT_KEY,
   MAX_PHOTOS,
 } from './storageKeys.js'
 
@@ -12,6 +13,7 @@ import {
   ACTIONS_STORAGE_KEY,
   SETTINGS_STORAGE_KEY,
   VISITOR_SIGN_IN_STORAGE_KEY,
+  SSSP_EDITOR_DRAFT_KEY,
 } from './storageKeys.js'
 
 export const MACHINE_TYPES = ['Excavator', 'Truck', 'Loader', 'Roller', 'Other']
@@ -340,6 +342,11 @@ export const DASHBOARD_GROUPS = [
     cardIds: ['job-start', 'pre-start', 'toolbox', 'incident', 'critical-risks', 'visitor-sign-in'],
   },
   {
+    id: 'planning-docs',
+    title: 'Planning & Documentation',
+    cardIds: ['sssp'],
+  },
+  {
     id: 'daily',
     title: 'Daily',
     cardIds: ['timesheet', 'safety-alerts', 'help-app-setup'],
@@ -400,6 +407,15 @@ export const DASHBOARD_CARDS = [
     id: 'visitor-sign-in',
     title: 'Visitor Sign-In',
     group: 'site-safety',
+    placement: 'mainDashboard',
+    available: true,
+    fullWidth: true,
+  },
+  {
+    id: 'sssp',
+    title: 'SSSP',
+    subtitle: 'Site-Specific Safety Plans',
+    group: 'planning-docs',
     placement: 'mainDashboard',
     available: true,
     fullWidth: true,

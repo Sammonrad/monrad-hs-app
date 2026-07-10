@@ -19,6 +19,9 @@ import { WeeklyTimesheetSummaryView } from './pages/WeeklyTimesheetSummaryView.j
 import { IncidentView } from './pages/IncidentView.jsx'
 import { CriticalRisksView } from './pages/CriticalRisksView.jsx'
 import { VisitorSignInView } from './pages/VisitorSignInView.jsx'
+import { SsspDashboardView } from './pages/SsspDashboardView.jsx'
+import { SsspEditorView } from './pages/SsspEditorView.jsx'
+import { SsspAcknowledgementView } from './pages/SsspAcknowledgementView.jsx'
 import { PrintableRecord } from './components/PrintableRecord.jsx'
 import { loadSavedRecords } from './utils/storage/recordsStorage.js'
 import { loadActions, persistActions, syncActionsFromRecord, patchAction } from './utils/storage/actionsStorage.js'
@@ -43,6 +46,7 @@ import {
   fetchVisitorSignInRecords,
   getMergedVisitorRecords,
 } from './utils/storage/visitorSignInCloudStorage.js'
+import { fetchSsspRecords } from './utils/storage/ssspCloudStorage.js'
 import {
   getRoleLabel,
   getStatusLabel,
@@ -76,6 +80,10 @@ function App() {
   const [cloudIncidents, setCloudIncidents] = useState([])
   const [cloudActions, setCloudActions] = useState([])
   const [cloudVisitorRecords, setCloudVisitorRecords] = useState([])
+  const [cloudSsspRecords, setCloudSsspRecords] = useState([])
+  const [ssspLoadError, setSsspLoadError] = useState(null)
+  const [ssspLoading, setSsspLoading] = useState(false)
+  const [ssspNavOptions, setSsspNavOptions] = useState({})
   const [profile, setProfile] = useState(null)
   const [profileLoading, setProfileLoading] = useState(false)
 
@@ -99,16 +107,31 @@ function App() {
     setHighlightActionId(options.highlightActionId ?? null)
     setActionFilter(options.actionFilter ?? null)
     setRecordFocus(options.recordFocus ?? null)
+    setSsspNavOptions({
+      ssspCloudId: options.ssspCloudId ?? null,
+      ssspMode: options.ssspMode ?? null,
+    })
     setReturnView(options.returnView ?? null)
     setCurrentView(viewId)
   }
 
-  function handleCriticalRisksBack() {
+  function handleSsspBack() {
+    setSsspNavOptions({})
+    if (returnView === 'sssp-editor') {
+      setCurrentView('sssp')
+      setReturnView(null)
+      return
+    }
     if (returnView) {
       setCurrentView(returnView)
       setReturnView(null)
       return
     }
+    goToDashboard()
+  }
+
+  function handleSsspDashboardBack() {
+    setSsspNavOptions({})
     goToDashboard()
   }
 
@@ -262,6 +285,8 @@ function App() {
       setCloudIncidents([])
       setCloudActions([])
       setCloudVisitorRecords([])
+      setCloudSsspRecords([])
+      setSsspLoadError(null)
       return undefined
     }
 
@@ -292,6 +317,8 @@ function App() {
       setCloudIncidents([])
       setCloudActions([])
       setCloudVisitorRecords([])
+      setCloudSsspRecords([])
+      setSsspLoadError(null)
       return undefined
     }
 
@@ -333,6 +360,16 @@ function App() {
       if (isMounted) setCloudVisitorRecords(records)
     }
 
+    async function loadCloudSsspRecords() {
+      setSsspLoading(true)
+      const { records, error } = await fetchSsspRecords(session.user.id, { isAdmin })
+      if (isMounted) {
+        setCloudSsspRecords(records)
+        setSsspLoadError(error?.message ?? null)
+        setSsspLoading(false)
+      }
+    }
+
     loadCloudTimesheets()
     loadCloudJobStarts()
     loadCloudPreStarts()
@@ -340,6 +377,7 @@ function App() {
     loadCloudIncidents()
     loadCloudActionRecords()
     loadCloudVisitorRecords()
+    loadCloudSsspRecords()
 
     return () => {
       isMounted = false
@@ -492,6 +530,8 @@ function App() {
           cloudTimesheets={cloudTimesheets}
           visitorRecords={visitorRecords}
           cloudVisitorRecords={cloudVisitorRecords}
+          cloudSsspRecords={cloudSsspRecords}
+          ssspLoading={ssspLoading}
         />
       )}
 
@@ -637,7 +677,7 @@ function App() {
       )}
 
       {currentView === 'critical-risks' && (
-        <CriticalRisksView onBack={handleCriticalRisksBack} />
+        <CriticalRisksView onBack={handleSsspBack} />
       )}
 
       {currentView === 'visitor-sign-in' && (
@@ -650,6 +690,47 @@ function App() {
           user={session?.user ?? null}
           cloudVisitorRecords={cloudVisitorRecords}
           setCloudVisitorRecords={setCloudVisitorRecords}
+        />
+      )}
+
+      {currentView === 'sssp' && (
+        <SsspDashboardView
+          onBack={handleSsspDashboardBack}
+          onNavigate={handleNavigate}
+          profile={profile}
+          user={session?.user ?? null}
+          ssspRecords={cloudSsspRecords}
+          setSsspRecords={setCloudSsspRecords}
+          isLoading={ssspLoading}
+          loadError={ssspLoadError}
+        />
+      )}
+
+      {currentView === 'sssp-editor' && (
+        <SsspEditorView
+          onBack={() => {
+            setSsspNavOptions({})
+            setCurrentView('sssp')
+          }}
+          onNavigate={handleNavigate}
+          user={session?.user ?? null}
+          profile={profile}
+          ssspRecords={cloudSsspRecords}
+          setSsspRecords={setCloudSsspRecords}
+          initialCloudId={ssspNavOptions.ssspCloudId}
+          initialMode={ssspNavOptions.ssspMode ?? 'view'}
+        />
+      )}
+
+      {currentView === 'sssp-acknowledge' && (
+        <SsspAcknowledgementView
+          onBack={() => {
+            setSsspNavOptions({})
+            setCurrentView('sssp')
+          }}
+          user={session?.user ?? null}
+          profile={profile}
+          ssspCloudId={ssspNavOptions.ssspCloudId}
         />
       )}
 

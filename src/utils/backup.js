@@ -16,17 +16,20 @@ import {
   normalizeSettings,
   createEmptySettings,
 } from './storage/settingsStorage.js'
-import { normalizeRecord } from './records.js'
+import { SSSP_EDITOR_DRAFT_KEY } from '../constants/storageKeys.js'
+import { loadEditorDraft } from './storage/ssspStorage.js'
 import { downloadFile } from './export.js'
 
 export { APP_STORAGE_KEYS, BACKUP_APP_NAME }
 
 export function collectBackupData() {
+  const ssspEditorDraft = loadEditorDraft()
   return {
     jobRecords: loadSavedRecords(),
     actions: loadActions(),
     settings: loadSettings(),
     visitorSignInRecords: loadVisitorRecords(),
+    ssspEditorDraft,
   }
 }
 
@@ -99,6 +102,14 @@ export function restoreBackupPayload(parsed) {
     }
     if (!persistSettings(settingsData)) {
       return { valid: false, error: 'Could not write settings to this device.' }
+    }
+
+    if (data.ssspEditorDraft != null) {
+      try {
+        localStorage.setItem(SSSP_EDITOR_DRAFT_KEY, JSON.stringify(data.ssspEditorDraft))
+      } catch {
+        return { valid: false, error: 'Could not write SSSP editor draft to this device.' }
+      }
     }
 
     return { valid: true }

@@ -299,6 +299,9 @@ All record tables follow a similar pattern: `id`, `user_id`, `record_data` (full
 | `incident_near_miss_records` | `incidentCloudStorage.js` | Incident fields + checklist_completed |
 | `action_register_records` | `actionCloudStorage.js` | Supports insert + update; `source_type`, `status`, `priority`, … |
 | `visitor_sign_in_records` | `visitorSignInCloudStorage.js` | Insert on sign-in, update on sign-out; shared read for all active users |
+| `sssp_records` | `ssspCloudStorage.js` | Site-Specific Safety Plans; admin CRUD, staff read approved+ |
+| `sssp_hazards` | `ssspCloudStorage.js` | Hazard rows linked to `sssp_records.id` |
+| `sssp_acknowledgements` | `ssspCloudStorage.js` | Staff acknowledgements per SSSP revision |
 
 Form cloud modules generally **insert** on new save; actions and visitor sign-in also **update** on edit/sign-out.
 
@@ -343,6 +346,185 @@ CREATE TABLE IF NOT EXISTS public.visitor_sign_in_records (
 ```
 
 Client fetch loads **all** visitor rows (no `user_id` filter) so any active staff member sees the full on-site list. RLS must allow this.
+
+### SSSP tables (`sssp_records`, `sssp_hazards`, `sssp_acknowledgements`)
+
+Run in Supabase SQL editor:
+
+```sql
+-- Main SSSP document
+CREATE TABLE IF NOT EXISTS public.sssp_records (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL REFERENCES auth.users(id),
+  record_data jsonb NOT NULL DEFAULT '{}'::jsonb,
+  sssp_number text NOT NULL,
+  project text,
+  client text,
+  principal_contractor text,
+  site text,
+  contract_ref text,
+  status text NOT NULL DEFAULT 'draft',
+  revision integer NOT NULL DEFAULT 1,
+  prepared_by text,
+  prepared_by_user_id uuid REFERENCES auth.users(id),
+  effective_date date,
+  review_date date,
+  approved_at timestamptz,
+  approved_by uuid REFERENCES auth.users(id),
+  approved_by_name text,
+  submitted_at timestamptz,
+  closed_at timestamptz,
+  archived_at timestamptz,
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now(),
+  CONSTRAINT sssp_records_sssp_number_unique UNIQUE (sssp_number),
+  CONSTRAINT sssp_records_status_check CHECK (
+    status IN ('draft', 'ready_for_review', 'approved', 'submitted', 'closed', 'archived')
+  )
+);
+
+CREATE INDEX IF NOT EXISTS sssp_records_status_idx ON public.sssp_records (status);
+CREATE INDEX IF NOT EXISTS sssp_records_project_idx ON public.sssp_records (project);
+CREATE INDEX IF NOT EXISTS sssp_records_updated_at_idx ON public.sssp_records (updated_at DESC);
+
+-- Hazard register rows (synced from record_data on save)
+CREATE TABLE IF NOT EXISTS public.sssp_hazards (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  sssp_id uuid NOT NULL REFERENCES public.sssp_records(id) ON DELETE CASCADE,
+  hazard_index integer NOT NULL DEFAULT 0,
+  hazard_data jsonb NOT NULL DEFAULT '{}'::jsonb,
+  activity text,
+  hazard text,
+  initial_risk integer,
+  residual_risk integer,
+  archived boolean NOT NULL DEFAULT false,
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS sssp_hazards_sssp_id_idx ON public.sssp_hazards (sssp_id);
+
+-- Staff acknowledgements per revision
+CREATE TABLE IF NOT EXISTS public.sssp_acknowledgements (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  sssp_id uuid NOT NULL REFERENCES public.sssp_records(id) ON DELETE CASCADE,
+  user_id uuid NOT NULL REFERENCES auth.users(id),
+  revision integer NOT NULL,
+  user_name text,
+  notes text,
+  acknowledged_at timestamptz NOT NULL DEFAULT now(),
+  created_at timestamptz DEFAULT now(),
+  CONSTRAINT sssp_ack_unique_user_revision UNIQUE (sssp_id, user_id, revision)
+);
+
+CREATE INDEX IF NOT EXISTS sssp_ack_sssp_id_idx ON public.sssp_acknowledgements (sssp_id);
+
+ALTER TABLE public.sssp_records ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.sssp_hazards ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.sssp_acknowledgements ENABLE ROW LEVEL SECURITY;
+
+-- Helper: active approved user profile
+CREATE OR REPLACE FUNCTION public.is_active_app_user()
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.user_profiles p
+    WHERE p.id = auth.uid()
+      AND (p.status = 'active' OR p.role = 'admin')
+  );
+$$;
+
+CREATE OR REPLACE FUNCTION public.is_admin_user()
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.user_profiles p
+    WHERE p.id = auth.uid() AND p.role = 'admin'
+  );
+$$;
+
+-- sssp_records: staff read approved/submitted/closed; admin read/write all
+CREATE POLICY sssp_records_select_staff ON public.sssp_records
+  FOR SELECT TO authenticated
+  USING (
+    public.is_active_app_user()
+    AND (
+      public.is_admin_user()
+      OR status IN ('approved', 'submitted', 'closed')
+    )
+  );
+
+CREATE POLICY sssp_records_insert_admin ON public.sssp_records
+  FOR INSERT TO authenticated
+  WITH CHECK (public.is_admin_user() AND user_id = auth.uid());
+
+CREATE POLICY sssp_records_update_admin ON public.sssp_records
+  FOR UPDATE TO authenticated
+  USING (public.is_admin_user())
+  WITH CHECK (public.is_admin_user());
+
+-- No DELETE policy — no permanent delete
+
+-- sssp_hazards: readable when parent SSSP readable; admin write
+CREATE POLICY sssp_hazards_select ON public.sssp_hazards
+  FOR SELECT TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.sssp_records r
+      WHERE r.id = sssp_id
+        AND public.is_active_app_user()
+        AND (
+          public.is_admin_user()
+          OR r.status IN ('approved', 'submitted', 'closed')
+        )
+    )
+  );
+
+CREATE POLICY sssp_hazards_insert_admin ON public.sssp_hazards
+  FOR INSERT TO authenticated
+  WITH CHECK (public.is_admin_user());
+
+CREATE POLICY sssp_hazards_update_admin ON public.sssp_hazards
+  FOR UPDATE TO authenticated
+  USING (public.is_admin_user())
+  WITH CHECK (public.is_admin_user());
+
+CREATE POLICY sssp_hazards_delete_admin ON public.sssp_hazards
+  FOR DELETE TO authenticated
+  USING (public.is_admin_user());
+
+-- sssp_acknowledgements: staff insert own; all active users read
+CREATE POLICY sssp_ack_select ON public.sssp_acknowledgements
+  FOR SELECT TO authenticated
+  USING (public.is_active_app_user());
+
+CREATE POLICY sssp_ack_insert_own ON public.sssp_acknowledgements
+  FOR INSERT TO authenticated
+  WITH CHECK (
+    public.is_active_app_user()
+    AND user_id = auth.uid()
+    AND EXISTS (
+      SELECT 1 FROM public.sssp_records r
+      WHERE r.id = sssp_id
+        AND r.status IN ('approved', 'submitted', 'closed')
+    )
+  );
+```
+
+**App behaviour:**
+
+- Admin: create, edit (draft/ready only), workflow transitions, duplicate, revision, archive/reactivate, print. No delete.
+- Staff: view approved/submitted/closed SSSPs; insert own acknowledgement for current revision.
+- Local editor draft key: `monrad-earthworx-sssp-editor-draft` (included in backup/restore).
+- Hazards stored in `sssp_hazards` table on save (re-synced from editor); full section JSON in `record_data`.
 
 ### Admin cloud reads
 
@@ -416,4 +598,4 @@ Client fetch loads **all** visitor rows (no `user_id` filter) so any active staf
 
 ## Quick reference: dashboard view IDs
 
-`job-start` · `pre-start` · `toolbox` · `incident` · `action-register` · `safety-alerts` · `records-dashboard` · `timesheet` · `weekly-timesheet-summary` · `settings` · `staff-management` · `admin-reports` · `backup-restore` · `help-app-setup`
+`job-start` · `pre-start` · `toolbox` · `incident` · `action-register` · `safety-alerts` · `records-dashboard` · `timesheet` · `weekly-timesheet-summary` · `settings` · `staff-management` · `admin-reports` · `backup-restore` · `help-app-setup` · `critical-risks` · `visitor-sign-in` · `sssp` · `sssp-editor` · `sssp-acknowledge`
