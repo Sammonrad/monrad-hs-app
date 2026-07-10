@@ -27,7 +27,7 @@ import { loadSavedRecords } from './utils/storage/recordsStorage.js'
 import { loadActions, persistActions, syncActionsFromRecord, patchAction } from './utils/storage/actionsStorage.js'
 import { loadSettings } from './utils/storage/settingsStorage.js'
 import { loadVisitorRecords, persistVisitorRecords } from './utils/storage/visitorSignInStorage.js'
-import { APP_VERSION } from './constants/index.js'
+import { AppShell } from './components/layout/AppShell.jsx'
 import { isSupabaseConfigured, supabase } from './utils/supabaseClient.js'
 import { fetchTimesheetRecords } from './utils/storage/timesheetCloudStorage.js'
 import { fetchJobStartRecords } from './utils/storage/jobStartCloudStorage.js'
@@ -509,7 +509,18 @@ function App() {
       )}
 
       {showMainApp && (
-        <>
+        <AppShell
+          currentView={currentView}
+          onNavigate={handleNavigate}
+          profile={profile}
+          userEmail={userEmail}
+          roleLabel={roleLabel}
+          statusLabel={statusLabel}
+          profileStatus={profileStatus}
+          onSignOut={signOut}
+          authLoading={authLoading}
+          openActionCount={openActionCount}
+        >
       {printRecord && (
         <div className="print-area" aria-hidden="true">
           <PrintableRecord record={printRecord} />
@@ -753,45 +764,7 @@ function App() {
         />
       )}
 
-      <footer className="app-footer no-print" aria-label="Account">
-        <div className="app-footer__account">
-          <div className="app-footer__details">
-            {userEmail && (
-              <p className="app-footer__email" title={userEmail}>
-                {userEmail}
-              </p>
-            )}
-            {(roleLabel || statusLabel) && (
-              <div className="app-footer__badges">
-                {roleLabel && (
-                  <span
-                    className={`type-badge type-badge--footer type-badge--role-${profile?.role ?? 'staff'}`}
-                  >
-                    {roleLabel}
-                  </span>
-                )}
-                {statusLabel && (
-                  <span
-                    className={`profile-status profile-status--${profileStatus} profile-status--footer`}
-                  >
-                    {statusLabel}
-                  </span>
-                )}
-              </div>
-            )}
-          </div>
-          <button
-            type="button"
-            className="app-footer__sign-out"
-            onClick={signOut}
-            disabled={authLoading}
-          >
-            {authLoading ? 'Signing out…' : 'Sign out'}
-          </button>
-        </div>
-        <p className="app-version">Monrad Earthworx H&amp;S v{APP_VERSION}</p>
-      </footer>
-        </>
+        </AppShell>
       )}
     </div>
   )

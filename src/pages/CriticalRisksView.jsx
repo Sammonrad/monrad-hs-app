@@ -22,7 +22,7 @@ export function CriticalRisksView({ onBack }) {
           {CRITICAL_RISKS_INTRO}
         </p>
 
-        <div className="critical-risks__list">
+        <div className="critical-risks__list critical-risks__list--grid">
           {CRITICAL_RISK_CATEGORIES.map((category) => (
               <details
                 key={category.id}

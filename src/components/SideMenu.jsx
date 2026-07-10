@@ -1,16 +1,19 @@
 import { useEffect, useMemo } from 'react'
-import { SIDEBAR_GROUPS, DASHBOARD_CARDS } from '../constants/index.js'
+import { DESKTOP_SIDEBAR_GROUPS, getNavGroups } from '../constants/navigation.js'
 import { isAdminProfile } from '../utils/storage/userProfileStorage.js'
+import { NavGroupList } from './layout/NavGroupList.jsx'
 
-export function SideMenu({ isOpen, onClose, onNavigate, profile, openActionCount = 0 }) {
+export function SideMenu({
+  isOpen,
+  onClose,
+  onNavigate,
+  profile,
+  openActionCount = 0,
+  currentView = null,
+}) {
   const isAdmin = isAdminProfile(profile)
-  const cardsById = useMemo(
-    () =>
-      Object.fromEntries(
-        DASHBOARD_CARDS.filter((card) => card.placement === 'sidebar')
-          .filter((card) => !card.adminOnly || isAdmin)
-          .map((card) => [card.id, card]),
-      ),
+  const groups = useMemo(
+    () => getNavGroups(isAdmin, DESKTOP_SIDEBAR_GROUPS),
     [isAdmin],
   )
 
@@ -66,38 +69,14 @@ export function SideMenu({ isOpen, onClose, onNavigate, profile, openActionCount
           </button>
         </div>
 
-        <nav className="side-menu__nav" aria-label="More navigation">
-          {SIDEBAR_GROUPS.map((group) => {
-            const visibleCards = group.cardIds
-              .map((cardId) => cardsById[cardId])
-              .filter(Boolean)
-
-            if (visibleCards.length === 0) return null
-
-            return (
-              <section key={group.id} className="side-menu__group" aria-labelledby={`side-menu-${group.id}`}>
-                <h3 id={`side-menu-${group.id}`} className="side-menu__group-title">
-                  {group.title}
-                </h3>
-                <ul className="side-menu__list">
-                  {visibleCards.map((card) => (
-                    <li key={card.id}>
-                      <button
-                        type="button"
-                        className="side-menu__item"
-                        onClick={() => handleNavigate(card.id)}
-                      >
-                        <span className="side-menu__item-label">{card.title}</span>
-                        {card.id === 'action-register' && openActionCount > 0 && (
-                          <span className="side-menu__badge">{openActionCount} open</span>
-                        )}
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            )
-          })}
+        <nav className="side-menu__nav" aria-label="Application navigation">
+          <NavGroupList
+            groups={groups}
+            currentView={currentView}
+            onNavigate={handleNavigate}
+            openActionCount={openActionCount}
+            variant="drawer"
+          />
         </nav>
       </aside>
     </>

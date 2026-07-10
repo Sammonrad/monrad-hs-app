@@ -10,6 +10,7 @@ import { CloudSyncBadge } from '../components/CloudSyncBadge.jsx'
 import { FormSection } from '../components/forms/FormSection.jsx'
 import { FormField } from '../components/forms/FormField.jsx'
 import { FormActions } from '../components/forms/FormActions.jsx'
+import { FormGrid, FormGridFull } from '../components/layout/FormGrid.jsx'
 import { FormPageHeader } from '../components/forms/FormPageHeader.jsx'
 import { ValidationMessage } from '../components/forms/ValidationMessage.jsx'
 import {
@@ -261,12 +262,16 @@ export function JobStartView({
 
       <form className="job-form no-print" onSubmit={handleSubmit} noValidate>
         <FormSection title="Job Details" id="job-details">
-          <TextField label="Job name" field="jobName" value={fields.jobName} onChange={updateField} placeholder="e.g. Driveway excavation" />
-          <ComboField label="Site location" field="siteLocation" value={fields.siteLocation} onChange={updateField} placeholder="Address or site name" options={comboOptions.sites} listId="job-start-sites" />
-          <ComboField label="Employee / operator name" field="employeeName" value={fields.employeeName} onChange={updateField} placeholder="Your name" options={comboOptions.operators} listId="job-start-operators" />
-          <ComboField label="Machine used" field="machineUsed" value={fields.machineUsed} onChange={updateField} placeholder="e.g. 5T excavator" options={comboOptions.machines} listId="job-start-machines" />
-          <DateField value={fields.date} onChange={updateField} />
-          <NotesField value={fields.notes} onChange={updateField} />
+          <FormGrid>
+            <TextField label="Job name" field="jobName" value={fields.jobName} onChange={updateField} placeholder="e.g. Driveway excavation" />
+            <ComboField label="Site location" field="siteLocation" value={fields.siteLocation} onChange={updateField} placeholder="Address or site name" options={comboOptions.sites} listId="job-start-sites" />
+            <ComboField label="Employee / operator name" field="employeeName" value={fields.employeeName} onChange={updateField} placeholder="Your name" options={comboOptions.operators} listId="job-start-operators" />
+            <ComboField label="Machine used" field="machineUsed" value={fields.machineUsed} onChange={updateField} placeholder="e.g. 5T excavator" options={comboOptions.machines} listId="job-start-machines" />
+            <DateField value={fields.date} onChange={updateField} />
+            <FormGridFull>
+              <NotesField value={fields.notes} onChange={updateField} />
+            </FormGridFull>
+          </FormGrid>
         </FormSection>
 
         <FormSection title="Safety Checklist" id="safety-checklist">

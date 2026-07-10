@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import {
   BriefcaseBusiness,
   ClipboardCheck,
@@ -12,8 +12,6 @@ import {
   Wrench,
 } from 'lucide-react'
 import { DASHBOARD_GROUPS, DASHBOARD_CARDS } from '../constants/index.js'
-import { MonradLogo } from '../components/MonradLogo.jsx'
-import { SideMenu } from '../components/SideMenu.jsx'
 import { isAdminProfile } from '../utils/storage/userProfileStorage.js'
 import {
   formatDashboardDate,
@@ -75,7 +73,6 @@ function OverviewStat({ label, value, variant }) {
 export function Dashboard({
   onNavigate,
   recordCount,
-  openActionCount,
   profile,
   userEmail,
   actions,
@@ -88,7 +85,6 @@ export function Dashboard({
   cloudSsspRecords,
   ssspLoading,
 }) {
-  const [menuOpen, setMenuOpen] = useState(false)
   const isAdmin = isAdminProfile(profile)
 
   const cardsById = useMemo(
@@ -159,44 +155,10 @@ export function Dashboard({
 
   return (
     <div className="dashboard">
-      <header className="dashboard__header">
-        <div className="dashboard__header-bar">
-          <button
-            type="button"
-            className="dashboard__menu-btn"
-            onClick={() => setMenuOpen(true)}
-            aria-label="Open menu"
-            aria-expanded={menuOpen}
-            aria-controls="app-side-menu"
-          >
-            <span className="dashboard__menu-icon" aria-hidden="true">
-              <span />
-              <span />
-              <span />
-            </span>
-          </button>
-
-          <div className="dashboard__header-brand">
-            <MonradLogo variant="header" />
-            <p className="dashboard__tagline">Health &amp; Safety App</p>
-          </div>
-
-          <div className="dashboard__header-spacer" aria-hidden="true" />
-        </div>
-      </header>
-
       <section className="dashboard-greeting" aria-label="Greeting">
         <h2 className="dashboard-greeting__title">{greetingLine}</h2>
         <p className="dashboard-greeting__date">{formatDashboardDate()}</p>
       </section>
-
-      <SideMenu
-        isOpen={menuOpen}
-        onClose={() => setMenuOpen(false)}
-        onNavigate={onNavigate}
-        profile={profile}
-        openActionCount={openActionCount}
-      />
 
       <nav className="dashboard__nav" aria-label="Form types">
         {DASHBOARD_GROUPS.map((group) => {
@@ -217,8 +179,7 @@ export function Dashboard({
                       card.id === 'safety-alerts' && overview.safetyAlertCount > 0
                     const showVisitorBadge =
                       card.id === 'visitor-sign-in' && visitorsOnSiteCount > 0
-                    const showSsspStatus =
-                      card.id === 'sssp' && !ssspLoading
+                    const showSsspStatus = card.id === 'sssp' && !ssspLoading
 
                     return (
                       <button

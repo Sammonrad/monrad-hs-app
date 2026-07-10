@@ -10,6 +10,7 @@ import { CloudSyncBadge } from '../components/CloudSyncBadge.jsx'
 import { FormSection } from '../components/forms/FormSection.jsx'
 import { FormField } from '../components/forms/FormField.jsx'
 import { FormActions } from '../components/forms/FormActions.jsx'
+import { FormGrid, FormGridFull } from '../components/layout/FormGrid.jsx'
 import { FormPageHeader } from '../components/forms/FormPageHeader.jsx'
 import { ValidationMessage } from '../components/forms/ValidationMessage.jsx'
 import {
@@ -263,25 +264,33 @@ export function ToolboxView({
 
       <form className="job-form no-print" onSubmit={handleSubmit} noValidate>
         <FormSection title="Meeting Details" id="toolbox-details">
-          <DateField value={fields.date} onChange={updateField} />
-          <FormField label="Job / project name" fieldId="jobProjectName" required error={fieldErrors.jobProjectName}>
-            <TextField label="" field="jobProjectName" value={fields.jobProjectName} onChange={updateField} placeholder="e.g. Riverside subdivision" />
-          </FormField>
-          <FormField label="Site location" fieldId="siteLocation" required error={fieldErrors.siteLocation}>
-            <ComboField label="" field="siteLocation" value={fields.siteLocation} onChange={updateField} placeholder="Address or site name" options={comboOptions.sites} listId="toolbox-sites" />
-          </FormField>
-          <FormField label="Meeting led by" fieldId="meetingLedBy" required error={fieldErrors.meetingLedBy}>
-            <ComboField label="" field="meetingLedBy" value={fields.meetingLedBy} onChange={updateField} placeholder="Facilitator name" options={comboOptions.operators} listId="toolbox-operators" />
-          </FormField>
-          <TextField label="Attendees" field="attendees" value={fields.attendees} onChange={updateField} placeholder="Names or crew count" />
-          <TextField label="Work planned today" field="workPlannedToday" value={fields.workPlannedToday} onChange={updateField} placeholder="Tasks planned for today" />
+          <FormGrid>
+            <DateField value={fields.date} onChange={updateField} />
+            <FormField label="Job / project name" fieldId="jobProjectName" required error={fieldErrors.jobProjectName}>
+              <TextField label="" field="jobProjectName" value={fields.jobProjectName} onChange={updateField} placeholder="e.g. Riverside subdivision" />
+            </FormField>
+            <FormField label="Site location" fieldId="siteLocation" required error={fieldErrors.siteLocation}>
+              <ComboField label="" field="siteLocation" value={fields.siteLocation} onChange={updateField} placeholder="Address or site name" options={comboOptions.sites} listId="toolbox-sites" />
+            </FormField>
+            <FormField label="Meeting led by" fieldId="meetingLedBy" required error={fieldErrors.meetingLedBy}>
+              <ComboField label="" field="meetingLedBy" value={fields.meetingLedBy} onChange={updateField} placeholder="Facilitator name" options={comboOptions.operators} listId="toolbox-operators" />
+            </FormField>
+            <TextField label="Attendees" field="attendees" value={fields.attendees} onChange={updateField} placeholder="Names or crew count" />
+            <FormGridFull>
+              <TextField label="Work planned today" field="workPlannedToday" value={fields.workPlannedToday} onChange={updateField} placeholder="Tasks planned for today" />
+            </FormGridFull>
+          </FormGrid>
         </FormSection>
 
         <FormSection title="Hazards and Controls" id="toolbox-hazards">
-          <TextField label="Main hazards discussed" field="mainHazardsDiscussed" value={fields.mainHazardsDiscussed} onChange={updateField} placeholder="Key hazards covered" />
-          <TextField label="Controls agreed" field="controlsAgreed" value={fields.controlsAgreed} onChange={updateField} placeholder="Agreed control measures" />
-          <TextField label="Weather / ground conditions" field="weatherGroundConditions" value={fields.weatherGroundConditions} onChange={updateField} placeholder="e.g. Dry, firm ground" />
-          <NotesField value={fields.notes} onChange={updateField} />
+          <FormGrid>
+            <TextField label="Main hazards discussed" field="mainHazardsDiscussed" value={fields.mainHazardsDiscussed} onChange={updateField} placeholder="Key hazards covered" />
+            <TextField label="Controls agreed" field="controlsAgreed" value={fields.controlsAgreed} onChange={updateField} placeholder="Agreed control measures" />
+            <TextField label="Weather / ground conditions" field="weatherGroundConditions" value={fields.weatherGroundConditions} onChange={updateField} placeholder="e.g. Dry, firm ground" />
+            <FormGridFull>
+              <NotesField value={fields.notes} onChange={updateField} />
+            </FormGridFull>
+          </FormGrid>
         </FormSection>
 
         <FormSection title="Toolbox Checklist" id="toolbox-checklist">

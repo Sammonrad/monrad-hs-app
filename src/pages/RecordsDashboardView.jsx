@@ -378,79 +378,141 @@ export function RecordsDashboardView({
             No records match your search and filters. Try different keywords or clear filters.
           </p>
         ) : (
-          <ul className="records-search__results">
-            {filteredItems.map((item) => (
-              <li
-                key={item.id}
-                className={[
-                  'search-result',
-                  item.itemType === 'action' && item.isOpenAction ? 'search-result--open' : '',
-                  item.isOverdue ? 'search-result--overdue' : '',
-                  item.isCritical ? 'search-result--critical' : '',
-                  item.hasDefect ? 'search-result--defect' : '',
-                  item.action?.status === 'completed' ? 'search-result--completed' : '',
-                ]
-                  .filter(Boolean)
-                  .join(' ')}
-              >
-                <div className="search-result__header">
-                  <span className="type-badge type-badge--small">{item.typeLabel}</span>
-                  {item.itemType === 'record' && (
-                    <CloudSyncBadge record={item.record} size="small" />
-                  )}
-                  {item.itemType === 'action' && (
-                    <CloudSyncBadge record={item.action} size="small" />
-                  )}
-                  {item.status && (
-                    <span
-                      className={
-                        item.itemType === 'action'
-                          ? `action-status action-status--${item.action.status}`
-                          : 'search-result__status'
-                      }
-                    >
-                      {item.status}
-                    </span>
-                  )}
-                </div>
-                <p className="search-result__title">{item.title}</p>
-                <dl className="search-result__meta">
-                  <div className="search-result__row">
-                    <dt>Date</dt>
-                    <dd>{item.date || (item.submittedAt ? formatSubmittedAt(item.submittedAt) : '—')}</dd>
+          <div className="responsive-data-list">
+            <ul className="records-search__results responsive-data-list__mobile">
+              {filteredItems.map((item) => (
+                <li
+                  key={item.id}
+                  className={[
+                    'search-result',
+                    item.itemType === 'action' && item.isOpenAction ? 'search-result--open' : '',
+                    item.isOverdue ? 'search-result--overdue' : '',
+                    item.isCritical ? 'search-result--critical' : '',
+                    item.hasDefect ? 'search-result--defect' : '',
+                    item.action?.status === 'completed' ? 'search-result--completed' : '',
+                  ]
+                    .filter(Boolean)
+                    .join(' ')}
+                >
+                  <div className="search-result__header">
+                    <span className="type-badge type-badge--small">{item.typeLabel}</span>
+                    {item.itemType === 'record' && (
+                      <CloudSyncBadge record={item.record} size="small" />
+                    )}
+                    {item.itemType === 'action' && (
+                      <CloudSyncBadge record={item.action} size="small" />
+                    )}
+                    {item.status && (
+                      <span
+                        className={
+                          item.itemType === 'action'
+                            ? `action-status action-status--${item.action.status}`
+                            : 'search-result__status'
+                        }
+                      >
+                        {item.status}
+                      </span>
+                    )}
                   </div>
-                  {item.mainPerson && (
+                  <p className="search-result__title">{item.title}</p>
+                  <dl className="search-result__meta">
                     <div className="search-result__row">
-                      <dt>Person</dt>
-                      <dd>{item.mainPerson}</dd>
+                      <dt>Date</dt>
+                      <dd>{item.date || (item.submittedAt ? formatSubmittedAt(item.submittedAt) : '—')}</dd>
                     </div>
-                  )}
-                  <div className="search-result__row">
-                    <dt>Site</dt>
-                    <dd>{item.site || '—'}</dd>
-                  </div>
-                </dl>
-                <div className="search-result__actions">
-                  {item.itemType === 'record' && (
+                    {item.mainPerson && (
+                      <div className="search-result__row">
+                        <dt>Person</dt>
+                        <dd>{item.mainPerson}</dd>
+                      </div>
+                    )}
+                    <div className="search-result__row">
+                      <dt>Site</dt>
+                      <dd>{item.site || '—'}</dd>
+                    </div>
+                  </dl>
+                  <div className="search-result__actions">
+                    {item.itemType === 'record' && (
+                      <button
+                        type="button"
+                        className="print-record-btn"
+                        onClick={() => setPrintRecord(item.record)}
+                      >
+                        Print Record
+                      </button>
+                    )}
                     <button
                       type="button"
-                      className="print-record-btn"
-                      onClick={() => setPrintRecord(item.record)}
+                      className="records-summary-card__btn"
+                      onClick={() => handleViewItem(item)}
                     >
-                      Print Record
+                      View
                     </button>
-                  )}
-                  <button
-                    type="button"
-                    className="records-summary-card__btn"
-                    onClick={() => handleViewItem(item)}
-                  >
-                    View
-                  </button>
-                </div>
-              </li>
-            ))}
-          </ul>
+                  </div>
+                </li>
+              ))}
+            </ul>
+
+            <div className="responsive-data-list__desktop">
+              <div className="data-table-scroll">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th scope="col">Type</th>
+                      <th scope="col">Title</th>
+                      <th scope="col">Date</th>
+                      <th scope="col">Person</th>
+                      <th scope="col">Site</th>
+                      <th scope="col">Status</th>
+                      <th scope="col">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredItems.map((item) => (
+                      <tr
+                        key={`table-${item.id}`}
+                        className={[
+                          item.isOverdue ? 'data-table__row--overdue' : '',
+                          item.isCritical ? 'data-table__row--critical' : '',
+                        ]
+                          .filter(Boolean)
+                          .join(' ')}
+                      >
+                        <td>
+                          <span className="type-badge type-badge--small">{item.typeLabel}</span>
+                        </td>
+                        <td className="data-table__title">{item.title}</td>
+                        <td>{item.date || (item.submittedAt ? formatSubmittedAt(item.submittedAt) : '—')}</td>
+                        <td>{item.mainPerson || '—'}</td>
+                        <td>{item.site || '—'}</td>
+                        <td>{item.status || '—'}</td>
+                        <td>
+                          <div className="data-table__actions">
+                            {item.itemType === 'record' && (
+                              <button
+                                type="button"
+                                className="action-btn"
+                                onClick={() => setPrintRecord(item.record)}
+                              >
+                                Print
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              className="action-btn action-btn--primary"
+                              onClick={() => handleViewItem(item)}
+                            >
+                              View
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
         )}
       </section>
 

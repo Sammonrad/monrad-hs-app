@@ -382,14 +382,16 @@ export function SsspEditorView({
         </FormField>
       )}
 
-      <div className="sssp-editor">
-        <SsspSectionNav
+      <div className="sssp-editor sssp-editor--layout">
+        <aside className="sssp-editor__nav-panel">
+          <SsspSectionNav
           sections={SSSP_SECTIONS}
           activeSectionId={activeSection}
           onSelect={setActiveSection}
           recordData={record.recordData}
           hazards={record.hazards}
-        />
+          />
+        </aside>
 
         <div className="sssp-editor__content">
           <SsspSectionForm

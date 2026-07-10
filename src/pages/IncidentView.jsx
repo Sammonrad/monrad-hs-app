@@ -10,6 +10,7 @@ import { CloudSyncBadge } from '../components/CloudSyncBadge.jsx'
 import { FormSection } from '../components/forms/FormSection.jsx'
 import { FormField } from '../components/forms/FormField.jsx'
 import { FormActions } from '../components/forms/FormActions.jsx'
+import { FormGrid, FormGridFull } from '../components/layout/FormGrid.jsx'
 import { FormPageHeader } from '../components/forms/FormPageHeader.jsx'
 import { ValidationMessage } from '../components/forms/ValidationMessage.jsx'
 import {
@@ -277,29 +278,31 @@ export function IncidentView({
           variant={isSeriousType ? 'urgent' : undefined}
           description="When and where did this occur?"
         >
-          <FormField label="Date" fieldId="date" required error={fieldErrors.date}>
-            <DateField label="" value={fields.date} onChange={updateField} />
-          </FormField>
-          <TextField label="Time" field="time" value={fields.time} onChange={updateField} placeholder="e.g. 14:30" />
-          <FormField label="Site / job location" fieldId="siteLocation" required error={fieldErrors.siteLocation}>
-            <ComboField label="" field="siteLocation" value={fields.siteLocation} onChange={updateField} placeholder="Where it occurred" options={comboOptions.sites} listId="incident-sites" />
-          </FormField>
-          <FormField label="Type of report" fieldId="reportType" required error={fieldErrors.reportType}>
-            <SelectField
-              label=""
-              field="reportType"
-              value={fields.reportType}
-              onChange={updateField}
-              options={[
-                { value: '', label: 'Select type...' },
-                { value: 'incident', label: 'Incident' },
-                { value: 'near-miss', label: 'Near Miss' },
-                { value: 'property-damage', label: 'Property Damage' },
-                { value: 'injury', label: 'Injury' },
-                { value: 'environmental', label: 'Environmental' },
-              ]}
-            />
-          </FormField>
+          <FormGrid>
+            <FormField label="Date" fieldId="date" required error={fieldErrors.date}>
+              <DateField label="" value={fields.date} onChange={updateField} />
+            </FormField>
+            <TextField label="Time" field="time" value={fields.time} onChange={updateField} placeholder="e.g. 14:30" />
+            <FormField label="Site / job location" fieldId="siteLocation" required error={fieldErrors.siteLocation}>
+              <ComboField label="" field="siteLocation" value={fields.siteLocation} onChange={updateField} placeholder="Where it occurred" options={comboOptions.sites} listId="incident-sites" />
+            </FormField>
+            <FormField label="Type of report" fieldId="reportType" required error={fieldErrors.reportType}>
+              <SelectField
+                label=""
+                field="reportType"
+                value={fields.reportType}
+                onChange={updateField}
+                options={[
+                  { value: '', label: 'Select type...' },
+                  { value: 'incident', label: 'Incident' },
+                  { value: 'near-miss', label: 'Near Miss' },
+                  { value: 'property-damage', label: 'Property Damage' },
+                  { value: 'injury', label: 'Injury' },
+                  { value: 'environmental', label: 'Environmental' },
+                ]}
+              />
+            </FormField>
+          </FormGrid>
         </FormSection>
 
         <FormSection title="Injury / Damage" id="incident-injury">
@@ -320,11 +323,13 @@ export function IncidentView({
         </FormSection>
 
         <FormSection title="People" id="incident-people">
-          <FormField label="Reported by" fieldId="reportedBy" required error={fieldErrors.reportedBy}>
-            <ComboField label="" field="reportedBy" value={fields.reportedBy} onChange={updateField} placeholder="Your name" options={comboOptions.operators} listId="incident-operators" />
-          </FormField>
-          <TextField label="Person involved" field="personInvolved" value={fields.personInvolved} onChange={updateField} placeholder="Names or roles" />
-          <TextField label="Person responsible for corrective action" field="correctiveActionPerson" value={fields.correctiveActionPerson} onChange={updateField} placeholder="Who will follow up?" />
+          <FormGrid>
+            <FormField label="Reported by" fieldId="reportedBy" required error={fieldErrors.reportedBy}>
+              <ComboField label="" field="reportedBy" value={fields.reportedBy} onChange={updateField} placeholder="Your name" options={comboOptions.operators} listId="incident-operators" />
+            </FormField>
+            <TextField label="Person involved" field="personInvolved" value={fields.personInvolved} onChange={updateField} placeholder="Names or roles" />
+            <TextField label="Person responsible for corrective action" field="correctiveActionPerson" value={fields.correctiveActionPerson} onChange={updateField} placeholder="Who will follow up?" />
+          </FormGrid>
         </FormSection>
 
         <FormSection title="Follow-Up" id="incident-followup">

@@ -9,6 +9,7 @@ import { TimesheetCloudSyncBadge } from '../components/TimesheetCloudSyncBadge.j
 import { FormSection } from '../components/forms/FormSection.jsx'
 import { FormField } from '../components/forms/FormField.jsx'
 import { FormActions } from '../components/forms/FormActions.jsx'
+import { FormGrid, FormGridFull } from '../components/layout/FormGrid.jsx'
 import { FormPageHeader } from '../components/forms/FormPageHeader.jsx'
 import { ValidationMessage } from '../components/forms/ValidationMessage.jsx'
 import {
@@ -306,62 +307,68 @@ export function TimesheetView({
 
       <form className="job-form no-print" onSubmit={handleSubmit} noValidate>
         <FormSection title="Date & Employee" id="timesheet-employee">
-          <FormField label="Date" fieldId="date" required error={fieldErrors.date}>
-            <DateField label="" value={fields.date} onChange={updateField} />
-          </FormField>
-          <FormField label="Employee / operator name" fieldId="employeeName" required error={fieldErrors.employeeName}>
-            <ComboField label="" field="employeeName" value={fields.employeeName} onChange={updateField} placeholder="Your name" options={comboOptions.operators} listId="timesheet-operators" />
-          </FormField>
-          <FormField label="Job / project name" fieldId="jobProjectName" required error={fieldErrors.jobProjectName}>
-            <TextField label="" field="jobProjectName" value={fields.jobProjectName} onChange={updateField} placeholder="e.g. Driveway excavation" />
-          </FormField>
-          <FormField label="Site location" fieldId="siteLocation" required error={fieldErrors.siteLocation}>
-            <ComboField label="" field="siteLocation" value={fields.siteLocation} onChange={updateField} placeholder="Address or site name" options={comboOptions.sites} listId="timesheet-sites" />
-          </FormField>
-          <TextField label="Customer / client name" field="customerName" value={fields.customerName} onChange={updateField} placeholder="Client or company name" />
-          <ComboField label="Machine used" field="machineUsed" value={fields.machineUsed} onChange={updateField} placeholder="e.g. EX-01" options={comboOptions.machines} listId="timesheet-machines" />
+          <FormGrid>
+            <FormField label="Date" fieldId="date" required error={fieldErrors.date}>
+              <DateField label="" value={fields.date} onChange={updateField} />
+            </FormField>
+            <FormField label="Employee / operator name" fieldId="employeeName" required error={fieldErrors.employeeName}>
+              <ComboField label="" field="employeeName" value={fields.employeeName} onChange={updateField} placeholder="Your name" options={comboOptions.operators} listId="timesheet-operators" />
+            </FormField>
+            <FormField label="Job / project name" fieldId="jobProjectName" required error={fieldErrors.jobProjectName}>
+              <TextField label="" field="jobProjectName" value={fields.jobProjectName} onChange={updateField} placeholder="e.g. Driveway excavation" />
+            </FormField>
+            <FormField label="Site location" fieldId="siteLocation" required error={fieldErrors.siteLocation}>
+              <ComboField label="" field="siteLocation" value={fields.siteLocation} onChange={updateField} placeholder="Address or site name" options={comboOptions.sites} listId="timesheet-sites" />
+            </FormField>
+            <TextField label="Customer / client name" field="customerName" value={fields.customerName} onChange={updateField} placeholder="Client or company name" />
+            <ComboField label="Machine used" field="machineUsed" value={fields.machineUsed} onChange={updateField} placeholder="e.g. EX-01" options={comboOptions.machines} listId="timesheet-machines" />
+          </FormGrid>
         </FormSection>
 
         <FormSection title="Hours" id="timesheet-hours">
-          <FormField label="Start time" fieldId="startTime" required error={fieldErrors.startTime}>
-            <TimeField label="" field="startTime" value={fields.startTime} onChange={updateField} />
-          </FormField>
-          <FormField label="Finish time" fieldId="finishTime" required error={fieldErrors.finishTime}>
-            <TimeField label="" field="finishTime" value={fields.finishTime} onChange={updateField} />
-          </FormField>
-          <div className="timesheet-calc" aria-live="polite" data-field-id="labourTime">
-            <span className="timesheet-calc__label">Total hours worked</span>
-            <span className="timesheet-calc__value">
-              {labourCalc.invalid
-                ? '—'
-                : labourCalc.value || 'Enter start and finish times'}
-            </span>
-          </div>
-          {fieldErrors.labourTime && <ValidationMessage message={fieldErrors.labourTime} />}
-          <label className="field">
-            <span className="field__label">Chargeable hours</span>
-            <input
+          <FormGrid>
+            <FormField label="Start time" fieldId="startTime" required error={fieldErrors.startTime}>
+              <TimeField label="" field="startTime" value={fields.startTime} onChange={updateField} />
+            </FormField>
+            <FormField label="Finish time" fieldId="finishTime" required error={fieldErrors.finishTime}>
+              <TimeField label="" field="finishTime" value={fields.finishTime} onChange={updateField} />
+            </FormField>
+            <FormGridFull>
+              <div className="timesheet-calc" aria-live="polite" data-field-id="labourTime">
+                <span className="timesheet-calc__label">Total hours worked</span>
+                <span className="timesheet-calc__value">
+                  {labourCalc.invalid
+                    ? '—'
+                    : labourCalc.value || 'Enter start and finish times'}
+                </span>
+              </div>
+              {fieldErrors.labourTime && <ValidationMessage message={fieldErrors.labourTime} />}
+            </FormGridFull>
+            <label className="field">
+              <span className="field__label">Chargeable hours</span>
+              <input
+                type="text"
+                inputMode="decimal"
+                className="field__input"
+                value={displayedChargeableHours}
+                onChange={(e) => handleChargeableChange(e.target.value)}
+                placeholder="Auto-calculated from total minus non-chargeable"
+              />
+              <span className="field__hint">
+                {chargeableEdited
+                  ? 'Manual override — change times or non-chargeable to recalculate automatically'
+                  : 'Auto: total hours worked minus non-chargeable hours'}
+              </span>
+            </label>
+            <TextField
+              label="Non-chargeable hours"
+              field="nonChargeableHours"
+              value={fields.nonChargeableHours}
+              onChange={updateField}
+              placeholder="e.g. 1.5"
               type="text"
-              inputMode="decimal"
-              className="field__input"
-              value={displayedChargeableHours}
-              onChange={(e) => handleChargeableChange(e.target.value)}
-              placeholder="Auto-calculated from total minus non-chargeable"
             />
-            <span className="field__hint">
-              {chargeableEdited
-                ? 'Manual override — change times or non-chargeable to recalculate automatically'
-                : 'Auto: total hours worked minus non-chargeable hours'}
-            </span>
-          </label>
-          <TextField
-            label="Non-chargeable hours"
-            field="nonChargeableHours"
-            value={fields.nonChargeableHours}
-            onChange={updateField}
-            placeholder="e.g. 1.5"
-            type="text"
-          />
+          </FormGrid>
         </FormSection>
 
         <FormSection title="Breaks" id="timesheet-breaks">

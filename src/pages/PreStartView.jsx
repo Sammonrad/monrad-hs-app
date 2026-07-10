@@ -11,6 +11,7 @@ import { CloudSyncBadge } from '../components/CloudSyncBadge.jsx'
 import { FormSection } from '../components/forms/FormSection.jsx'
 import { FormField } from '../components/forms/FormField.jsx'
 import { FormActions } from '../components/forms/FormActions.jsx'
+import { FormGrid, FormGridFull } from '../components/layout/FormGrid.jsx'
 import { FormPageHeader } from '../components/forms/FormPageHeader.jsx'
 import { SegmentedChoice } from '../components/forms/SegmentedChoice.jsx'
 import { ValidationMessage } from '../components/forms/ValidationMessage.jsx'
@@ -319,16 +320,20 @@ export function PreStartView({
 
       <form className="job-form no-print" onSubmit={handleSubmit} noValidate>
         <FormSection title="People and Equipment" id="prestart-details">
-          <DateField value={fields.date} onChange={updateField} />
-          <FormField label="Operator name" fieldId="operatorName" required error={fieldErrors.operatorName}>
-            <ComboField label="" field="operatorName" value={fields.operatorName} onChange={updateField} placeholder="Your name" options={comboOptions.operators} listId="pre-start-operators" />
-          </FormField>
-          <FormField label="Machine name / ID" fieldId="machineNameId" required error={fieldErrors.machineNameId}>
-            <ComboField label="" field="machineNameId" value={fields.machineNameId} onChange={updateField} placeholder="e.g. EX-01 or 5T excavator" options={comboOptions.machines} listId="pre-start-machines" />
-          </FormField>
-          <TextField label="Machine hours" field="machineHours" value={fields.machineHours} onChange={updateField} placeholder="Current hour meter reading" />
-          <ComboField label="Site / job location" field="siteLocation" value={fields.siteLocation} onChange={updateField} placeholder="Site or yard" options={comboOptions.sites} listId="pre-start-sites" />
-          <NotesField value={fields.notes} onChange={updateField} />
+          <FormGrid>
+            <DateField value={fields.date} onChange={updateField} />
+            <FormField label="Operator name" fieldId="operatorName" required error={fieldErrors.operatorName}>
+              <ComboField label="" field="operatorName" value={fields.operatorName} onChange={updateField} placeholder="Your name" options={comboOptions.operators} listId="pre-start-operators" />
+            </FormField>
+            <FormField label="Machine name / ID" fieldId="machineNameId" required error={fieldErrors.machineNameId}>
+              <ComboField label="" field="machineNameId" value={fields.machineNameId} onChange={updateField} placeholder="e.g. EX-01 or 5T excavator" options={comboOptions.machines} listId="pre-start-machines" />
+            </FormField>
+            <TextField label="Machine hours" field="machineHours" value={fields.machineHours} onChange={updateField} placeholder="Current hour meter reading" />
+            <ComboField label="Site / job location" field="siteLocation" value={fields.siteLocation} onChange={updateField} placeholder="Site or yard" options={comboOptions.sites} listId="pre-start-sites" />
+            <FormGridFull>
+              <NotesField value={fields.notes} onChange={updateField} />
+            </FormGridFull>
+          </FormGrid>
         </FormSection>
 
         <FormSection title="Pre-Start Checklist" id="prestart-checklist">
