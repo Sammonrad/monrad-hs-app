@@ -22,9 +22,13 @@ import { VisitorSignInView } from './pages/VisitorSignInView.jsx'
 import { SsspDashboardView } from './pages/SsspDashboardView.jsx'
 import { SsspEditorView } from './pages/SsspEditorView.jsx'
 import { SsspAcknowledgementView } from './pages/SsspAcknowledgementView.jsx'
+import { EquipmentView } from './pages/EquipmentView.jsx'
+import { EquipmentProfileView } from './pages/EquipmentProfileView.jsx'
+import { GeneralMeetingView } from './pages/GeneralMeetingView.jsx'
 import { PrintableRecord } from './components/PrintableRecord.jsx'
 import { loadSavedRecords } from './utils/storage/recordsStorage.js'
-import { loadActions, persistActions, syncActionsFromRecord, patchAction } from './utils/storage/actionsStorage.js'
+import { loadActions, persistActions, syncActionsFromRecord, syncActionsFromGeneralMeeting, patchAction } from './utils/storage/actionsStorage.js'
+import { loadMeetings } from './utils/storage/generalMeetingStorage.js'
 import { loadSettings } from './utils/storage/settingsStorage.js'
 import { loadVisitorRecords, persistVisitorRecords } from './utils/storage/visitorSignInStorage.js'
 import { AppShell } from './components/layout/AppShell.jsx'
@@ -47,6 +51,14 @@ import {
   getMergedVisitorRecords,
 } from './utils/storage/visitorSignInCloudStorage.js'
 import { fetchSsspRecords } from './utils/storage/ssspCloudStorage.js'
+import { fetchEquipmentRecords } from './utils/storage/equipmentCloudStorage.js'
+import { fetchServiceRecords } from './utils/storage/equipmentServiceCloudStorage.js'
+import { fetchDocumentRecords } from './utils/storage/equipmentDocumentCloudStorage.js'
+import {
+  fetchDefectRecords,
+  loadLocalDefectRecords,
+} from './utils/storage/equipmentDefectStorage.js'
+import { fetchGeneralMeetingRecords } from './utils/storage/generalMeetingCloudStorage.js'
 import {
   getRoleLabel,
   getStatusLabel,
@@ -84,6 +96,16 @@ function App() {
   const [ssspLoadError, setSsspLoadError] = useState(null)
   const [ssspLoading, setSsspLoading] = useState(false)
   const [ssspNavOptions, setSsspNavOptions] = useState({})
+  const [equipmentNavOptions, setEquipmentNavOptions] = useState({})
+  const [cloudEquipment, setCloudEquipment] = useState([])
+  const [cloudServiceRecords, setCloudServiceRecords] = useState([])
+  const [cloudDocumentRecords, setCloudDocumentRecords] = useState([])
+  const [cloudDefectRecords, setCloudDefectRecords] = useState([])
+  const [localDefectRecords, setLocalDefectRecords] = useState(() => loadLocalDefectRecords())
+  const [generalMeetings, setGeneralMeetings] = useState(() => loadMeetings())
+  const [cloudGeneralMeetings, setCloudGeneralMeetings] = useState([])
+  const [generalMeetingNavOptions, setGeneralMeetingNavOptions] = useState({})
+  const [printContent, setPrintContent] = useState(null)
   const [profile, setProfile] = useState(null)
   const [profileLoading, setProfileLoading] = useState(false)
 
@@ -110,6 +132,14 @@ function App() {
     setSsspNavOptions({
       ssspCloudId: options.ssspCloudId ?? null,
       ssspMode: options.ssspMode ?? null,
+    })
+    setEquipmentNavOptions({
+      equipmentTab: options.equipmentTab ?? null,
+      equipmentId: options.equipmentId ?? null,
+      defectPrefill: options.defectPrefill ?? null,
+    })
+    setGeneralMeetingNavOptions({
+      meetingId: options.meetingId ?? null,
     })
     setReturnView(options.returnView ?? null)
     setCurrentView(viewId)
@@ -177,6 +207,25 @@ function App() {
     })
   }
 
+  function handleGeneralMeetingCompleted(meeting) {
+    setActions((prev) => {
+      const next = syncActionsFromGeneralMeeting(meeting, prev)
+      if (next.length === prev.length) return prev
+      if (!persistActions(next)) return prev
+
+      const newActions = next.filter(
+        (action) =>
+          !prev.some((existing) => existing.id === action.id) &&
+          action.autoCreated &&
+          action.sourceType === 'general-meeting' &&
+          action.sourceRecordId === meeting.id,
+      )
+
+      newActions.forEach((action) => pushActionToCloud(action))
+      return next
+    })
+  }
+
   async function pushActionToCloud(action) {
     if (isCloudSaveUnavailable(session?.user)) {
       setActions((prev) => {
@@ -220,7 +269,7 @@ function App() {
   }
 
   useEffect(() => {
-    if (!printRecord) return undefined
+    if (!printRecord && !printContent) return undefined
 
     const timer = window.setTimeout(() => {
       window.print()
@@ -228,6 +277,7 @@ function App() {
 
     function handleAfterPrint() {
       setPrintRecord(null)
+      setPrintContent(null)
     }
 
     window.addEventListener('afterprint', handleAfterPrint)
@@ -236,7 +286,7 @@ function App() {
       window.clearTimeout(timer)
       window.removeEventListener('afterprint', handleAfterPrint)
     }
-  }, [printRecord])
+  }, [printRecord, printContent])
 
   useEffect(() => {
     if (!isSupabaseConfigured || !supabase) {
@@ -286,6 +336,11 @@ function App() {
       setCloudActions([])
       setCloudVisitorRecords([])
       setCloudSsspRecords([])
+      setCloudEquipment([])
+      setCloudServiceRecords([])
+      setCloudDocumentRecords([])
+      setCloudDefectRecords([])
+      setCloudGeneralMeetings([])
       setSsspLoadError(null)
       return undefined
     }
@@ -318,6 +373,11 @@ function App() {
       setCloudActions([])
       setCloudVisitorRecords([])
       setCloudSsspRecords([])
+      setCloudEquipment([])
+      setCloudServiceRecords([])
+      setCloudDocumentRecords([])
+      setCloudDefectRecords([])
+      setCloudGeneralMeetings([])
       setSsspLoadError(null)
       return undefined
     }
@@ -370,6 +430,31 @@ function App() {
       }
     }
 
+    async function loadCloudEquipment() {
+      const { records } = await fetchEquipmentRecords(session.user.id)
+      if (isMounted) setCloudEquipment(records)
+    }
+
+    async function loadCloudServiceRecords() {
+      const { records } = await fetchServiceRecords(session.user.id)
+      if (isMounted) setCloudServiceRecords(records)
+    }
+
+    async function loadCloudDocumentRecords() {
+      const { records } = await fetchDocumentRecords(session.user.id)
+      if (isMounted) setCloudDocumentRecords(records)
+    }
+
+    async function loadCloudDefectRecords() {
+      const { records } = await fetchDefectRecords(session.user.id)
+      if (isMounted) setCloudDefectRecords(records)
+    }
+
+    async function loadCloudGeneralMeetings() {
+      const { records } = await fetchGeneralMeetingRecords(session.user.id, { isAdmin })
+      if (isMounted) setCloudGeneralMeetings(records)
+    }
+
     loadCloudTimesheets()
     loadCloudJobStarts()
     loadCloudPreStarts()
@@ -378,6 +463,11 @@ function App() {
     loadCloudActionRecords()
     loadCloudVisitorRecords()
     loadCloudSsspRecords()
+    loadCloudEquipment()
+    loadCloudServiceRecords()
+    loadCloudDocumentRecords()
+    loadCloudDefectRecords()
+    loadCloudGeneralMeetings()
 
     return () => {
       isMounted = false
@@ -527,6 +617,12 @@ function App() {
         </div>
       )}
 
+      {printContent && (
+        <div className="print-area" aria-hidden="true">
+          {printContent}
+        </div>
+      )}
+
       {currentView === 'dashboard' && (
         <Dashboard
           onNavigate={handleNavigate}
@@ -543,6 +639,12 @@ function App() {
           cloudVisitorRecords={cloudVisitorRecords}
           cloudSsspRecords={cloudSsspRecords}
           ssspLoading={ssspLoading}
+          equipment={cloudEquipment}
+          defectRecords={cloudDefectRecords}
+          localDefectRecords={localDefectRecords}
+          documentRecords={cloudDocumentRecords}
+          generalMeetings={generalMeetings}
+          cloudGeneralMeetings={cloudGeneralMeetings}
         />
       )}
 
@@ -628,6 +730,7 @@ function App() {
       {currentView === 'pre-start' && (
         <PreStartView
           onBack={goToDashboard}
+          onNavigate={handleNavigate}
           savedRecords={savedRecords}
           setSavedRecords={setSavedRecords}
           setPrintRecord={setPrintRecord}
@@ -641,6 +744,9 @@ function App() {
           profile={profile}
           cloudPreStarts={cloudPreStarts}
           setCloudPreStarts={setCloudPreStarts}
+          equipment={cloudEquipment}
+          defectRecords={cloudDefectRecords}
+          localDefectRecords={localDefectRecords}
         />
       )}
 
@@ -728,6 +834,7 @@ function App() {
           profile={profile}
           ssspRecords={cloudSsspRecords}
           setSsspRecords={setCloudSsspRecords}
+          equipment={cloudEquipment}
           initialCloudId={ssspNavOptions.ssspCloudId}
           initialMode={ssspNavOptions.ssspMode ?? 'view'}
         />
@@ -761,6 +868,67 @@ function App() {
           profile={profile}
           cloudIncidents={cloudIncidents}
           setCloudIncidents={setCloudIncidents}
+        />
+      )}
+
+      {currentView === 'machines-equipment' && (
+        <EquipmentView
+          onBack={goToDashboard}
+          onNavigate={handleNavigate}
+          initialTab={equipmentNavOptions.equipmentTab ?? 'register'}
+          initialDefectPrefill={equipmentNavOptions.defectPrefill}
+          user={session?.user ?? null}
+          profile={profile}
+          settings={settings}
+          equipment={cloudEquipment}
+          setEquipment={setCloudEquipment}
+          serviceRecords={cloudServiceRecords}
+          setServiceRecords={setCloudServiceRecords}
+          documentRecords={cloudDocumentRecords}
+          setDocumentRecords={setCloudDocumentRecords}
+          defectRecords={cloudDefectRecords}
+          setDefectRecords={setCloudDefectRecords}
+          localDefectRecords={localDefectRecords}
+          setLocalDefectRecords={setLocalDefectRecords}
+        />
+      )}
+
+      {currentView === 'equipment-profile' && (
+        <EquipmentProfileView
+          onBack={() => setCurrentView('machines-equipment')}
+          onNavigate={handleNavigate}
+          equipmentId={equipmentNavOptions.equipmentId}
+          user={session?.user ?? null}
+          profile={profile}
+          settings={settings}
+          equipment={cloudEquipment}
+          setEquipment={setCloudEquipment}
+          serviceRecords={cloudServiceRecords}
+          setServiceRecords={setCloudServiceRecords}
+          documentRecords={cloudDocumentRecords}
+          setDocumentRecords={setCloudDocumentRecords}
+          defectRecords={cloudDefectRecords}
+          setDefectRecords={setCloudDefectRecords}
+          localDefectRecords={localDefectRecords}
+          setLocalDefectRecords={setLocalDefectRecords}
+          savedRecords={savedRecords}
+          cloudPreStarts={cloudPreStarts}
+          setPrintContent={setPrintContent}
+        />
+      )}
+
+      {currentView === 'general-meeting' && (
+        <GeneralMeetingView
+          onBack={goToDashboard}
+          meetings={generalMeetings}
+          setMeetings={setGeneralMeetings}
+          cloudMeetings={cloudGeneralMeetings}
+          setCloudMeetings={setCloudGeneralMeetings}
+          onMeetingCompleted={handleGeneralMeetingCompleted}
+          settings={settings}
+          user={session?.user ?? null}
+          profile={profile}
+          initialMeetingId={generalMeetingNavOptions.meetingId}
         />
       )}
 

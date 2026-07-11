@@ -5,6 +5,7 @@ export {
   VISITOR_SIGN_IN_STORAGE_KEY,
   VISITOR_SIGN_IN_DRAFT_KEY,
   SSSP_EDITOR_DRAFT_KEY,
+  GENERAL_MEETING_STORAGE_KEY,
   MAX_PHOTOS,
 } from './storageKeys.js'
 
@@ -14,6 +15,7 @@ import {
   SETTINGS_STORAGE_KEY,
   VISITOR_SIGN_IN_STORAGE_KEY,
   SSSP_EDITOR_DRAFT_KEY,
+  GENERAL_MEETING_STORAGE_KEY,
 } from './storageKeys.js'
 
 export const MACHINE_TYPES = ['Excavator', 'Truck', 'Loader', 'Roller', 'Other']
@@ -210,6 +212,7 @@ export const SOURCE_TYPE_LABELS = {
   'pre-start': 'Machine Pre-Start',
   toolbox: 'Toolbox Meeting',
   incident: 'Incident / Near Miss',
+  'general-meeting': 'H&S General Meeting',
   manual: 'Manual entry',
 }
 
@@ -249,6 +252,11 @@ export const APP_STORAGE_KEYS = [
     key: VISITOR_SIGN_IN_STORAGE_KEY,
     label: 'Visitor sign-in records',
     dataKey: 'visitorSignInRecords',
+  },
+  {
+    key: GENERAL_MEETING_STORAGE_KEY,
+    label: 'H&S General Meeting records',
+    dataKey: 'generalMeetingRecords',
   },
 ]
 

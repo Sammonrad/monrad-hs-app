@@ -46,6 +46,11 @@ import {
   SYNC_STATUS,
 } from '../utils/storage/preStartCloudStorage.js'
 import { isAdminProfile } from '../utils/storage/userProfileStorage.js'
+import { getEquipmentReadableName, isPreStartSelectable } from '../constants/equipmentConfig.js'
+import { getEquipmentByReadableName } from '../utils/storage/equipmentCloudStorage.js'
+import { getMergedDefectRecords, findDefectBySource } from '../utils/storage/equipmentDefectStorage.js'
+import { getPreStartEquipmentWarnings } from '../utils/equipmentStats.js'
+import { EquipmentSelector } from '../components/equipment/EquipmentSelector.jsx'
 import {
   scrollToFirstInvalid,
   hasValidationErrors,
@@ -54,6 +59,7 @@ import {
 
 export function PreStartView({
   onBack,
+  onNavigate,
   savedRecords,
   setSavedRecords,
   setPrintRecord,
@@ -67,6 +73,9 @@ export function PreStartView({
   profile,
   cloudPreStarts,
   setCloudPreStarts,
+  equipment = [],
+  defectRecords = [],
+  localDefectRecords = [],
 }) {
   const formConfig = FORM_TYPES['pre-start']
   const [draft, setDraft] = useState(() => createEmptyDraft('pre-start'))
@@ -76,6 +85,9 @@ export function PreStartView({
   const [completedSyncStatus, setCompletedSyncStatus] = useState(null)
   const [cloudLoadWarning, setCloudLoadWarning] = useState(null)
   const [cloudSaving, setCloudSaving] = useState(false)
+  const [selectedEquipmentId, setSelectedEquipmentId] = useState('')
+  const [preSubmitWarnings, setPreSubmitWarnings] = useState([])
+  const [preSubmitAcknowledged, setPreSubmitAcknowledged] = useState(false)
   const recordRef = useRef(null)
 
   const {
@@ -108,9 +120,77 @@ export function PreStartView({
     [savedRecords, cloudPreStarts],
   )
 
+  const preStartEquipment = useMemo(
+    () => equipment.filter(isPreStartSelectable),
+    [equipment],
+  )
+
+  const mergedDefects = useMemo(
+    () => getMergedDefectRecords(localDefectRecords, defectRecords),
+    [localDefectRecords, defectRecords],
+  )
+
+  const selectedEquipment = useMemo(() => {
+    if (selectedEquipmentId) {
+      return equipment.find((item) => (item.cloudId ?? item.id) === selectedEquipmentId) ?? null
+    }
+    return getEquipmentByReadableName(equipment, fields.machineNameId)
+  }, [equipment, selectedEquipmentId, fields.machineNameId])
+
+  const activePreSubmitWarnings = useMemo(() => {
+    if (!selectedEquipment) return []
+    return getPreStartEquipmentWarnings(selectedEquipment, mergedDefects)
+  }, [selectedEquipment, mergedDefects])
+
+  function handleEquipmentSelect(equipmentId) {
+    setSelectedEquipmentId(equipmentId)
+    setPreSubmitAcknowledged(false)
+    const item = equipment.find((e) => (e.cloudId ?? e.id) === equipmentId)
+    if (item) {
+      updateField('machineNameId', getEquipmentReadableName(item))
+    }
+  }
+
+  function handleManualMachineChange(value) {
+    setSelectedEquipmentId('')
+    setPreSubmitAcknowledged(false)
+    updateField('machineNameId', value)
+  }
+
   const cloudPreStartCount = preStartRecords.filter(
     (record) => resolveRecordSyncStatus(record) === SYNC_STATUS.CLOUD,
   ).length
+
+  function mapPreStartSeverityToEquipment(severity) {
+    const map = { low: 'Minor', medium: 'Major', high: 'Major', critical: 'Critical' }
+    return map[severity] ?? 'Minor'
+  }
+
+  function handleCreateEquipmentDefect(record) {
+    const existing = findDefectBySource(mergedDefects, 'Machine Pre-Start', record.cloudId ?? record.id)
+    if (existing) {
+      window.alert('An equipment defect has already been created from this pre-start record.')
+      return
+    }
+    const confirmed = window.confirm('Create an equipment defect from this pre-start record?')
+    if (!confirmed) return
+
+    const matchedEquipment = getEquipmentByReadableName(equipment, record.fields?.machineNameId)
+    onNavigate?.('machines-equipment', {
+      equipmentTab: 'defects',
+      defectPrefill: {
+        equipmentId: matchedEquipment?.cloudId ?? '',
+        equipmentName: record.fields?.machineNameId ?? '',
+        description: record.defectDescription ?? '',
+        severity: mapPreStartSeverityToEquipment(record.defectSeverity),
+        immediateAction: record.actionRequired ?? '',
+        safeToOperate: record.machineOperableSafely !== 'no',
+        sourceType: 'Machine Pre-Start',
+        sourceRecordId: record.cloudId ?? record.id,
+        reportedByName: record.fields?.operatorName ?? profile?.full_name?.trim() ?? '',
+      },
+    })
+  }
 
   function patchSavedPreStartRecord(recordId, patch) {
     setSavedRecords((prev) => {
@@ -219,6 +299,13 @@ export function PreStartView({
       return
     }
 
+    const warnings = activePreSubmitWarnings
+    if (warnings.length > 0 && !preSubmitAcknowledged) {
+      setPreSubmitWarnings(warnings)
+      return
+    }
+    setPreSubmitWarnings([])
+
     setFieldErrors({})
     const completedItems = checklist.filter((_, index) => checked.has(index))
     const submittedAt = new Date().toISOString()
@@ -326,7 +413,20 @@ export function PreStartView({
               <ComboField label="" field="operatorName" value={fields.operatorName} onChange={updateField} placeholder="Your name" options={comboOptions.operators} listId="pre-start-operators" />
             </FormField>
             <FormField label="Machine name / ID" fieldId="machineNameId" required error={fieldErrors.machineNameId}>
-              <ComboField label="" field="machineNameId" value={fields.machineNameId} onChange={updateField} placeholder="e.g. EX-01 or 5T excavator" options={comboOptions.machines} listId="pre-start-machines" />
+              {preStartEquipment.length > 0 && (
+                <div className="prestart-equipment-select">
+                  <EquipmentSelector
+                    equipment={equipment}
+                    value={selectedEquipmentId}
+                    onChange={handleEquipmentSelect}
+                    preStartOnly
+                    includeManual={false}
+                    placeholder="Select from register"
+                    id="prestart-equipment"
+                  />
+                </div>
+              )}
+              <ComboField label="" field="machineNameId" value={fields.machineNameId} onChange={(_, value) => handleManualMachineChange(value)} placeholder="e.g. EX-01 or 5T excavator" options={[...comboOptions.machines, ...preStartEquipment.map(getEquipmentReadableName)]} listId="pre-start-machines" />
             </FormField>
             <TextField label="Machine hours" field="machineHours" value={fields.machineHours} onChange={updateField} placeholder="Current hour meter reading" />
             <ComboField label="Site / job location" field="siteLocation" value={fields.siteLocation} onChange={updateField} placeholder="Site or yard" options={comboOptions.sites} listId="pre-start-sites" />
@@ -501,6 +601,24 @@ export function PreStartView({
           </p>
         )}
 
+        {preSubmitWarnings.length > 0 && (
+          <div className="equipment-prestart-warning" role="alert">
+            <p><strong>Equipment warning — review before submitting:</strong></p>
+            <ul>
+              {preSubmitWarnings.map((warning) => (
+                <li key={warning}>{warning}</li>
+              ))}
+            </ul>
+            <button
+              type="button"
+              className="btn btn--secondary"
+              onClick={() => setPreSubmitAcknowledged(true)}
+            >
+              I understand — continue to submit
+            </button>
+          </div>
+        )}
+
         <FormActions>
           {hasValidationErrors(fieldErrors) && (
             <ValidationMessage variant="summary" messages={getValidationSummary(fieldErrors)} />
@@ -550,6 +668,17 @@ export function PreStartView({
           )}
 
           <RecordDetails record={completedRecord} />
+          {completedRecord.defectsFound === 'found' && onNavigate && (
+            <div className="prestart-defect-action">
+              <button
+                type="button"
+                className="btn btn--primary"
+                onClick={() => handleCreateEquipmentDefect(completedRecord)}
+              >
+                Create Equipment Defect
+              </button>
+            </div>
+          )}
           <RecordActions record={completedRecord} onPrint={setPrintRecord} />
         </section>
       )}

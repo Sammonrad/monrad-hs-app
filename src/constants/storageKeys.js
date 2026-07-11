@@ -4,4 +4,6 @@ export const SETTINGS_STORAGE_KEY = 'monrad-earthworx-settings'
 export const VISITOR_SIGN_IN_STORAGE_KEY = 'monrad-earthworx-visitor-sign-in-records'
 export const VISITOR_SIGN_IN_DRAFT_KEY = 'monrad-earthworx-visitor-sign-in-draft'
 export const SSSP_EDITOR_DRAFT_KEY = 'monrad-earthworx-sssp-editor-draft'
+export const MACHINE_DEFECT_RECORDS_KEY = 'machine_defect_records'
+export const GENERAL_MEETING_STORAGE_KEY = 'monrad-earthworx-general-meeting-records'
 export const MAX_PHOTOS = 3

@@ -145,6 +145,56 @@ function createActionFromRecord(record) {
   return null
 }
 
+function hasMeetingActionLinked(actions, meeting, meetingAction) {
+  if (meetingAction.linkedActionId) {
+    return actions.some((action) => action.id === meetingAction.linkedActionId)
+  }
+  return actions.some(
+    (action) =>
+      action.autoCreated &&
+      action.sourceType === 'general-meeting' &&
+      action.sourceRecordId === meeting.id &&
+      action.notes === meetingAction.id,
+  )
+}
+
+function createActionFromMeetingAction(meeting, meetingAction) {
+  if (!meetingAction.description?.trim()) return null
+  return normalizeAction({
+    id: createRecordId(),
+    sourceType: 'general-meeting',
+    sourceRecordId: meeting.id,
+    date: meeting.meetingDate || TODAY(),
+    site: meeting.location || '',
+    description: meetingAction.description.trim(),
+    personResponsible: meetingAction.personResponsible || meeting.chairperson || '',
+    dueDate: meetingAction.dueDate || '',
+    status: meetingAction.status === 'completed' ? 'completed' : meetingAction.status || 'open',
+    priority: meetingAction.priority || DEFAULT_ACTION_PRIORITY,
+    notes: meetingAction.id,
+    createdAt: new Date().toISOString(),
+    autoCreated: true,
+    serious: meetingAction.priority === 'critical',
+  })
+}
+
+export function syncActionsFromGeneralMeeting(meeting, actions) {
+  if (meeting.status !== 'completed') return actions
+  let next = actions
+  let changed = false
+
+  for (const meetingAction of meeting.newActions ?? []) {
+    if (!meetingAction.description?.trim()) continue
+    if (hasMeetingActionLinked(next, meeting, meetingAction)) continue
+    const newAction = createActionFromMeetingAction(meeting, meetingAction)
+    if (!newAction) continue
+    next = [newAction, ...next]
+    changed = true
+  }
+
+  return changed ? next : actions
+}
+
 export function syncActionsFromRecord(record, actions) {
   const newAction = createActionFromRecord(record)
   if (!newAction || hasActionForRecord(actions, record)) return actions

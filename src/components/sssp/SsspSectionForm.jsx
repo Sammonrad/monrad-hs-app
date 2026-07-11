@@ -5,6 +5,7 @@ import { SSSP_SECTIONS } from '../../constants/ssspSections.js'
 import { RiskRegister } from './RiskRegister.jsx'
 import { RiskMatrix } from './RiskMatrix.jsx'
 import { RepeatableList } from './RepeatableList.jsx'
+import { SsspPlantEquipmentList } from './SsspPlantEquipmentList.jsx'
 
 export function SsspSectionForm({
   sectionId,
@@ -14,6 +15,8 @@ export function SsspSectionForm({
   onHazardsChange,
   readOnly = false,
   onNavigateCriticalRisks,
+  equipment = [],
+  isAdmin = false,
 }) {
   const section = SSSP_SECTIONS.find((s) => s.id === sectionId)
   if (!section) return null
@@ -38,14 +41,17 @@ export function SsspSectionForm({
   const data = recordData?.[section.id]
 
   if (section.repeatable) {
+    const ListComponent = section.id === 'plant' ? SsspPlantEquipmentList : RepeatableList
     return (
       <FormSection title={section.title} id={`sssp-section-${section.id}`}>
-        <RepeatableList
+        <ListComponent
           items={data}
           itemFields={section.itemFields}
           onChange={(next) => onSectionChange(section.id, next)}
           readOnly={readOnly}
           addLabel={`Add ${section.shortTitle ?? section.title} row`}
+          equipment={equipment}
+          isAdmin={isAdmin}
         />
       </FormSection>
     )

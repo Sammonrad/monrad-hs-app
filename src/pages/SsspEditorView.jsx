@@ -48,6 +48,7 @@ export function SsspEditorView({
   profile,
   ssspRecords,
   setSsspRecords,
+  equipment = [],
   initialCloudId = null,
   initialMode = 'view',
   returnView = 'sssp',
@@ -401,6 +402,8 @@ export function SsspEditorView({
             onSectionChange={updateSection}
             onHazardsChange={updateHazards}
             readOnly={readOnly}
+            equipment={equipment}
+            isAdmin={isAdminProfile(profile)}
             onNavigateCriticalRisks={() =>
               onNavigate('critical-risks', { returnView: 'sssp-editor' })
             }

@@ -22,6 +22,20 @@ export const NAV_ITEMS = {
     pageDescription: 'Daily machine safety inspection',
     formView: true,
   },
+  'machines-equipment': {
+    id: 'machines-equipment',
+    title: 'Machines & Equipment',
+    adminOnly: false,
+    pageTitle: 'Machines & Equipment',
+    pageDescription: 'Plant register, defects, maintenance and compliance',
+  },
+  'equipment-profile': {
+    id: 'equipment-profile',
+    title: 'Equipment Profile',
+    adminOnly: false,
+    pageTitle: 'Equipment Profile',
+    hideFromNav: true,
+  },
   toolbox: {
     id: 'toolbox',
     title: 'Toolbox',
@@ -29,6 +43,13 @@ export const NAV_ITEMS = {
     pageTitle: 'Toolbox Meeting',
     pageDescription: 'Team safety briefing record',
     formView: true,
+  },
+  'general-meeting': {
+    id: 'general-meeting',
+    title: 'H&S General Meeting',
+    adminOnly: false,
+    pageTitle: 'H&S General Meeting',
+    pageDescription: 'Formal health and safety meeting records',
   },
   incident: {
     id: 'incident',
@@ -154,9 +175,14 @@ export const DESKTOP_SIDEBAR_GROUPS = [
     ],
   },
   {
+    id: 'plant-equipment',
+    title: 'Plant & Equipment',
+    itemIds: ['machines-equipment'],
+  },
+  {
     id: 'planning-docs',
     title: 'Planning & Documentation',
-    itemIds: ['sssp', 'safety-alerts'],
+    itemIds: ['sssp', 'general-meeting', 'safety-alerts'],
   },
   {
     id: 'records-actions',
@@ -205,7 +231,7 @@ export const DASHBOARD_GROUPS = [
   {
     id: 'planning-docs',
     title: 'Planning & Documentation',
-    cardIds: ['sssp'],
+    cardIds: ['sssp', 'general-meeting'],
   },
   {
     id: 'daily',
@@ -263,6 +289,15 @@ export const DASHBOARD_CARDS = [
     id: 'sssp',
     title: 'SSSP',
     subtitle: 'Site-Specific Safety Plans',
+    group: 'planning-docs',
+    placement: 'mainDashboard',
+    available: true,
+    fullWidth: true,
+  },
+  {
+    id: 'general-meeting',
+    title: 'H&S General Meeting',
+    subtitle: 'Formal H&S meeting records',
     group: 'planning-docs',
     placement: 'mainDashboard',
     available: true,

@@ -4,6 +4,7 @@ import {
   APP_STORAGE_KEYS,
 } from '../constants/index.js'
 import { loadSavedRecords, persistSavedRecords } from './storage/recordsStorage.js'
+import { normalizeRecord } from './records.js'
 import { loadActions, persistActions, normalizeAction } from './storage/actionsStorage.js'
 import {
   loadVisitorRecords,
@@ -16,7 +17,9 @@ import {
   normalizeSettings,
   createEmptySettings,
 } from './storage/settingsStorage.js'
-import { SSSP_EDITOR_DRAFT_KEY } from '../constants/storageKeys.js'
+import { SSSP_EDITOR_DRAFT_KEY, MACHINE_DEFECT_RECORDS_KEY } from '../constants/storageKeys.js'
+import { loadLocalDefectRecords, persistLocalDefectRecords, normalizeDefectRecord } from './storage/equipmentDefectStorage.js'
+import { loadMeetings, persistMeetings, normalizeMeeting } from './storage/generalMeetingStorage.js'
 import { loadEditorDraft } from './storage/ssspStorage.js'
 import { downloadFile } from './export.js'
 
@@ -30,6 +33,8 @@ export function collectBackupData() {
     settings: loadSettings(),
     visitorSignInRecords: loadVisitorRecords(),
     ssspEditorDraft,
+    machineDefectRecords: loadLocalDefectRecords(),
+    generalMeetingRecords: loadMeetings(),
   }
 }
 
@@ -109,6 +114,24 @@ export function restoreBackupPayload(parsed) {
         localStorage.setItem(SSSP_EDITOR_DRAFT_KEY, JSON.stringify(data.ssspEditorDraft))
       } catch {
         return { valid: false, error: 'Could not write SSSP editor draft to this device.' }
+      }
+    }
+
+    if (data.machineDefectRecords != null) {
+      const defectList = Array.isArray(data.machineDefectRecords)
+        ? data.machineDefectRecords.map(normalizeDefectRecord)
+        : []
+      if (!persistLocalDefectRecords(defectList)) {
+        return { valid: false, error: 'Could not write machine defect records to this device.' }
+      }
+    }
+
+    if (data.generalMeetingRecords != null) {
+      const meetingList = Array.isArray(data.generalMeetingRecords)
+        ? data.generalMeetingRecords.map(normalizeMeeting)
+        : []
+      if (!persistMeetings(meetingList)) {
+        return { valid: false, error: 'Could not write H&S General Meeting records to this device.' }
       }
     }
 

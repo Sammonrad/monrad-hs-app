@@ -5,6 +5,7 @@ import {
   ClipboardSignature,
   Clock,
   ShieldCheck,
+  UsersRound,
   HelpCircle,
   OctagonAlert,
   ShieldAlert,
@@ -22,6 +23,10 @@ import {
 import { getMergedVisitorRecords } from '../utils/storage/visitorSignInCloudStorage.js'
 import { countVisitorsOnSite } from '../utils/storage/visitorSignInStorage.js'
 import { countSsspByStatus } from '../utils/storage/ssspStorage.js'
+import { computeEquipmentStats, getEquipmentDashboardWarnings } from '../utils/equipmentStats.js'
+import { getGeneralMeetingDashboardStats } from '../utils/generalMeetingStats.js'
+import { getMergedMeetings } from '../utils/storage/generalMeetingCloudStorage.js'
+import { getMergedDefectRecords } from '../utils/storage/equipmentDefectStorage.js'
 
 const CARD_ICONS = {
   'job-start': ClipboardCheck,
@@ -31,6 +36,7 @@ const CARD_ICONS = {
   'critical-risks': OctagonAlert,
   'visitor-sign-in': ClipboardSignature,
   sssp: ShieldCheck,
+  'general-meeting': UsersRound,
   timesheet: Clock,
   'safety-alerts': ShieldAlert,
   'help-app-setup': HelpCircle,
@@ -54,6 +60,9 @@ function getDashboardCardClass(card) {
       break
     case 'sssp':
       classes.push('dashboard-card--sssp')
+      break
+    case 'general-meeting':
+      classes.push('dashboard-card--general-meeting')
       break
     default:
       break
@@ -84,6 +93,12 @@ export function Dashboard({
   cloudVisitorRecords,
   cloudSsspRecords,
   ssspLoading,
+  equipment = [],
+  defectRecords = [],
+  localDefectRecords = [],
+  documentRecords = [],
+  generalMeetings = [],
+  cloudGeneralMeetings = [],
 }) {
   const isAdmin = isAdminProfile(profile)
 
@@ -119,6 +134,28 @@ export function Dashboard({
     [cloudSsspRecords],
   )
 
+  const equipmentWarnings = useMemo(() => {
+    try {
+      const mergedDefects = getMergedDefectRecords(
+        localDefectRecords ?? [],
+        defectRecords ?? [],
+      )
+      const stats = computeEquipmentStats({
+        equipment: equipment ?? [],
+        defectRecords: mergedDefects,
+        documentRecords: documentRecords ?? [],
+      })
+      return getEquipmentDashboardWarnings(stats)
+    } catch {
+      return []
+    }
+  }, [equipment, defectRecords, localDefectRecords, documentRecords])
+
+  const generalMeetingStats = useMemo(() => {
+    const merged = getMergedMeetings(generalMeetings, cloudGeneralMeetings)
+    return getGeneralMeetingDashboardStats(merged, actions)
+  }, [generalMeetings, cloudGeneralMeetings, actions])
+
   const firstName = getFirstName(profile, userEmail)
   const greeting = getTimeGreeting()
   const greetingLine = firstName ? `${greeting}, ${firstName}` : greeting
@@ -153,6 +190,15 @@ export function Dashboard({
     })
   }
 
+  equipmentWarnings.forEach((warning) => {
+    warnings.push({
+      id: warning.id,
+      text: warning.text,
+      severity: warning.severity,
+      onClick: () => onNavigate('machines-equipment', { equipmentTab: warning.tab }),
+    })
+  })
+
   return (
     <div className="dashboard">
       <section className="dashboard-greeting" aria-label="Greeting">
@@ -180,12 +226,15 @@ export function Dashboard({
                     const showVisitorBadge =
                       card.id === 'visitor-sign-in' && visitorsOnSiteCount > 0
                     const showSsspStatus = card.id === 'sssp' && !ssspLoading
+                    const showGeneralMeetingStatus = card.id === 'general-meeting'
+                    const generalMeetingOverdue =
+                      showGeneralMeetingStatus && generalMeetingStats.isOverdue
 
                     return (
                       <button
                         key={card.id}
                         type="button"
-                        className={getDashboardCardClass(card)}
+                        className={`${getDashboardCardClass(card)}${generalMeetingOverdue ? ' dashboard-card--overdue' : ''}`}
                         onClick={() => onNavigate(card.id)}
                       >
                         {Icon ? (
@@ -199,6 +248,20 @@ export function Dashboard({
                         <span className="dashboard-card__title">{card.title}</span>
                         {card.subtitle && (
                           <span className="dashboard-card__subtitle">{card.subtitle}</span>
+                        )}
+                        {showGeneralMeetingStatus && (
+                          <span className="dashboard-card__gm-status">
+                            {generalMeetingStats.lastCompletedDate
+                              ? `Last: ${generalMeetingStats.lastCompletedDate}`
+                              : 'No completed meeting yet'}
+                            {generalMeetingStats.nextDueDate
+                              ? ` · Next due: ${generalMeetingStats.nextDueDate}`
+                              : ''}
+                            {generalMeetingStats.isOverdue ? ' · Overdue' : ''}
+                            {generalMeetingStats.openMeetingActions > 0
+                              ? ` · ${generalMeetingStats.openMeetingActions} open action${generalMeetingStats.openMeetingActions === 1 ? '' : 's'}`
+                              : ''}
+                          </span>
                         )}
                         {showSsspStatus && (
                           <span className="dashboard-card__sssp-status">
@@ -259,9 +322,15 @@ export function Dashboard({
             {warnings.map((warning) => (
               <li
                 key={warning.id}
-                className={`dashboard-overview__warning dashboard-overview__warning--${warning.severity}`}
+                className={`dashboard-overview__warning dashboard-overview__warning--${warning.severity}${warning.onClick ? ' dashboard-overview__warning--clickable' : ''}`}
               >
-                {warning.text}
+                {warning.onClick ? (
+                  <button type="button" className="dashboard-overview__warning-btn" onClick={warning.onClick}>
+                    {warning.text}
+                  </button>
+                ) : (
+                  warning.text
+                )}
               </li>
             ))}
           </ul>
