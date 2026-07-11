@@ -87,63 +87,61 @@ function withCloudOwnership(record, row) {
   })
 }
 
-export function mapDefectToRow(record, userId) {
+function blankToNull(value) {
+  if (value === '' || value == null) return null
+  return value
+}
+
+export function mapDefectToRow(record, userId, { forInsert = false } = {}) {
   const normalized = normalizeDefectRecord(record)
-  return {
-    user_id: userId,
-    equipment_id: normalized.equipmentId || null,
-    record_data: { ...normalized, syncStatus: SYNC_STATUS.CLOUD },
+  const row = {
+    machine_id: normalized.equipmentId || null,
     reported_at: normalized.reportedAt || new Date().toISOString(),
     severity: normalized.severity?.trim() || 'Minor',
-    description: normalized.description?.trim() || null,
+    defect_description: normalized.description?.trim() || null,
+    immediate_action: normalized.immediateAction?.trim() || null,
+    machine_isolated: normalized.machineIsolated,
+    safe_to_operate: normalized.safeToOperate,
     status: normalized.status?.trim() || 'Open',
-    assigned_person: normalized.assignedPerson?.trim() || null,
-    target_date: normalized.targetDate?.trim() || null,
+    assigned_to: normalized.assignedPerson?.trim() || null,
+    target_date: blankToNull(normalized.targetDate?.trim?.() ?? normalized.targetDate),
     source_type: normalized.sourceType?.trim() || 'Manual',
     source_record_id: normalized.sourceRecordId?.trim() || null,
     resolution_details: normalized.resolutionDetails?.trim() || null,
     resolved_at: normalized.resolvedAt || null,
-    resolved_by_name: normalized.resolvedByName?.trim() || null,
-    reported_by_name: normalized.reportedByName?.trim() || null,
-    equipment_name: normalized.equipmentName?.trim() || null,
     updated_at: new Date().toISOString(),
   }
+
+  if (forInsert && userId) {
+    row.reported_by = userId
+  }
+
+  if (normalized.status === 'Resolved' && userId) {
+    row.resolved_by = userId
+  }
+
+  return row
 }
 
 export function rowToDefectRecord(row) {
-  const data = row.record_data
-  if (data && typeof data === 'object') {
-    return normalizeDefectRecord(
-      withCloudOwnership(
-        {
-          ...data,
-          equipmentId: row.equipment_id ?? data.equipmentId,
-          equipmentName: row.equipment_name ?? data.equipmentName,
-          cloudId: row.id,
-        },
-        row,
-      ),
-    )
-  }
-
   return normalizeDefectRecord(
     withCloudOwnership(
       {
         id: row.id,
-        equipmentId: row.equipment_id ?? '',
-        equipmentName: row.equipment_name ?? '',
+        equipmentId: row.machine_id ?? '',
         reportedAt: row.reported_at ?? row.created_at ?? new Date().toISOString(),
         severity: row.severity ?? 'Minor',
-        description: row.description ?? '',
+        description: row.defect_description ?? '',
+        immediateAction: row.immediate_action ?? '',
+        machineIsolated: row.machine_isolated ?? false,
+        safeToOperate: row.safe_to_operate !== false,
         status: row.status ?? 'Open',
-        assignedPerson: row.assigned_person ?? '',
+        assignedPerson: row.assigned_to ?? '',
         targetDate: row.target_date ?? '',
         sourceType: row.source_type ?? 'Manual',
         sourceRecordId: row.source_record_id ?? '',
         resolutionDetails: row.resolution_details ?? '',
         resolvedAt: row.resolved_at ?? null,
-        resolvedByName: row.resolved_by_name ?? '',
-        reportedByName: row.reported_by_name ?? '',
         createdAt: row.created_at ?? new Date().toISOString(),
       },
       row,
@@ -246,7 +244,7 @@ export async function saveDefectRecord(user, record) {
     return { record: null, error: new Error('You must be signed in to save to the cloud.') }
   }
 
-  const row = mapDefectToRow(record, user.id)
+  const row = mapDefectToRow(record, user.id, { forInsert: true })
   const { data, error } = await supabase
     .from('machine_defect_records')
     .insert(row)
@@ -269,24 +267,7 @@ export async function updateDefectRecord(user, record) {
   const row = mapDefectToRow(record, user.id)
   const { data, error } = await supabase
     .from('machine_defect_records')
-    .update({
-      record_data: row.record_data,
-      equipment_id: row.equipment_id,
-      reported_at: row.reported_at,
-      severity: row.severity,
-      description: row.description,
-      status: row.status,
-      assigned_person: row.assigned_person,
-      target_date: row.target_date,
-      source_type: row.source_type,
-      source_record_id: row.source_record_id,
-      resolution_details: row.resolution_details,
-      resolved_at: row.resolved_at,
-      resolved_by_name: row.resolved_by_name,
-      reported_by_name: row.reported_by_name,
-      equipment_name: row.equipment_name,
-      updated_at: row.updated_at,
-    })
+    .update(row)
     .eq('id', record.cloudId)
     .select()
     .single()

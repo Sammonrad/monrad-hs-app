@@ -39,6 +39,17 @@ export function normalizeServiceRecord(record) {
   }
 }
 
+function blankToNull(value) {
+  if (value === '' || value == null) return null
+  return value
+}
+
+function blankNumberToNull(value) {
+  if (value === '' || value == null) return null
+  const n = Number(value)
+  return Number.isNaN(n) ? null : n
+}
+
 function withCloudOwnership(record, row) {
   return {
     ...record,
@@ -47,53 +58,48 @@ function withCloudOwnership(record, row) {
   }
 }
 
-export function mapServiceToRow(record, userId) {
+export function mapServiceToRow(record) {
   const normalized = normalizeServiceRecord(record)
   return {
-    user_id: userId,
-    equipment_id: normalized.equipmentId,
-    record_data: { ...normalized, syncStatus: SYNC_STATUS.CLOUD },
-    service_date: normalized.serviceDate?.trim() || null,
+    machine_id: normalized.equipmentId || null,
+    service_date: blankToNull(normalized.serviceDate?.trim?.() ?? normalized.serviceDate),
     service_type: normalized.serviceType?.trim() || null,
-    operating_hours: normalized.operatingHours === '' ? null : Number(normalized.operatingHours),
-    odometer: normalized.odometer === '' ? null : Number(normalized.odometer),
+    hours_at_service: blankNumberToNull(normalized.operatingHours),
+    odometer_at_service: blankNumberToNull(normalized.odometer),
     service_provider: normalized.serviceProvider?.trim() || null,
     work_completed: normalized.workCompleted?.trim() || null,
-    next_service_date: normalized.nextServiceDate?.trim() || null,
-    next_service_hours: normalized.nextServiceHours === '' ? null : Number(normalized.nextServiceHours),
-    next_service_odometer:
-      normalized.nextServiceOdometer === '' ? null : Number(normalized.nextServiceOdometer),
+    parts_or_fluids: normalized.partsOrFluids?.trim() || null,
+    recommendations: normalized.recommendations?.trim() || null,
+    next_service_date: blankToNull(normalized.nextServiceDate?.trim?.() ?? normalized.nextServiceDate),
+    next_service_hours: blankNumberToNull(normalized.nextServiceHours),
+    next_service_odometer: blankNumberToNull(normalized.nextServiceOdometer),
     completed_by: normalized.completedBy?.trim() || null,
-    invoice_reference: normalized.invoiceReference?.trim() || null,
+    reference_number: normalized.invoiceReference?.trim() || null,
     updated_at: new Date().toISOString(),
   }
 }
 
 export function rowToServiceRecord(row) {
-  const data = row.record_data
-  if (data && typeof data === 'object') {
-    return normalizeServiceRecord(
-      withCloudOwnership({ ...data, equipmentId: row.equipment_id ?? data.equipmentId, cloudId: row.id }, row),
-    )
-  }
-
   return normalizeServiceRecord(
     withCloudOwnership(
       {
         id: row.id,
-        equipmentId: row.equipment_id ?? '',
+        equipmentId: row.machine_id ?? '',
         serviceDate: row.service_date ?? '',
         serviceType: row.service_type ?? '',
-        operatingHours: row.operating_hours ?? '',
-        odometer: row.odometer ?? '',
+        operatingHours: row.hours_at_service ?? '',
+        odometer: row.odometer_at_service ?? '',
         serviceProvider: row.service_provider ?? '',
         workCompleted: row.work_completed ?? '',
+        partsOrFluids: row.parts_or_fluids ?? '',
+        recommendations: row.recommendations ?? '',
         nextServiceDate: row.next_service_date ?? '',
         nextServiceHours: row.next_service_hours ?? '',
         nextServiceOdometer: row.next_service_odometer ?? '',
         completedBy: row.completed_by ?? '',
-        invoiceReference: row.invoice_reference ?? '',
+        invoiceReference: row.reference_number ?? '',
         createdAt: row.created_at ?? new Date().toISOString(),
+        updatedAt: row.updated_at ?? null,
       },
       row,
     ),
@@ -123,7 +129,10 @@ export async function saveServiceRecord(user, record) {
     return { record: null, error: new Error('You must be signed in to save to the cloud.') }
   }
 
-  const row = mapServiceToRow(record, user.id)
+  const row = {
+    ...mapServiceToRow(record),
+    created_by: user.id,
+  }
   const { data, error } = await supabase
     .from('machine_service_records')
     .insert(row)
@@ -143,24 +152,10 @@ export async function updateServiceRecord(user, record) {
   }
   if (!record.cloudId) return saveServiceRecord(user, record)
 
-  const row = mapServiceToRow(record, user.id)
+  const row = mapServiceToRow(record)
   const { data, error } = await supabase
     .from('machine_service_records')
-    .update({
-      record_data: row.record_data,
-      service_date: row.service_date,
-      service_type: row.service_type,
-      operating_hours: row.operating_hours,
-      odometer: row.odometer,
-      service_provider: row.service_provider,
-      work_completed: row.work_completed,
-      next_service_date: row.next_service_date,
-      next_service_hours: row.next_service_hours,
-      next_service_odometer: row.next_service_odometer,
-      completed_by: row.completed_by,
-      invoice_reference: row.invoice_reference,
-      updated_at: row.updated_at,
-    })
+    .update(row)
     .eq('id', record.cloudId)
     .select()
     .single()

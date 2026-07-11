@@ -146,7 +146,7 @@ export function EquipmentProfileView({
 
   async function handleArchive() {
     if (!window.confirm(`Archive ${getEquipmentReadableName(asset)}?`)) return
-    const updated = { ...asset, archived: true, archivedAt: new Date().toISOString() }
+    const updated = { ...asset, archived: true }
     const { record, error } = await updateEquipmentRecord(user, updated)
     if (!error && record) {
       setEquipment((prev) => prev.map((e) => (e.cloudId === record.cloudId ? record : e)))
@@ -154,7 +154,7 @@ export function EquipmentProfileView({
   }
 
   async function handleReactivate() {
-    const updated = { ...asset, archived: false, archivedAt: null }
+    const updated = { ...asset, archived: false }
     const { record, error } = await updateEquipmentRecord(user, updated)
     if (!error && record) {
       setEquipment((prev) => prev.map((e) => (e.cloudId === record.cloudId ? record : e)))

@@ -34,6 +34,11 @@ export function normalizeDocumentRecord(record) {
   }
 }
 
+function blankToNull(value) {
+  if (value === '' || value == null) return null
+  return value
+}
+
 function withCloudOwnership(record, row) {
   return {
     ...record,
@@ -42,18 +47,16 @@ function withCloudOwnership(record, row) {
   }
 }
 
-export function mapDocumentToRow(record, userId) {
+export function mapDocumentToRow(record) {
   const normalized = normalizeDocumentRecord(record)
   return {
-    user_id: userId,
-    equipment_id: normalized.equipmentId,
-    record_data: { ...normalized, syncStatus: SYNC_STATUS.CLOUD },
+    machine_id: normalized.equipmentId || null,
     document_type: normalized.documentType?.trim() || null,
     document_title: normalized.documentTitle?.trim() || null,
     reference_number: normalized.referenceNumber?.trim() || null,
     issuing_organisation: normalized.issuingOrganisation?.trim() || null,
-    issue_date: normalized.issueDate?.trim() || null,
-    expiry_date: normalized.expiryDate?.trim() || null,
+    issue_date: blankToNull(normalized.issueDate?.trim?.() ?? normalized.issueDate),
+    expiry_date: blankToNull(normalized.expiryDate?.trim?.() ?? normalized.expiryDate),
     document_location: normalized.documentLocation?.trim() || null,
     notes: normalized.notes?.trim() || null,
     updated_at: new Date().toISOString(),
@@ -61,18 +64,11 @@ export function mapDocumentToRow(record, userId) {
 }
 
 export function rowToDocumentRecord(row) {
-  const data = row.record_data
-  if (data && typeof data === 'object') {
-    return normalizeDocumentRecord(
-      withCloudOwnership({ ...data, equipmentId: row.equipment_id ?? data.equipmentId, cloudId: row.id }, row),
-    )
-  }
-
   return normalizeDocumentRecord(
     withCloudOwnership(
       {
         id: row.id,
-        equipmentId: row.equipment_id ?? '',
+        equipmentId: row.machine_id ?? '',
         documentType: row.document_type ?? '',
         documentTitle: row.document_title ?? '',
         referenceNumber: row.reference_number ?? '',
@@ -82,6 +78,7 @@ export function rowToDocumentRecord(row) {
         documentLocation: row.document_location ?? '',
         notes: row.notes ?? '',
         createdAt: row.created_at ?? new Date().toISOString(),
+        updatedAt: row.updated_at ?? null,
       },
       row,
     ),
@@ -110,7 +107,10 @@ export async function saveDocumentRecord(user, record) {
     return { record: null, error: new Error('You must be signed in to save to the cloud.') }
   }
 
-  const row = mapDocumentToRow(record, user.id)
+  const row = {
+    ...mapDocumentToRow(record),
+    created_by: user.id,
+  }
   const { data, error } = await supabase
     .from('machine_document_records')
     .insert(row)
@@ -130,21 +130,10 @@ export async function updateDocumentRecord(user, record) {
   }
   if (!record.cloudId) return saveDocumentRecord(user, record)
 
-  const row = mapDocumentToRow(record, user.id)
+  const row = mapDocumentToRow(record)
   const { data, error } = await supabase
     .from('machine_document_records')
-    .update({
-      record_data: row.record_data,
-      document_type: row.document_type,
-      document_title: row.document_title,
-      reference_number: row.reference_number,
-      issuing_organisation: row.issuing_organisation,
-      issue_date: row.issue_date,
-      expiry_date: row.expiry_date,
-      document_location: row.document_location,
-      notes: row.notes,
-      updated_at: row.updated_at,
-    })
+    .update(row)
     .eq('id', record.cloudId)
     .select()
     .single()

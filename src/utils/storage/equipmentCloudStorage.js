@@ -31,7 +31,6 @@ export function createEmptyEquipment() {
     roadLegal: false,
     notes: '',
     archived: false,
-    archivedAt: null,
     createdAt: new Date().toISOString(),
     updatedAt: null,
     syncStatus: null,
@@ -51,6 +50,17 @@ export function normalizeEquipment(record) {
   }
 }
 
+function blankToNull(value) {
+  if (value === '' || value == null) return null
+  return value
+}
+
+function blankNumberToNull(value) {
+  if (value === '' || value == null) return null
+  const n = Number(value)
+  return Number.isNaN(n) ? null : n
+}
+
 function withCloudOwnership(record, row) {
   return {
     ...record,
@@ -60,53 +70,35 @@ function withCloudOwnership(record, row) {
   }
 }
 
-export function mapEquipmentToRow(record, userId) {
+export function mapEquipmentToRow(record) {
   const normalized = normalizeEquipment(record)
   return {
-    user_id: userId,
-    record_data: { ...normalized, syncStatus: SYNC_STATUS.CLOUD },
     asset_number: normalized.assetNumber?.trim() || null,
     asset_name: normalized.assetName?.trim() || null,
     asset_type: normalized.assetType?.trim() || null,
     make: normalized.make?.trim() || null,
     model: normalized.model?.trim() || null,
+    manufacture_year: blankNumberToNull(normalized.manufactureYear),
     serial_number: normalized.serialNumber?.trim() || null,
     registration_number: normalized.registrationNumber?.trim() || null,
     ownership_status: normalized.ownershipStatus?.trim() || null,
     operational_status: normalized.operationalStatus?.trim() || 'Available',
     assigned_operator: normalized.assignedOperator?.trim() || null,
     normal_location: normalized.normalLocation?.trim() || null,
-    current_hours: normalized.currentHours === '' ? null : Number(normalized.currentHours),
-    current_odometer: normalized.currentOdometer === '' ? null : Number(normalized.currentOdometer),
-    next_service_date: normalized.nextServiceDate?.trim() || null,
-    next_service_hours: normalized.nextServiceHours === '' ? null : Number(normalized.nextServiceHours),
-    next_service_odometer:
-      normalized.nextServiceOdometer === '' ? null : Number(normalized.nextServiceOdometer),
+    current_hours: blankNumberToNull(normalized.currentHours),
+    current_odometer: blankNumberToNull(normalized.currentOdometer),
+    next_service_date: blankToNull(normalized.nextServiceDate?.trim?.() ?? normalized.nextServiceDate),
+    next_service_hours: blankNumberToNull(normalized.nextServiceHours),
+    next_service_odometer: blankNumberToNull(normalized.nextServiceOdometer),
     prestart_required: normalized.prestartRequired,
     road_legal: normalized.roadLegal,
     archived: normalized.archived,
-    archived_at: normalized.archivedAt || null,
     notes: normalized.notes?.trim() || null,
     updated_at: new Date().toISOString(),
   }
 }
 
 export function rowToEquipment(row) {
-  const data = row.record_data
-  if (data && typeof data === 'object' && data.assetNumber != null) {
-    return normalizeEquipment(
-      withCloudOwnership(
-        {
-          ...data,
-          cloudId: row.id,
-          archived: row.archived ?? data.archived ?? false,
-          archivedAt: row.archived_at ?? data.archivedAt ?? null,
-        },
-        row,
-      ),
-    )
-  }
-
   return normalizeEquipment(
     withCloudOwnership(
       {
@@ -116,6 +108,7 @@ export function rowToEquipment(row) {
         assetType: row.asset_type ?? '',
         make: row.make ?? '',
         model: row.model ?? '',
+        manufactureYear: row.manufacture_year ?? '',
         serialNumber: row.serial_number ?? '',
         registrationNumber: row.registration_number ?? '',
         ownershipStatus: row.ownership_status ?? 'Owned',
@@ -131,7 +124,6 @@ export function rowToEquipment(row) {
         roadLegal: row.road_legal ?? false,
         notes: row.notes ?? '',
         archived: row.archived ?? false,
-        archivedAt: row.archived_at ?? null,
         createdAt: row.created_at ?? new Date().toISOString(),
         updatedAt: row.updated_at ?? null,
       },
@@ -182,7 +174,10 @@ export async function saveEquipmentRecord(user, record) {
     return { record: null, error: new Error('You must be signed in to save to the cloud.') }
   }
 
-  const row = mapEquipmentToRow(record, user.id)
+  const row = {
+    ...mapEquipmentToRow(record),
+    created_by: user.id,
+  }
   const { data, error } = await supabase
     .from('machine_equipment')
     .insert(row)
@@ -204,34 +199,10 @@ export async function updateEquipmentRecord(user, record) {
     return saveEquipmentRecord(user, record)
   }
 
-  const row = mapEquipmentToRow(record, user.id)
+  const row = mapEquipmentToRow(record)
   const { data, error } = await supabase
     .from('machine_equipment')
-    .update({
-      record_data: row.record_data,
-      asset_number: row.asset_number,
-      asset_name: row.asset_name,
-      asset_type: row.asset_type,
-      make: row.make,
-      model: row.model,
-      serial_number: row.serial_number,
-      registration_number: row.registration_number,
-      ownership_status: row.ownership_status,
-      operational_status: row.operational_status,
-      assigned_operator: row.assigned_operator,
-      normal_location: row.normal_location,
-      current_hours: row.current_hours,
-      current_odometer: row.current_odometer,
-      next_service_date: row.next_service_date,
-      next_service_hours: row.next_service_hours,
-      next_service_odometer: row.next_service_odometer,
-      prestart_required: row.prestart_required,
-      road_legal: row.road_legal,
-      archived: row.archived,
-      archived_at: row.archived_at,
-      notes: row.notes,
-      updated_at: row.updated_at,
-    })
+    .update(row)
     .eq('id', record.cloudId)
     .select()
     .single()
