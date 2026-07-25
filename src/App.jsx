@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
 import { Dashboard } from './pages/Dashboard.jsx'
 import { AuthView } from './pages/AuthView.jsx'
@@ -112,6 +112,7 @@ function App() {
   const [profile, setProfile] = useState(null)
   const [profileLoading, setProfileLoading] = useState(false)
   const [profileError, setProfileError] = useState('')
+  const prevShowMainAppRef = useRef(false)
 
   const mergedEquipment = useMemo(
     () => getMergedEquipmentRecords(localEquipment, cloudEquipment),
@@ -133,6 +134,17 @@ function App() {
     setHighlightActionId(null)
     setActionFilter(null)
     setRecordFocus(null)
+  }
+
+  function resetAppNavigationState() {
+    clearNavFocus()
+    setReturnView(null)
+    setCurrentView('dashboard')
+    setSsspNavOptions({})
+    setEquipmentNavOptions({})
+    setGeneralMeetingNavOptions({})
+    setPrintRecord(null)
+    setPrintContent(null)
   }
 
   function goToDashboard() {
@@ -360,6 +372,9 @@ function App() {
       setCloudDefectRecords([])
       setCloudGeneralMeetings([])
       setSsspLoadError(null)
+      // Same SPA instance keeps currentView across sign-out; clear so next login
+      // does not flash or land on the previous page.
+      resetAppNavigationState()
       return undefined
     }
 
@@ -591,6 +606,16 @@ function App() {
   const showDisabledView =
     authReady && session && !profileLoading && profile && !hasAppAccess && profileStatus === STATUS.DISABLED
   const showMainApp = authReady && session && !profileLoading && hasAppAccess
+
+  // After fresh sign-in (AuthView / blocked → main app), always land on Dashboard.
+  // Mid-session navigation keeps showMainApp true, so currentView is left alone.
+  // Pending/disabled users never set showMainApp, so they stay on AccessBlockedView.
+  useEffect(() => {
+    if (showMainApp && !prevShowMainAppRef.current) {
+      resetAppNavigationState()
+    }
+    prevShowMainAppRef.current = showMainApp
+  }, [showMainApp])
 
   return (
     <div className="app">
