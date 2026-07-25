@@ -1,10 +1,31 @@
 /**
  * Supabase table: public.machine_equipment
+ * Local fallback key: monrad-earthworx-machine-equipment
  */
 
+import { MACHINE_EQUIPMENT_KEY } from '../../constants/storageKeys.js'
 import { supabase, isSupabaseConfigured } from '../supabaseClient.js'
 import { createRecordId } from '../ids.js'
-import { SYNC_STATUS } from './cloudSyncStatus.js'
+import {
+  SYNC_STATUS,
+  withSyncStatus,
+  isCloudSaveUnavailable,
+  getUnavailableSyncStatus,
+  formatCloudSaveError,
+  NOT_SIGNED_IN_CLOUD_MESSAGE,
+  AUTH_REQUIRED_CODE,
+  isAuthRequiredError,
+} from './cloudSyncStatus.js'
+
+export {
+  SYNC_STATUS,
+  isCloudSaveUnavailable,
+  getUnavailableSyncStatus,
+  formatCloudSaveError,
+  NOT_SIGNED_IN_CLOUD_MESSAGE,
+  AUTH_REQUIRED_CODE,
+  isAuthRequiredError,
+} from './cloudSyncStatus.js'
 
 export function createEmptyEquipment() {
   return {
@@ -50,6 +71,27 @@ export function normalizeEquipment(record) {
   }
 }
 
+export function loadLocalEquipmentRecords() {
+  try {
+    const raw = localStorage.getItem(MACHINE_EQUIPMENT_KEY)
+    if (!raw) return []
+    const parsed = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return []
+    return parsed.map(normalizeEquipment)
+  } catch {
+    return []
+  }
+}
+
+export function persistLocalEquipmentRecords(records) {
+  try {
+    localStorage.setItem(MACHINE_EQUIPMENT_KEY, JSON.stringify(records))
+    return true
+  } catch {
+    return false
+  }
+}
+
 function blankToNull(value) {
   if (value === '' || value == null) return null
   return value
@@ -62,12 +104,12 @@ function blankNumberToNull(value) {
 }
 
 function withCloudOwnership(record, row) {
-  return {
+  return withSyncStatus({
     ...record,
     cloudId: row.id,
     storageSource: 'cloud',
     syncStatus: SYNC_STATUS.CLOUD,
-  }
+  })
 }
 
 export function mapEquipmentToRow(record) {
@@ -132,6 +174,87 @@ export function rowToEquipment(row) {
   )
 }
 
+function assetDedupeKey(record) {
+  return (record.assetNumber || '').trim().toLowerCase()
+}
+
+export function mergeEquipmentRecords(localRecords, cloudRecords) {
+  const byId = new Map()
+  const byCloudId = new Map()
+  const byAsset = new Map()
+
+  function register(record, source) {
+    const entry = withSyncStatus({
+      ...normalizeEquipment(record),
+      storageSource:
+        record.storageSource === 'cloud' && source === 'local'
+          ? 'both'
+          : record.storageSource === 'local' && source === 'cloud'
+            ? 'both'
+            : source,
+    })
+    if (entry.cloudId && entry.syncStatus !== SYNC_STATUS.CLOUD_FAILED) {
+      entry.syncStatus = SYNC_STATUS.CLOUD
+    }
+    byId.set(entry.id, entry)
+    if (entry.cloudId) byCloudId.set(entry.cloudId, entry)
+    const key = assetDedupeKey(entry)
+    if (key) byAsset.set(key, entry)
+    return entry
+  }
+
+  localRecords.forEach((record) => {
+    register({ ...record, storageSource: record.cloudId ? 'both' : 'local' }, 'local')
+  })
+
+  cloudRecords.forEach((cloudRecord) => {
+    const cloudId = cloudRecord.cloudId
+    if (cloudId && byCloudId.has(cloudId)) {
+      const existing = byCloudId.get(cloudId)
+      const merged = withSyncStatus({
+        ...existing,
+        ...cloudRecord,
+        id: existing.id,
+        cloudId,
+        storageSource: 'both',
+        syncStatus: SYNC_STATUS.CLOUD,
+      })
+      byId.set(existing.id, merged)
+      byCloudId.set(cloudId, merged)
+      const key = assetDedupeKey(merged)
+      if (key) byAsset.set(key, merged)
+      return
+    }
+
+    const key = assetDedupeKey(cloudRecord)
+    if (key && byAsset.has(key)) {
+      const existing = byAsset.get(key)
+      const merged = withSyncStatus({
+        ...existing,
+        ...cloudRecord,
+        id: existing.id,
+        cloudId: cloudId ?? existing.cloudId,
+        storageSource: 'both',
+        syncStatus: SYNC_STATUS.CLOUD,
+      })
+      byId.set(existing.id, merged)
+      if (merged.cloudId) byCloudId.set(merged.cloudId, merged)
+      byAsset.set(key, merged)
+      return
+    }
+
+    register(cloudRecord, 'cloud')
+  })
+
+  return [...byId.values()].sort((a, b) =>
+    (a.assetNumber || '').localeCompare(b.assetNumber || ''),
+  )
+}
+
+export function getMergedEquipmentRecords(localRecords, cloudRecords) {
+  return mergeEquipmentRecords(localRecords ?? [], cloudRecords ?? [])
+}
+
 export async function fetchEquipmentRecords(userId) {
   if (!isSupabaseConfigured || !supabase || !userId) {
     return { records: [], error: null }
@@ -166,34 +289,80 @@ export async function checkAssetNumberExists(assetNumber, excludeCloudId = null)
   return { exists: Boolean(data), error: null }
 }
 
-export async function saveEquipmentRecord(user, record) {
+function authRequiredError(message = 'Not signed into cloud.') {
+  return Object.assign(new Error(message), {
+    code: AUTH_REQUIRED_CODE,
+    message,
+  })
+}
+
+function firstInsertedRow(data) {
+  if (Array.isArray(data)) return data[0] ?? null
+  if (data && typeof data === 'object') return data
+  return null
+}
+
+/** Verifies a live Supabase session before any equipment cloud write. */
+export async function requireEquipmentCloudUser() {
   if (!isSupabaseConfigured || !supabase) {
-    return { record: null, error: new Error('Supabase is not configured.') }
-  }
-  if (!user?.id) {
-    return { record: null, error: new Error('You must be signed in to save to the cloud.') }
+    console.log('Equipment cloud save auth.getUser(): Supabase is not configured.')
+    return { user: null, error: authRequiredError('Supabase is not configured.') }
   }
 
+  const authResult = await supabase.auth.getUser()
+  console.log('Equipment cloud save auth.getUser():', {
+    user: authResult?.data?.user
+      ? { id: authResult.data.user.id, email: authResult.data.user.email }
+      : null,
+    error: authResult?.error ?? null,
+  })
+
+  if (authResult?.error) {
+    return { user: null, error: authResult.error }
+  }
+
+  const user = authResult?.data?.user ?? null
+  if (!user?.id) {
+    return { user: null, error: authRequiredError() }
+  }
+
+  return { user, error: null }
+}
+
+export async function saveEquipmentRecord(_user, record) {
+  const { user, error: authError } = await requireEquipmentCloudUser()
+  if (authError || !user?.id) {
+    return { record: null, error: authError ?? authRequiredError() }
+  }
+
+  // Do not send a client-generated id — DB generates uuid via gen_random_uuid().
   const row = {
     ...mapEquipmentToRow(record),
     created_by: user.id,
   }
-  const { data, error } = await supabase
-    .from('machine_equipment')
-    .insert(row)
-    .select()
-    .single()
+  const { data, error } = await supabase.from('machine_equipment').insert(row).select()
 
+  console.log('Equipment cloud save result:', { data, error })
+
+  const inserted = firstInsertedRow(data)
   if (error) return { record: null, error }
-  return { record: rowToEquipment(data), error: null }
+  if (!inserted?.id) {
+    return {
+      record: null,
+      error: Object.assign(new Error('Insert returned no row.'), {
+        code: 'NO_ROW',
+        message: 'Insert returned no row.',
+      }),
+    }
+  }
+
+  return { record: rowToEquipment(inserted), error: null }
 }
 
-export async function updateEquipmentRecord(user, record) {
-  if (!isSupabaseConfigured || !supabase) {
-    return { record: null, error: new Error('Supabase is not configured.') }
-  }
-  if (!user?.id) {
-    return { record: null, error: new Error('You must be signed in to save to the cloud.') }
+export async function updateEquipmentRecord(_user, record) {
+  const { user, error: authError } = await requireEquipmentCloudUser()
+  if (authError || !user?.id) {
+    return { record: null, error: authError ?? authRequiredError() }
   }
   if (!record.cloudId) {
     return saveEquipmentRecord(user, record)
@@ -205,10 +374,22 @@ export async function updateEquipmentRecord(user, record) {
     .update(row)
     .eq('id', record.cloudId)
     .select()
-    .single()
 
+  console.log('Equipment cloud save result:', { data, error })
+
+  const updated = firstInsertedRow(data)
   if (error) return { record: null, error }
-  return { record: rowToEquipment(data), error: null }
+  if (!updated?.id) {
+    return {
+      record: null,
+      error: Object.assign(new Error('Update returned no row.'), {
+        code: 'NO_ROW',
+        message: 'Update returned no row.',
+      }),
+    }
+  }
+
+  return { record: rowToEquipment(updated), error: null }
 }
 
 export function getEquipmentById(equipmentList, id) {

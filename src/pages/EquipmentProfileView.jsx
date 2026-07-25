@@ -4,6 +4,7 @@ import { EquipmentStatusBadge } from '../components/equipment/EquipmentStatusBad
 import { DefectSeverityBadge } from '../components/equipment/DefectSeverityBadge.jsx'
 import { MaintenanceDueBadge } from '../components/equipment/MaintenanceDueBadge.jsx'
 import { ComplianceExpiryBadge } from '../components/equipment/ComplianceExpiryBadge.jsx'
+import { CloudSyncBadge } from '../components/CloudSyncBadge.jsx'
 import {
   EquipmentForm,
   DefectForm,
@@ -21,27 +22,37 @@ import {
   getEquipmentById,
   checkAssetNumberExists,
   updateEquipmentRecord,
+  persistLocalEquipmentRecords,
+  isCloudSaveUnavailable,
+  getUnavailableSyncStatus,
+  formatCloudSaveError,
+  isAuthRequiredError,
+  NOT_SIGNED_IN_CLOUD_MESSAGE,
+  requireEquipmentCloudUser,
+  SYNC_STATUS,
 } from '../utils/storage/equipmentCloudStorage.js'
 import {
   getServicesForEquipment,
   saveServiceRecord,
   updateServiceRecord,
+  persistLocalServiceRecords,
 } from '../utils/storage/equipmentServiceCloudStorage.js'
 import {
   getDocumentsForEquipment,
   saveDocumentRecord,
   updateDocumentRecord,
+  persistLocalDocumentRecords,
 } from '../utils/storage/equipmentDocumentCloudStorage.js'
 import {
   getDefectsForEquipment,
   saveDefectRecord,
   updateDefectRecord,
   getMergedDefectRecords,
+  persistLocalDefectRecords,
 } from '../utils/storage/equipmentDefectStorage.js'
 import { getMergedPreStartRecords } from '../utils/storage/preStartCloudStorage.js'
 import {
   PrintableEquipmentProfile,
-  PrintableDefectReport,
   PrintableMaintenanceHistory,
   PrintableComplianceSummary,
 } from '../components/equipment/PrintableEquipment.jsx'
@@ -54,11 +65,17 @@ export function EquipmentProfileView({
   profile,
   settings,
   equipment,
-  setEquipment,
+  setCloudEquipment,
+  localEquipment,
+  setLocalEquipment,
   serviceRecords,
-  setServiceRecords,
+  setCloudServiceRecords,
+  localServiceRecords,
+  setLocalServiceRecords,
   documentRecords,
-  setDocumentRecords,
+  setCloudDocumentRecords,
+  localDocumentRecords,
+  setLocalDocumentRecords,
   defectRecords,
   setDefectRecords,
   localDefectRecords,
@@ -74,6 +91,7 @@ export function EquipmentProfileView({
   const [saveError, setSaveError] = useState('')
 
   const asset = useMemo(() => getEquipmentById(equipment, equipmentId), [equipment, equipmentId])
+  const assetKey = asset?.cloudId ?? asset?.id
 
   const mergedDefects = useMemo(
     () => getMergedDefectRecords(localDefectRecords, defectRecords),
@@ -81,18 +99,18 @@ export function EquipmentProfileView({
   )
 
   const assetDefects = useMemo(
-    () => getDefectsForEquipment(mergedDefects, equipmentId).filter((d) => d.status !== 'Resolved'),
-    [mergedDefects, equipmentId],
+    () => getDefectsForEquipment(mergedDefects, assetKey).filter((d) => d.status !== 'Resolved'),
+    [mergedDefects, assetKey],
   )
 
   const assetServices = useMemo(
-    () => getServicesForEquipment(serviceRecords, equipmentId),
-    [serviceRecords, equipmentId],
+    () => getServicesForEquipment(serviceRecords, assetKey),
+    [serviceRecords, assetKey],
   )
 
   const assetDocuments = useMemo(
-    () => getDocumentsForEquipment(documentRecords, equipmentId),
-    [documentRecords, equipmentId],
+    () => getDocumentsForEquipment(documentRecords, assetKey),
+    [documentRecords, assetKey],
   )
 
   const preStartHistory = useMemo(() => {
@@ -111,6 +129,27 @@ export function EquipmentProfileView({
       .sort((a, b) => (b.submittedAt || '').localeCompare(a.submittedAt || ''))
   }, [asset, savedRecords, cloudPreStarts])
 
+  function upsertLocalEquipment(record) {
+    const next = [record, ...localEquipment.filter((item) => item.id !== record.id)]
+    if (!persistLocalEquipmentRecords(next)) return false
+    setLocalEquipment(next)
+    return true
+  }
+
+  function upsertLocalService(record) {
+    const next = [record, ...localServiceRecords.filter((item) => item.id !== record.id)]
+    if (!persistLocalServiceRecords(next)) return false
+    setLocalServiceRecords(next)
+    return true
+  }
+
+  function upsertLocalDocument(record) {
+    const next = [record, ...localDocumentRecords.filter((item) => item.id !== record.id)]
+    if (!persistLocalDocumentRecords(next)) return false
+    setLocalDocumentRecords(next)
+    return true
+  }
+
   if (!asset) {
     return (
       <>
@@ -123,50 +162,261 @@ export function EquipmentProfileView({
   function closeModal() {
     setModal(null)
     setSaveError('')
+    setSaving(false)
   }
 
   async function handleSaveEquipment(form) {
     setSaving(true)
     setSaveError('')
-    const { exists, error: checkError } = await checkAssetNumberExists(form.assetNumber, form.cloudId)
-    if (checkError || exists) {
-      setSaveError(exists ? 'An asset with this asset number already exists.' : checkError.message)
+
+    const persistLocalFallback = (syncStatus) =>
+      upsertLocalEquipment({
+        ...form,
+        syncStatus,
+        storageSource: 'local',
+        updatedAt: new Date().toISOString(),
+      })
+
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      if (!persistLocalFallback(SYNC_STATUS.OFFLINE)) {
+        setSaveError('Could not save equipment locally.')
+        setSaving(false)
+        return
+      }
+      setSaveError('Offline/local save only')
       setSaving(false)
       return
     }
-    const { record, error } = await updateEquipmentRecord(user, form)
-    setSaving(false)
-    if (error) {
-      setSaveError(error.message)
+
+    const { user: cloudUser, error: authError } = await requireEquipmentCloudUser()
+    if (authError || !cloudUser?.id) {
+      if (!persistLocalFallback(SYNC_STATUS.LOCAL_ONLY)) {
+        setSaveError('Could not save equipment locally.')
+        setSaving(false)
+        return
+      }
+      setSaveError(
+        !authError || isAuthRequiredError(authError)
+          ? NOT_SIGNED_IN_CLOUD_MESSAGE
+          : `Cloud save failed — saved locally. ${formatCloudSaveError(authError)}`,
+      )
+      setSaving(false)
       return
     }
-    setEquipment((prev) => prev.map((e) => (e.cloudId === record.cloudId ? record : e)))
+
+    const { exists, error: checkError } = await checkAssetNumberExists(form.assetNumber, form.cloudId)
+    if (checkError || exists) {
+      setSaveError(
+        exists
+          ? 'An asset with this asset number already exists.'
+          : formatCloudSaveError(checkError),
+      )
+      setSaving(false)
+      return
+    }
+
+    const { record, error } = await updateEquipmentRecord(cloudUser, form)
+    setSaving(false)
+    if (isAuthRequiredError(error)) {
+      if (!persistLocalFallback(SYNC_STATUS.LOCAL_ONLY)) {
+        setSaveError('Could not save equipment locally.')
+        return
+      }
+      setSaveError(NOT_SIGNED_IN_CLOUD_MESSAGE)
+      return
+    }
+    if (error || !record?.cloudId) {
+      persistLocalFallback(SYNC_STATUS.CLOUD_FAILED)
+      setSaveError(
+        `Cloud save failed — saved locally. ${formatCloudSaveError(
+          error ?? { code: 'NO_ROW', message: 'Update returned no row.' },
+          { adminRequired: true },
+        )}`,
+      )
+      return
+    }
+    setCloudEquipment((prev) => prev.map((e) => (e.cloudId === record.cloudId ? record : e)))
+    setLocalEquipment((prev) => {
+      const next = prev.filter((item) => item.id !== form.id && item.cloudId !== record.cloudId)
+      persistLocalEquipmentRecords(next)
+      return next
+    })
     closeModal()
+  }
+
+  async function persistEquipmentPatch(updated) {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      upsertLocalEquipment({
+        ...updated,
+        syncStatus: SYNC_STATUS.OFFLINE,
+        storageSource: 'local',
+      })
+      return { ok: true }
+    }
+
+    const { user: cloudUser, error: authError } = await requireEquipmentCloudUser()
+    if (authError || !cloudUser?.id) {
+      upsertLocalEquipment({
+        ...updated,
+        syncStatus: SYNC_STATUS.LOCAL_ONLY,
+        storageSource: 'local',
+      })
+      setSaveError(
+        !authError || isAuthRequiredError(authError)
+          ? NOT_SIGNED_IN_CLOUD_MESSAGE
+          : `Cloud save failed — saved locally. ${formatCloudSaveError(authError)}`,
+      )
+      return { ok: false }
+    }
+
+    const { record, error } = await updateEquipmentRecord(cloudUser, updated)
+    if (isAuthRequiredError(error)) {
+      upsertLocalEquipment({
+        ...updated,
+        syncStatus: SYNC_STATUS.LOCAL_ONLY,
+        storageSource: 'local',
+      })
+      setSaveError(NOT_SIGNED_IN_CLOUD_MESSAGE)
+      return { ok: false }
+    }
+    if (error || !record?.cloudId) {
+      upsertLocalEquipment({
+        ...updated,
+        syncStatus: SYNC_STATUS.CLOUD_FAILED,
+        storageSource: 'local',
+      })
+      setSaveError(
+        `Cloud save failed — saved locally. ${formatCloudSaveError(
+          error ?? { code: 'NO_ROW', message: 'Update returned no row.' },
+          { adminRequired: true },
+        )}`,
+      )
+      return { ok: false }
+    }
+    setCloudEquipment((prev) => prev.map((e) => (e.cloudId === record.cloudId ? record : e)))
+    return { ok: true }
   }
 
   async function handleArchive() {
     if (!window.confirm(`Archive ${getEquipmentReadableName(asset)}?`)) return
-    const updated = { ...asset, archived: true }
-    const { record, error } = await updateEquipmentRecord(user, updated)
-    if (!error && record) {
-      setEquipment((prev) => prev.map((e) => (e.cloudId === record.cloudId ? record : e)))
-    }
+    await persistEquipmentPatch({ ...asset, archived: true })
   }
 
   async function handleReactivate() {
-    const updated = { ...asset, archived: false }
-    const { record, error } = await updateEquipmentRecord(user, updated)
-    if (!error && record) {
-      setEquipment((prev) => prev.map((e) => (e.cloudId === record.cloudId ? record : e)))
-    }
+    await persistEquipmentPatch({ ...asset, archived: false })
   }
 
   async function handleStatusUpdate(values) {
-    const updated = { ...asset, ...values }
-    const { record, error } = await updateEquipmentRecord(user, updated)
-    if (!error && record) {
-      setEquipment((prev) => prev.map((e) => (e.cloudId === record.cloudId ? record : e)))
+    await persistEquipmentPatch({ ...asset, ...values })
+    closeModal()
+  }
+
+  async function handleSaveDefect(form) {
+    setSaving(true)
+    setSaveError('')
+    if (isCloudSaveUnavailable(user)) {
+      const syncStatus = getUnavailableSyncStatus(user)
+      const localRecord = { ...form, syncStatus, storageSource: 'local' }
+      const next = [localRecord, ...localDefectRecords.filter((d) => d.id !== form.id)]
+      if (!persistLocalDefectRecords(next)) {
+        setSaveError('Could not save defect locally.')
+        setSaving(false)
+        return
+      }
+      setLocalDefectRecords(next)
+      closeModal()
+      return
     }
+    const saveFn = form.cloudId ? updateDefectRecord : saveDefectRecord
+    const { record, error } = await saveFn(user, form)
+    setSaving(false)
+    if (error) {
+      const localRecord = {
+        ...form,
+        syncStatus: SYNC_STATUS.CLOUD_FAILED,
+        storageSource: 'local',
+      }
+      const next = [localRecord, ...localDefectRecords.filter((d) => d.id !== form.id)]
+      persistLocalDefectRecords(next)
+      setLocalDefectRecords(next)
+      setSaveError(`Cloud save failed — saved locally. ${formatCloudSaveError(error)}`)
+      return
+    }
+    setDefectRecords((prev) => [record, ...prev.filter((d) => d.cloudId !== record?.cloudId)])
+    closeModal()
+  }
+
+  async function handleSaveService(form) {
+    setSaving(true)
+    setSaveError('')
+    if (isCloudSaveUnavailable(user)) {
+      const syncStatus = getUnavailableSyncStatus(user)
+      const localRecord = { ...form, syncStatus, storageSource: 'local' }
+      if (!upsertLocalService(localRecord)) {
+        setSaveError('Could not save service record locally.')
+        setSaving(false)
+        return
+      }
+      closeModal()
+      return
+    }
+    const saveFn = form.cloudId ? updateServiceRecord : saveServiceRecord
+    const { record, error } = await saveFn(user, form)
+    setSaving(false)
+    if (error) {
+      upsertLocalService({
+        ...form,
+        syncStatus: SYNC_STATUS.CLOUD_FAILED,
+        storageSource: 'local',
+      })
+      setSaveError(
+        `Cloud save failed — saved locally. ${formatCloudSaveError(error, { adminRequired: true })}`,
+      )
+      return
+    }
+    setCloudServiceRecords((prev) => [record, ...prev.filter((s) => s.cloudId !== record.cloudId)])
+    setLocalServiceRecords((prev) => {
+      const next = prev.filter((s) => s.id !== form.id && s.cloudId !== record.cloudId)
+      persistLocalServiceRecords(next)
+      return next
+    })
+    closeModal()
+  }
+
+  async function handleSaveDocument(form) {
+    setSaving(true)
+    setSaveError('')
+    if (isCloudSaveUnavailable(user)) {
+      const syncStatus = getUnavailableSyncStatus(user)
+      const localRecord = { ...form, syncStatus, storageSource: 'local' }
+      if (!upsertLocalDocument(localRecord)) {
+        setSaveError('Could not save document locally.')
+        setSaving(false)
+        return
+      }
+      closeModal()
+      return
+    }
+    const saveFn = form.cloudId ? updateDocumentRecord : saveDocumentRecord
+    const { record, error } = await saveFn(user, form)
+    setSaving(false)
+    if (error) {
+      upsertLocalDocument({
+        ...form,
+        syncStatus: SYNC_STATUS.CLOUD_FAILED,
+        storageSource: 'local',
+      })
+      setSaveError(
+        `Cloud save failed — saved locally. ${formatCloudSaveError(error, { adminRequired: true })}`,
+      )
+      return
+    }
+    setCloudDocumentRecords((prev) => [record, ...prev.filter((d) => d.cloudId !== record.cloudId)])
+    setLocalDocumentRecords((prev) => {
+      const next = prev.filter((d) => d.id !== form.id && d.cloudId !== record.cloudId)
+      persistLocalDocumentRecords(next)
+      return next
+    })
     closeModal()
   }
 
@@ -202,8 +452,17 @@ export function EquipmentProfileView({
             {asset.registrationNumber && ` · ${asset.registrationNumber}`}
           </p>
         </div>
-        <EquipmentStatusBadge status={asset.operationalStatus} />
+        <div className="equipment-summary-card__badge-row">
+          <EquipmentStatusBadge status={asset.operationalStatus} />
+          <CloudSyncBadge syncStatus={asset.syncStatus} />
+        </div>
       </header>
+
+      {saveError && !modal && (
+        <p className="validation-message validation-message--error" role="alert">
+          {saveError}
+        </p>
+      )}
 
       <div className="equipment-profile-actions no-print">
         <button type="button" className="btn btn--secondary" onClick={() => setModal({ type: 'report-defect' })}>
@@ -263,9 +522,11 @@ export function EquipmentProfileView({
           ) : (
             <ul className="equipment-profile-list">
               {assetDefects.map((defect) => (
-                <li key={defect.id}>
+                <li key={defect.cloudId ?? defect.id}>
                   <DefectSeverityBadge severity={defect.severity} /> {defect.description}
                   <span className="equipment-profile-list__meta">{defect.status}</span>
+                  {' '}
+                  <CloudSyncBadge syncStatus={defect.syncStatus} size="small" />
                 </li>
               ))}
             </ul>
@@ -280,8 +541,10 @@ export function EquipmentProfileView({
           ) : (
             <ul className="equipment-profile-list">
               {assetServices.map((service) => (
-                <li key={service.id}>
+                <li key={service.cloudId ?? service.id}>
                   <strong>{service.serviceDate}</strong> — {service.serviceType}: {service.workCompleted || 'No details'}
+                  {' '}
+                  <CloudSyncBadge syncStatus={service.syncStatus} size="small" />
                 </li>
               ))}
             </ul>
@@ -302,8 +565,10 @@ export function EquipmentProfileView({
           ) : (
             <ul className="equipment-profile-list">
               {assetDocuments.map((doc) => (
-                <li key={doc.id}>
+                <li key={doc.cloudId ?? doc.id}>
                   {doc.documentTitle} ({doc.documentType}) — <ComplianceExpiryBadge document={doc} />
+                  {' '}
+                  <CloudSyncBadge syncStatus={doc.syncStatus} size="small" />
                 </li>
               ))}
             </ul>
@@ -362,15 +627,15 @@ export function EquipmentProfileView({
             {modal.type === 'report-defect' && (
               <DefectForm
                 equipment={equipment.filter((e) => !e.archived)}
-                initial={{ equipmentId: asset.cloudId, equipmentName: getEquipmentReadableName(asset), reportedByName: profile?.full_name?.trim() || '' }}
-                onSave={async (form) => {
-                  const saveFn = form.cloudId ? updateDefectRecord : saveDefectRecord
-                  const { record, error } = await saveFn(user, form)
-                  if (!error) setDefectRecords((prev) => [record, ...prev.filter((d) => d.cloudId !== record?.cloudId)])
-                  closeModal()
+                initial={{
+                  equipmentId: assetKey,
+                  equipmentName: getEquipmentReadableName(asset),
+                  reportedByName: profile?.full_name?.trim() || '',
                 }}
+                onSave={handleSaveDefect}
                 onCancel={closeModal}
                 saving={saving}
+                saveError={saveError}
                 isAdmin={isAdmin}
                 operatorOptions={operatorOptions}
               />
@@ -378,27 +643,21 @@ export function EquipmentProfileView({
             {modal.type === 'service' && (
               <ServiceForm
                 equipment={equipment.filter((e) => !e.archived)}
-                initial={{ equipmentId: asset.cloudId }}
-                onSave={async (form) => {
-                  const { record, error } = await saveServiceRecord(user, form)
-                  if (!error) setServiceRecords((prev) => [record, ...prev])
-                  closeModal()
-                }}
+                initial={{ equipmentId: assetKey }}
+                onSave={handleSaveService}
                 onCancel={closeModal}
                 saving={saving}
+                saveError={saveError}
               />
             )}
             {modal.type === 'document' && (
               <DocumentForm
                 equipment={equipment.filter((e) => !e.archived)}
-                initial={{ equipmentId: asset.cloudId }}
-                onSave={async (form) => {
-                  const { record, error } = await saveDocumentRecord(user, form)
-                  if (!error) setDocumentRecords((prev) => [record, ...prev])
-                  closeModal()
-                }}
+                initial={{ equipmentId: assetKey }}
+                onSave={handleSaveDocument}
                 onCancel={closeModal}
                 saving={saving}
+                saveError={saveError}
               />
             )}
             {modal.type === 'status' && (

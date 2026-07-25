@@ -62,6 +62,7 @@ export function JobStartView({
   const [completedRecord, setCompletedRecord] = useState(null)
   const [fieldErrors, setFieldErrors] = useState({})
   const [completedSyncStatus, setCompletedSyncStatus] = useState(null)
+  const [completedCloudError, setCompletedCloudError] = useState('')
   const [cloudLoadWarning, setCloudLoadWarning] = useState(null)
   const [cloudSaving, setCloudSaving] = useState(false)
   const [recordFilter, setRecordFilter] = useState('job-start')
@@ -198,6 +199,7 @@ export function JobStartView({
     setSavedRecords(nextRecords)
     setCompletedRecord(record)
     setCompletedSyncStatus(null)
+    setCompletedCloudError('')
 
     if (isCloudSaveUnavailable(user)) {
       const syncStatus = getUnavailableSyncStatus(user)
@@ -213,6 +215,7 @@ export function JobStartView({
     if (error) {
       patchSavedJobStartRecord(record.id, { syncStatus: SYNC_STATUS.CLOUD_FAILED })
       setCompletedSyncStatus(SYNC_STATUS.CLOUD_FAILED)
+      setCompletedCloudError(error.message)
       return
     }
 
@@ -222,6 +225,7 @@ export function JobStartView({
     }
     patchSavedJobStartRecord(record.id, cloudPatch)
     setCompletedSyncStatus(SYNC_STATUS.CLOUD)
+    setCompletedCloudError('')
 
     if (cloudRecord) {
       setCloudJobStarts((prev) => {
@@ -238,6 +242,7 @@ export function JobStartView({
     setCompletedRecord(null)
     setFieldErrors({})
     setCompletedSyncStatus(null)
+    setCompletedCloudError('')
   }
 
   function handleClearAllRecords() {
@@ -361,7 +366,14 @@ export function JobStartView({
             </p>
           ) : (
             completedSyncStatus && (
-              <CloudSyncBadge syncStatus={completedSyncStatus} className="cloud-sync-status--block" />
+              <>
+                <CloudSyncBadge syncStatus={completedSyncStatus} className="cloud-sync-status--block" />
+                {completedCloudError && (
+                  <p className="validation-message validation-message--error" role="alert">
+                    {completedCloudError}
+                  </p>
+                )}
+              </>
             )
           )}
 

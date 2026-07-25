@@ -22,13 +22,21 @@ export function AuthView({ onSignIn, onSignUp, isLoading, errorMessage, isConfig
           Sign in
         </h1>
         <p className="auth-card__subtitle">
-          Use your Supabase account to access this device's local records.
+          Sign in with your Supabase Auth email and password. Cloud sync only works while you have an
+          active session. Local device saves still work offline as a fallback.
         </p>
 
         {isConfigMissing && (
           <p className="validation-message">
             Supabase configuration missing. Set VITE_SUPABASE_URL and
-            VITE_SUPABASE_PUBLISHABLE_KEY in your environment.
+            VITE_SUPABASE_PUBLISHABLE_KEY in your environment (never use the service-role key in the app).
+          </p>
+        )}
+
+        {!isConfigMissing && (
+          <p className="auth-card__hint">
+            If Auth has no users yet, create one here with Sign up, or in the Supabase dashboard
+            (Authentication → Users). The first admin must set <code>user_profiles.role = admin</code>.
           </p>
         )}
 

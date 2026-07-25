@@ -1,10 +1,25 @@
 /**
  * Supabase table: public.machine_service_records
+ * Local fallback key: monrad-earthworx-machine-service-records
  */
 
+import { MACHINE_SERVICE_RECORDS_KEY } from '../../constants/storageKeys.js'
 import { supabase, isSupabaseConfigured } from '../supabaseClient.js'
 import { createRecordId } from '../ids.js'
-import { SYNC_STATUS } from './cloudSyncStatus.js'
+import {
+  SYNC_STATUS,
+  withSyncStatus,
+  isCloudSaveUnavailable,
+  getUnavailableSyncStatus,
+  formatCloudSaveError,
+} from './cloudSyncStatus.js'
+
+export {
+  SYNC_STATUS,
+  isCloudSaveUnavailable,
+  getUnavailableSyncStatus,
+  formatCloudSaveError,
+} from './cloudSyncStatus.js'
 
 export function createEmptyServiceRecord(equipmentId = '') {
   return {
@@ -26,7 +41,8 @@ export function createEmptyServiceRecord(equipmentId = '') {
     invoiceReference: '',
     createdAt: new Date().toISOString(),
     updatedAt: null,
-    syncStatus: SYNC_STATUS.CLOUD,
+    syncStatus: null,
+    storageSource: 'local',
   }
 }
 
@@ -36,6 +52,27 @@ export function normalizeServiceRecord(record) {
     ...createEmptyServiceRecord(),
     ...record,
     id: record.id || createRecordId(),
+  }
+}
+
+export function loadLocalServiceRecords() {
+  try {
+    const raw = localStorage.getItem(MACHINE_SERVICE_RECORDS_KEY)
+    if (!raw) return []
+    const parsed = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return []
+    return parsed.map(normalizeServiceRecord)
+  } catch {
+    return []
+  }
+}
+
+export function persistLocalServiceRecords(records) {
+  try {
+    localStorage.setItem(MACHINE_SERVICE_RECORDS_KEY, JSON.stringify(records))
+    return true
+  } catch {
+    return false
   }
 }
 
@@ -51,11 +88,12 @@ function blankNumberToNull(value) {
 }
 
 function withCloudOwnership(record, row) {
-  return {
+  return withSyncStatus({
     ...record,
     cloudId: row.id,
+    storageSource: 'cloud',
     syncStatus: SYNC_STATUS.CLOUD,
-  }
+  })
 }
 
 export function mapServiceToRow(record) {
@@ -104,6 +142,89 @@ export function rowToServiceRecord(row) {
       row,
     ),
   )
+}
+
+function serviceDedupeKey(record) {
+  return [
+    record.equipmentId,
+    record.serviceDate,
+    record.serviceType,
+    record.operatingHours,
+    record.invoiceReference,
+  ]
+    .map((part) => String(part ?? '').trim().toLowerCase())
+    .join('|')
+}
+
+export function mergeServiceRecords(localRecords, cloudRecords) {
+  const byId = new Map()
+  const byCloudId = new Map()
+  const byDedupe = new Map()
+
+  function register(record, source) {
+    const entry = withSyncStatus({
+      ...normalizeServiceRecord(record),
+      storageSource:
+        record.storageSource === 'cloud' && source === 'local'
+          ? 'both'
+          : record.storageSource === 'local' && source === 'cloud'
+            ? 'both'
+            : source,
+    })
+    if (entry.cloudId && entry.syncStatus !== SYNC_STATUS.CLOUD_FAILED) {
+      entry.syncStatus = SYNC_STATUS.CLOUD
+    }
+    byId.set(entry.id, entry)
+    if (entry.cloudId) byCloudId.set(entry.cloudId, entry)
+    byDedupe.set(serviceDedupeKey(entry), entry)
+    return entry
+  }
+
+  localRecords.forEach((record) => {
+    register({ ...record, storageSource: record.cloudId ? 'both' : 'local' }, 'local')
+  })
+
+  cloudRecords.forEach((cloudRecord) => {
+    const cloudId = cloudRecord.cloudId
+    if (cloudId && byCloudId.has(cloudId)) {
+      const existing = byCloudId.get(cloudId)
+      const merged = withSyncStatus({
+        ...existing,
+        ...cloudRecord,
+        id: existing.id,
+        cloudId,
+        storageSource: 'both',
+        syncStatus: SYNC_STATUS.CLOUD,
+      })
+      byId.set(existing.id, merged)
+      byCloudId.set(cloudId, merged)
+      return
+    }
+
+    const key = serviceDedupeKey(cloudRecord)
+    if (key && byDedupe.has(key)) {
+      const existing = byDedupe.get(key)
+      const merged = withSyncStatus({
+        ...existing,
+        ...cloudRecord,
+        id: existing.id,
+        cloudId: cloudId ?? existing.cloudId,
+        storageSource: 'both',
+        syncStatus: SYNC_STATUS.CLOUD,
+      })
+      byId.set(existing.id, merged)
+      if (merged.cloudId) byCloudId.set(merged.cloudId, merged)
+      return
+    }
+
+    register(cloudRecord, 'cloud')
+  })
+
+  return [...byId.values()].sort((a, b) => (b.serviceDate || '').localeCompare(a.serviceDate || ''))
+}
+
+export function getMergedServiceRecords(localRecords, cloudRecords) {
+  return mergeServiceRecords(localRecords ?? [], cloudRecords ?? [])
 }
 
 export async function fetchServiceRecords(userId) {

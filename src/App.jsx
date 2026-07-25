@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import './App.css'
 import { Dashboard } from './pages/Dashboard.jsx'
 import { AuthView } from './pages/AuthView.jsx'
@@ -51,9 +51,9 @@ import {
   getMergedVisitorRecords,
 } from './utils/storage/visitorSignInCloudStorage.js'
 import { fetchSsspRecords } from './utils/storage/ssspCloudStorage.js'
-import { fetchEquipmentRecords } from './utils/storage/equipmentCloudStorage.js'
-import { fetchServiceRecords } from './utils/storage/equipmentServiceCloudStorage.js'
-import { fetchDocumentRecords } from './utils/storage/equipmentDocumentCloudStorage.js'
+import { fetchEquipmentRecords, loadLocalEquipmentRecords, getMergedEquipmentRecords } from './utils/storage/equipmentCloudStorage.js'
+import { fetchServiceRecords, loadLocalServiceRecords, getMergedServiceRecords } from './utils/storage/equipmentServiceCloudStorage.js'
+import { fetchDocumentRecords, loadLocalDocumentRecords, getMergedDocumentRecords } from './utils/storage/equipmentDocumentCloudStorage.js'
 import {
   fetchDefectRecords,
   loadLocalDefectRecords,
@@ -98,8 +98,11 @@ function App() {
   const [ssspNavOptions, setSsspNavOptions] = useState({})
   const [equipmentNavOptions, setEquipmentNavOptions] = useState({})
   const [cloudEquipment, setCloudEquipment] = useState([])
+  const [localEquipment, setLocalEquipment] = useState(() => loadLocalEquipmentRecords())
   const [cloudServiceRecords, setCloudServiceRecords] = useState([])
+  const [localServiceRecords, setLocalServiceRecords] = useState(() => loadLocalServiceRecords())
   const [cloudDocumentRecords, setCloudDocumentRecords] = useState([])
+  const [localDocumentRecords, setLocalDocumentRecords] = useState(() => loadLocalDocumentRecords())
   const [cloudDefectRecords, setCloudDefectRecords] = useState([])
   const [localDefectRecords, setLocalDefectRecords] = useState(() => loadLocalDefectRecords())
   const [generalMeetings, setGeneralMeetings] = useState(() => loadMeetings())
@@ -108,6 +111,20 @@ function App() {
   const [printContent, setPrintContent] = useState(null)
   const [profile, setProfile] = useState(null)
   const [profileLoading, setProfileLoading] = useState(false)
+  const [profileError, setProfileError] = useState('')
+
+  const mergedEquipment = useMemo(
+    () => getMergedEquipmentRecords(localEquipment, cloudEquipment),
+    [localEquipment, cloudEquipment],
+  )
+  const mergedServiceRecords = useMemo(
+    () => getMergedServiceRecords(localServiceRecords, cloudServiceRecords),
+    [localServiceRecords, cloudServiceRecords],
+  )
+  const mergedDocumentRecords = useMemo(
+    () => getMergedDocumentRecords(localDocumentRecords, cloudDocumentRecords),
+    [localDocumentRecords, cloudDocumentRecords],
+  )
 
   const openActionCount = actions.filter((action) => action.status !== 'completed').length
 
@@ -327,6 +344,7 @@ function App() {
   useEffect(() => {
     if (!session?.user?.id) {
       setProfile(null)
+      setProfileError('')
       setProfileLoading(false)
       setCloudTimesheets([])
       setCloudJobStarts([])
@@ -347,13 +365,25 @@ function App() {
 
     let isMounted = true
     setProfileLoading(true)
+    setProfileError('')
 
     async function loadProfile() {
-      const { profile: nextProfile } = await loadOrCreateProfile(session.user)
-      if (isMounted) {
-        setProfile(nextProfile)
+      const { profile: nextProfile, error } = await loadOrCreateProfile(session.user)
+      if (!isMounted) return
+      if (error) {
+        setProfile(null)
+        setProfileError(error.message || 'Could not load your user profile.')
         setProfileLoading(false)
+        return
       }
+      if (!nextProfile) {
+        setProfile(null)
+        setProfileError('No user profile was found for this account.')
+        setProfileLoading(false)
+        return
+      }
+      setProfile(nextProfile)
+      setProfileLoading(false)
     }
 
     loadProfile()
@@ -525,11 +555,15 @@ function App() {
     if (!supabase) return
     setAuthLoading(true)
     setAuthError('')
-    const { error } = await supabase.auth.signUp({ email, password })
+    const { data, error } = await supabase.auth.signUp({ email, password })
     if (error) {
       setAuthError(error.message)
+    } else if (data.session) {
+      setAuthError('')
     } else {
-      setAuthError('Check your email to confirm your account if confirmation is enabled.')
+      setAuthError(
+        'Account created. If email confirmation is enabled in Supabase, confirm your email before signing in. New accounts start as pending staff until an admin activates them.',
+      )
     }
     setAuthLoading(false)
   }
@@ -550,6 +584,8 @@ function App() {
   const hasAppAccess = profile ? isProfileAccessAllowed(profile) : false
   const showAuthView = authReady && (!isSupabaseConfigured || !session)
   const showProfileLoading = authReady && session && profileLoading
+  const showProfileError =
+    authReady && session && !profileLoading && !profile && Boolean(profileError)
   const showPendingView =
     authReady && session && !profileLoading && profile && !hasAppAccess && profileStatus === STATUS.PENDING
   const showDisabledView =
@@ -578,6 +614,15 @@ function App() {
         <section className="auth-card" aria-live="polite">
           <p className="progress">Loading your profile…</p>
         </section>
+      )}
+
+      {showProfileError && (
+        <AccessBlockedView
+          title="Profile unavailable"
+          message={`Signed in, but your user profile could not be loaded: ${profileError}. Confirm Email auth is enabled, that a user_profiles row exists for this account, and that RLS allows reading your own profile.`}
+          onSignOut={signOut}
+          isLoading={authLoading}
+        />
       )}
 
       {showPendingView && (
@@ -639,10 +684,10 @@ function App() {
           cloudVisitorRecords={cloudVisitorRecords}
           cloudSsspRecords={cloudSsspRecords}
           ssspLoading={ssspLoading}
-          equipment={cloudEquipment}
+          equipment={mergedEquipment}
           defectRecords={cloudDefectRecords}
           localDefectRecords={localDefectRecords}
-          documentRecords={cloudDocumentRecords}
+          documentRecords={mergedDocumentRecords}
           generalMeetings={generalMeetings}
           cloudGeneralMeetings={cloudGeneralMeetings}
         />
@@ -744,7 +789,7 @@ function App() {
           profile={profile}
           cloudPreStarts={cloudPreStarts}
           setCloudPreStarts={setCloudPreStarts}
-          equipment={cloudEquipment}
+          equipment={mergedEquipment}
           defectRecords={cloudDefectRecords}
           localDefectRecords={localDefectRecords}
         />
@@ -834,7 +879,7 @@ function App() {
           profile={profile}
           ssspRecords={cloudSsspRecords}
           setSsspRecords={setCloudSsspRecords}
-          equipment={cloudEquipment}
+          equipment={mergedEquipment}
           initialCloudId={ssspNavOptions.ssspCloudId}
           initialMode={ssspNavOptions.ssspMode ?? 'view'}
         />
@@ -880,12 +925,18 @@ function App() {
           user={session?.user ?? null}
           profile={profile}
           settings={settings}
-          equipment={cloudEquipment}
-          setEquipment={setCloudEquipment}
-          serviceRecords={cloudServiceRecords}
-          setServiceRecords={setCloudServiceRecords}
-          documentRecords={cloudDocumentRecords}
-          setDocumentRecords={setCloudDocumentRecords}
+          cloudEquipment={cloudEquipment}
+          setCloudEquipment={setCloudEquipment}
+          localEquipment={localEquipment}
+          setLocalEquipment={setLocalEquipment}
+          cloudServiceRecords={cloudServiceRecords}
+          setCloudServiceRecords={setCloudServiceRecords}
+          localServiceRecords={localServiceRecords}
+          setLocalServiceRecords={setLocalServiceRecords}
+          cloudDocumentRecords={cloudDocumentRecords}
+          setCloudDocumentRecords={setCloudDocumentRecords}
+          localDocumentRecords={localDocumentRecords}
+          setLocalDocumentRecords={setLocalDocumentRecords}
           defectRecords={cloudDefectRecords}
           setDefectRecords={setCloudDefectRecords}
           localDefectRecords={localDefectRecords}
@@ -901,12 +952,18 @@ function App() {
           user={session?.user ?? null}
           profile={profile}
           settings={settings}
-          equipment={cloudEquipment}
-          setEquipment={setCloudEquipment}
-          serviceRecords={cloudServiceRecords}
-          setServiceRecords={setCloudServiceRecords}
-          documentRecords={cloudDocumentRecords}
-          setDocumentRecords={setCloudDocumentRecords}
+          equipment={mergedEquipment}
+          setCloudEquipment={setCloudEquipment}
+          localEquipment={localEquipment}
+          setLocalEquipment={setLocalEquipment}
+          serviceRecords={mergedServiceRecords}
+          setCloudServiceRecords={setCloudServiceRecords}
+          localServiceRecords={localServiceRecords}
+          setLocalServiceRecords={setLocalServiceRecords}
+          documentRecords={mergedDocumentRecords}
+          setCloudDocumentRecords={setCloudDocumentRecords}
+          localDocumentRecords={localDocumentRecords}
+          setLocalDocumentRecords={setLocalDocumentRecords}
           defectRecords={cloudDefectRecords}
           setDefectRecords={setCloudDefectRecords}
           localDefectRecords={localDefectRecords}

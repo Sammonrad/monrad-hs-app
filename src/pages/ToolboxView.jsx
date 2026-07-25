@@ -63,6 +63,7 @@ export function ToolboxView({
   const [completedRecord, setCompletedRecord] = useState(null)
   const [fieldErrors, setFieldErrors] = useState({})
   const [completedSyncStatus, setCompletedSyncStatus] = useState(null)
+  const [completedCloudError, setCompletedCloudError] = useState('')
   const [cloudLoadWarning, setCloudLoadWarning] = useState(null)
   const [cloudSaving, setCloudSaving] = useState(false)
   const recordRef = useRef(null)
@@ -212,6 +213,7 @@ export function ToolboxView({
     if (error) {
       patchSavedToolboxRecord(record.id, { syncStatus: SYNC_STATUS.CLOUD_FAILED })
       setCompletedSyncStatus(SYNC_STATUS.CLOUD_FAILED)
+      setCompletedCloudError(error.message)
       return
     }
 
@@ -221,6 +223,7 @@ export function ToolboxView({
     }
     patchSavedToolboxRecord(record.id, cloudPatch)
     setCompletedSyncStatus(SYNC_STATUS.CLOUD)
+    setCompletedCloudError('')
 
     if (cloudRecord) {
       setCloudToolboxRecords((prev) => {
@@ -380,7 +383,14 @@ export function ToolboxView({
             </p>
           ) : (
             completedSyncStatus && (
-              <CloudSyncBadge syncStatus={completedSyncStatus} className="cloud-sync-status--block" />
+              <>
+                <CloudSyncBadge syncStatus={completedSyncStatus} className="cloud-sync-status--block" />
+                {completedCloudError && (
+                  <p className="validation-message validation-message--error" role="alert">
+                    {completedCloudError}
+                  </p>
+                )}
+              </>
             )
           )}
 

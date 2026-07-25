@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Plus, Search } from 'lucide-react'
+import { Archive, CheckCircle2, Clock3, FileCheck2, FileText, Plus, Search, Send } from 'lucide-react'
 import { BackButton } from '../components/BackButton.jsx'
 import { FormPageHeader } from '../components/forms/FormPageHeader.jsx'
 import { PrintableSSSP } from '../components/PrintableSSSP.jsx'
@@ -51,6 +51,27 @@ export function SsspDashboardView({
       }),
     [ssspRecords, activeTab, search, isAdmin],
   )
+
+  const statusSummary = useMemo(() => {
+    const counts = { total: ssspRecords.length, drafts: 0, review: 0, approved: 0, submitted: 0, archived: 0 }
+    ssspRecords.forEach((record) => {
+      if (record.status === SSSP_STATUS.DRAFT) counts.drafts += 1
+      if (record.status === SSSP_STATUS.READY_FOR_REVIEW) counts.review += 1
+      if (record.status === SSSP_STATUS.APPROVED) counts.approved += 1
+      if (record.status === SSSP_STATUS.SUBMITTED) counts.submitted += 1
+      if (record.status === SSSP_STATUS.ARCHIVED) counts.archived += 1
+    })
+    return counts
+  }, [ssspRecords])
+
+  const summaryCards = [
+    { label: 'All plans', value: statusSummary.total, icon: FileText, tab: 'all' },
+    { label: 'Drafts', value: statusSummary.drafts, icon: Clock3, tab: 'drafts' },
+    { label: 'Awaiting review', value: statusSummary.review, icon: FileCheck2, tab: 'ready_for_review' },
+    { label: 'Approved', value: statusSummary.approved, icon: CheckCircle2, tab: 'approved' },
+    { label: 'Submitted', value: statusSummary.submitted, icon: Send, tab: 'submitted' },
+    { label: 'Archived', value: statusSummary.archived, icon: Archive, tab: 'archived', adminOnly: true },
+  ].filter((item) => !item.adminOnly || isAdmin)
 
   function openRecord(record, mode = 'view') {
     onNavigate('sssp-editor', { ssspCloudId: record.cloudId, ssspMode: mode })
@@ -111,7 +132,7 @@ export function SsspDashboardView({
 
       <FormPageHeader
         title="Site-Specific Safety Plans"
-        subtitle="Planning & documentation — SSSP register"
+        subtitle="Create, review and manage project safety plans"
       />
 
       {actionError && (
@@ -127,6 +148,15 @@ export function SsspDashboardView({
       {isLoading && <p className="progress">Loading SSSPs…</p>}
 
       <div className="sssp-dashboard">
+        <section className="sssp-dashboard__summary" aria-label="SSSP status summary">
+          {summaryCards.map(({ label, value, icon: Icon, tab }) => (
+            <button key={label} type="button" className="sssp-summary-card" onClick={() => setActiveTab(tab)}>
+              <Icon size={18} aria-hidden="true" />
+              <span className="sssp-summary-card__value">{value}</span>
+              <span className="sssp-summary-card__label">{label}</span>
+            </button>
+          ))}
+        </section>
         <div className="sssp-dashboard__toolbar">
           {isAdmin && (
             <button type="button" className="btn btn--primary" onClick={startNew}>

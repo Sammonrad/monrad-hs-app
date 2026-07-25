@@ -1,10 +1,25 @@
 /**
  * Supabase table: public.machine_document_records
+ * Local fallback key: monrad-earthworx-machine-document-records
  */
 
+import { MACHINE_DOCUMENT_RECORDS_KEY } from '../../constants/storageKeys.js'
 import { supabase, isSupabaseConfigured } from '../supabaseClient.js'
 import { createRecordId } from '../ids.js'
-import { SYNC_STATUS } from './cloudSyncStatus.js'
+import {
+  SYNC_STATUS,
+  withSyncStatus,
+  isCloudSaveUnavailable,
+  getUnavailableSyncStatus,
+  formatCloudSaveError,
+} from './cloudSyncStatus.js'
+
+export {
+  SYNC_STATUS,
+  isCloudSaveUnavailable,
+  getUnavailableSyncStatus,
+  formatCloudSaveError,
+} from './cloudSyncStatus.js'
 
 export function createEmptyDocumentRecord(equipmentId = '') {
   return {
@@ -21,7 +36,8 @@ export function createEmptyDocumentRecord(equipmentId = '') {
     notes: '',
     createdAt: new Date().toISOString(),
     updatedAt: null,
-    syncStatus: SYNC_STATUS.CLOUD,
+    syncStatus: null,
+    storageSource: 'local',
   }
 }
 
@@ -34,17 +50,39 @@ export function normalizeDocumentRecord(record) {
   }
 }
 
+export function loadLocalDocumentRecords() {
+  try {
+    const raw = localStorage.getItem(MACHINE_DOCUMENT_RECORDS_KEY)
+    if (!raw) return []
+    const parsed = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return []
+    return parsed.map(normalizeDocumentRecord)
+  } catch {
+    return []
+  }
+}
+
+export function persistLocalDocumentRecords(records) {
+  try {
+    localStorage.setItem(MACHINE_DOCUMENT_RECORDS_KEY, JSON.stringify(records))
+    return true
+  } catch {
+    return false
+  }
+}
+
 function blankToNull(value) {
   if (value === '' || value == null) return null
   return value
 }
 
 function withCloudOwnership(record, row) {
-  return {
+  return withSyncStatus({
     ...record,
     cloudId: row.id,
+    storageSource: 'cloud',
     syncStatus: SYNC_STATUS.CLOUD,
-  }
+  })
 }
 
 export function mapDocumentToRow(record) {
@@ -83,6 +121,89 @@ export function rowToDocumentRecord(row) {
       row,
     ),
   )
+}
+
+function documentDedupeKey(record) {
+  return [
+    record.equipmentId,
+    record.documentType,
+    record.documentTitle,
+    record.referenceNumber,
+    record.expiryDate,
+  ]
+    .map((part) => String(part ?? '').trim().toLowerCase())
+    .join('|')
+}
+
+export function mergeDocumentRecords(localRecords, cloudRecords) {
+  const byId = new Map()
+  const byCloudId = new Map()
+  const byDedupe = new Map()
+
+  function register(record, source) {
+    const entry = withSyncStatus({
+      ...normalizeDocumentRecord(record),
+      storageSource:
+        record.storageSource === 'cloud' && source === 'local'
+          ? 'both'
+          : record.storageSource === 'local' && source === 'cloud'
+            ? 'both'
+            : source,
+    })
+    if (entry.cloudId && entry.syncStatus !== SYNC_STATUS.CLOUD_FAILED) {
+      entry.syncStatus = SYNC_STATUS.CLOUD
+    }
+    byId.set(entry.id, entry)
+    if (entry.cloudId) byCloudId.set(entry.cloudId, entry)
+    byDedupe.set(documentDedupeKey(entry), entry)
+    return entry
+  }
+
+  localRecords.forEach((record) => {
+    register({ ...record, storageSource: record.cloudId ? 'both' : 'local' }, 'local')
+  })
+
+  cloudRecords.forEach((cloudRecord) => {
+    const cloudId = cloudRecord.cloudId
+    if (cloudId && byCloudId.has(cloudId)) {
+      const existing = byCloudId.get(cloudId)
+      const merged = withSyncStatus({
+        ...existing,
+        ...cloudRecord,
+        id: existing.id,
+        cloudId,
+        storageSource: 'both',
+        syncStatus: SYNC_STATUS.CLOUD,
+      })
+      byId.set(existing.id, merged)
+      byCloudId.set(cloudId, merged)
+      return
+    }
+
+    const key = documentDedupeKey(cloudRecord)
+    if (key && byDedupe.has(key)) {
+      const existing = byDedupe.get(key)
+      const merged = withSyncStatus({
+        ...existing,
+        ...cloudRecord,
+        id: existing.id,
+        cloudId: cloudId ?? existing.cloudId,
+        storageSource: 'both',
+        syncStatus: SYNC_STATUS.CLOUD,
+      })
+      byId.set(existing.id, merged)
+      if (merged.cloudId) byCloudId.set(merged.cloudId, merged)
+      return
+    }
+
+    register(cloudRecord, 'cloud')
+  })
+
+  return [...byId.values()]
+}
+
+export function getMergedDocumentRecords(localRecords, cloudRecords) {
+  return mergeDocumentRecords(localRecords ?? [], cloudRecords ?? [])
 }
 
 export async function fetchDocumentRecords(userId) {

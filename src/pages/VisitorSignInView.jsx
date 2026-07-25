@@ -28,6 +28,7 @@ import {
 } from '../utils/storage/visitorSignInStorage.js'
 import {
   fetchVisitorSignInRecords,
+  formatCloudSaveError,
   getMergedVisitorRecords,
   getUnavailableSyncStatus,
   isCloudSaveUnavailable,
@@ -102,6 +103,7 @@ export function VisitorSignInView({
   const [submitting, setSubmitting] = useState(false)
   const [signInSuccess, setSignInSuccess] = useState(null)
   const [completedSyncStatus, setCompletedSyncStatus] = useState(null)
+  const [completedCloudError, setCompletedCloudError] = useState('')
   const [cloudLoadWarning, setCloudLoadWarning] = useState(null)
   const [signingOutId, setSigningOutId] = useState(null)
   const [historySearch, setHistorySearch] = useState('')
@@ -164,7 +166,7 @@ export function VisitorSignInView({
 
       if (error) {
         setCloudLoadWarning(
-          `Could not load cloud visitor records: ${error.message}. Showing device records only.`,
+          `Could not load cloud visitor records: ${formatCloudSaveError(error)}. Showing device records only.`,
         )
         return
       }
@@ -308,6 +310,7 @@ export function VisitorSignInView({
     if (error) {
       patchLocalRecord(record.id, { syncStatus: SYNC_STATUS.CLOUD_FAILED })
       setCompletedSyncStatus(SYNC_STATUS.CLOUD_FAILED)
+      setCompletedCloudError(formatCloudSaveError(error))
       return
     }
 
@@ -318,6 +321,7 @@ export function VisitorSignInView({
       storageSource: 'both',
     })
     setCompletedSyncStatus(SYNC_STATUS.CLOUD)
+    setCompletedCloudError('')
 
     if (cloudRecord) {
       setCloudVisitorRecords((prev) => {
@@ -364,6 +368,7 @@ export function VisitorSignInView({
     if (error) {
       patchLocalRecord(visitor.id, { ...patch, syncStatus: SYNC_STATUS.CLOUD_FAILED })
       setSigningOutId(null)
+      window.alert(`Cloud sign-out failed — saved on this device.\n\n${formatCloudSaveError(error)}`)
       return
     }
 
@@ -604,7 +609,14 @@ export function VisitorSignInView({
                 <p className="cloud-sync-status cloud-sync-status--pending">Signing in…</p>
               ) : (
                 completedSyncStatus && (
-                  <CloudSyncBadge syncStatus={completedSyncStatus} className="cloud-sync-status--block" />
+                  <>
+                    <CloudSyncBadge syncStatus={completedSyncStatus} className="cloud-sync-status--block" />
+                    {completedCloudError && (
+                      <p className="validation-message validation-message--error" role="alert">
+                        {completedCloudError}
+                      </p>
+                    )}
+                  </>
                 )
               )}
             </div>

@@ -130,6 +130,7 @@ export function DefectForm({
   onSave,
   onCancel,
   saving,
+  saveError,
   isAdmin,
   operatorOptions = [],
   readOnlyResolve = false,
@@ -150,6 +151,7 @@ export function DefectForm({
 
   return (
     <form className="equipment-form" onSubmit={handleSubmit} noValidate>
+      {saveError && <p className="validation-message validation-message--error">{saveError}</p>}
       {form.severity === 'Critical' && (
         <div className="equipment-critical-warning" role="alert">
           Critical defect — consider marking the machine Out of Service until resolved.
@@ -257,7 +259,7 @@ export function DefectForm({
   )
 }
 
-export function ServiceForm({ initial, equipment = [], onSave, onCancel, saving }) {
+export function ServiceForm({ initial, equipment = [], onSave, onCancel, saving, saveError }) {
   const [form, setForm] = useState(() => ({ ...createEmptyServiceRecord(), ...initial }))
 
   function updateField(field, value) {
@@ -266,6 +268,7 @@ export function ServiceForm({ initial, equipment = [], onSave, onCancel, saving 
 
   return (
     <form className="equipment-form" onSubmit={(e) => { e.preventDefault(); onSave(form) }} noValidate>
+      {saveError && <p className="validation-message validation-message--error">{saveError}</p>}
       <FormGrid>
         <FormField label="Machine / equipment" required>
           <EquipmentSelector
@@ -325,7 +328,7 @@ export function ServiceForm({ initial, equipment = [], onSave, onCancel, saving 
   )
 }
 
-export function DocumentForm({ initial, equipment = [], onSave, onCancel, saving }) {
+export function DocumentForm({ initial, equipment = [], onSave, onCancel, saving, saveError }) {
   const [form, setForm] = useState(() => ({ ...createEmptyDocumentRecord(), ...initial }))
 
   function updateField(field, value) {
@@ -334,6 +337,7 @@ export function DocumentForm({ initial, equipment = [], onSave, onCancel, saving
 
   return (
     <form className="equipment-form" onSubmit={(e) => { e.preventDefault(); onSave(form) }} noValidate>
+      {saveError && <p className="validation-message validation-message--error">{saveError}</p>}
       <FormGrid>
         <FormField label="Machine / equipment" required>
           <EquipmentSelector

@@ -67,6 +67,7 @@ export function TimesheetView({
   const [completedRecord, setCompletedRecord] = useState(null)
   const [fieldErrors, setFieldErrors] = useState({})
   const [completedSyncStatus, setCompletedSyncStatus] = useState(null)
+  const [completedCloudError, setCompletedCloudError] = useState('')
   const [cloudLoadWarning, setCloudLoadWarning] = useState(null)
   const [cloudSaving, setCloudSaving] = useState(false)
   const [chargeableEdited, setChargeableEdited] = useState(false)
@@ -240,6 +241,7 @@ export function TimesheetView({
     setSavedRecords(nextRecords)
     setCompletedRecord(record)
     setCompletedSyncStatus(null)
+    setCompletedCloudError('')
 
     if (isCloudSaveUnavailable(user)) {
       const syncStatus = getUnavailableSyncStatus(user)
@@ -255,6 +257,7 @@ export function TimesheetView({
     if (error) {
       patchSavedTimesheetRecord(record.id, { syncStatus: SYNC_STATUS.CLOUD_FAILED })
       setCompletedSyncStatus(SYNC_STATUS.CLOUD_FAILED)
+      setCompletedCloudError(error.message)
       return
     }
 
@@ -264,6 +267,7 @@ export function TimesheetView({
     }
     patchSavedTimesheetRecord(record.id, cloudPatch)
     setCompletedSyncStatus(SYNC_STATUS.CLOUD)
+    setCompletedCloudError('')
 
     if (cloudRecord) {
       setCloudTimesheets((prev) => {
@@ -455,7 +459,14 @@ export function TimesheetView({
             </p>
           ) : (
             completedSyncStatus && (
-              <TimesheetCloudSyncBadge syncStatus={completedSyncStatus} className="cloud-sync-status--block" />
+              <>
+                <TimesheetCloudSyncBadge syncStatus={completedSyncStatus} className="cloud-sync-status--block" />
+                {completedCloudError && (
+                  <p className="validation-message validation-message--error" role="alert">
+                    {completedCloudError}
+                  </p>
+                )}
+              </>
             )
           )}
 

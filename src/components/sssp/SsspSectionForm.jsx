@@ -101,6 +101,17 @@ export function SsspSectionNav({ sections, activeSectionId, onSelect, recordData
   }
 
   return (
+    <>
+    <label className="sssp-section-select">
+      <span>SSSP section</span>
+      <select value={activeSectionId} onChange={(event) => onSelect(event.target.value)}>
+        {sections.map((section, index) => (
+          <option key={section.id} value={section.id}>
+            {index + 1}. {section.title}{sectionComplete(section) ? ' — complete' : ''}
+          </option>
+        ))}
+      </select>
+    </label>
     <nav className="sssp-section-nav" aria-label="SSSP sections">
       {sections.map((section, index) => {
         const complete = sectionComplete(section)
@@ -110,12 +121,15 @@ export function SsspSectionNav({ sections, activeSectionId, onSelect, recordData
             type="button"
             className={`sssp-section-nav__btn${activeSectionId === section.id ? ' sssp-section-nav__btn--active' : ''}${complete ? ' sssp-section-nav__btn--complete' : ''}`}
             onClick={() => onSelect(section.id)}
+            aria-current={activeSectionId === section.id ? 'step' : undefined}
           >
             <span className="sssp-section-nav__num">{index + 1}</span>
             <span className="sssp-section-nav__label">{section.shortTitle ?? section.title}</span>
+            <span className="sssp-section-nav__state" aria-hidden="true">{complete ? '✓' : ''}</span>
           </button>
         )
       })}
     </nav>
+    </>
   )
 }

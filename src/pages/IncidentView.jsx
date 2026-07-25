@@ -66,6 +66,7 @@ export function IncidentView({
   const [completedRecord, setCompletedRecord] = useState(null)
   const [fieldErrors, setFieldErrors] = useState({})
   const [completedSyncStatus, setCompletedSyncStatus] = useState(null)
+  const [completedCloudError, setCompletedCloudError] = useState('')
   const [cloudLoadWarning, setCloudLoadWarning] = useState(null)
   const [cloudSaving, setCloudSaving] = useState(false)
   const recordRef = useRef(null)
@@ -221,6 +222,7 @@ export function IncidentView({
     if (error) {
       patchSavedIncidentRecord(record.id, { syncStatus: SYNC_STATUS.CLOUD_FAILED })
       setCompletedSyncStatus(SYNC_STATUS.CLOUD_FAILED)
+      setCompletedCloudError(error.message)
       return
     }
 
@@ -230,6 +232,7 @@ export function IncidentView({
     }
     patchSavedIncidentRecord(record.id, cloudPatch)
     setCompletedSyncStatus(SYNC_STATUS.CLOUD)
+    setCompletedCloudError('')
 
     if (cloudRecord) {
       setCloudIncidents((prev) => {
@@ -425,7 +428,14 @@ export function IncidentView({
             </p>
           ) : (
             completedSyncStatus && (
-              <CloudSyncBadge syncStatus={completedSyncStatus} className="cloud-sync-status--block" />
+              <>
+                <CloudSyncBadge syncStatus={completedSyncStatus} className="cloud-sync-status--block" />
+                {completedCloudError && (
+                  <p className="validation-message validation-message--error" role="alert">
+                    {completedCloudError}
+                  </p>
+                )}
+              </>
             )
           )}
 

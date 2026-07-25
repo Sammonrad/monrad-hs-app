@@ -1,5 +1,6 @@
 import { EquipmentStatusBadge } from './EquipmentStatusBadge.jsx'
 import { MaintenanceDueBadge } from './MaintenanceDueBadge.jsx'
+import { CloudSyncBadge } from '../CloudSyncBadge.jsx'
 import { getEquipmentMakeModel, getEquipmentReadableName } from '../../constants/equipmentConfig.js'
 import { getOpenDefectCountForEquipment } from '../../utils/storage/equipmentDefectStorage.js'
 
@@ -16,7 +17,10 @@ export function EquipmentSummaryCard({ equipment, defectRecords = [], onView, on
             {equipment.assetType || '—'} · {getEquipmentMakeModel(equipment)}
           </p>
         </div>
-        <EquipmentStatusBadge status={equipment.operationalStatus} />
+        <div className="equipment-summary-card__badge-row">
+          <EquipmentStatusBadge status={equipment.operationalStatus} />
+          <CloudSyncBadge syncStatus={equipment.syncStatus} size="small" />
+        </div>
       </header>
 
       <dl className="equipment-summary-card__details">

@@ -152,6 +152,25 @@ export function SsspEditorView({
   const validationForReady = useMemo(() => validateSsspRecord(record, 'ready'), [record])
   const validationForApproval = useMemo(() => validateSsspRecord(record, 'approval'), [record])
   const validationForSubmitted = useMemo(() => validateSsspRecord(record, 'submitted'), [record])
+  const activeSectionIndex = SSSP_SECTIONS.findIndex((section) => section.id === activeSection)
+  const completedSectionCount = useMemo(
+    () =>
+      SSSP_SECTIONS.filter((section) => {
+        if (section.isRiskRegister) return (record.hazards ?? []).some((hazard) => !hazard.archived)
+        const data = record.recordData?.[section.id]
+        if (section.repeatable) return Array.isArray(data) && data.length > 0
+        return section.fields?.some((field) => field.required && data?.[field.key]?.trim?.())
+      }).length,
+    [record.hazards, record.recordData],
+  )
+  const progressPercent = Math.round((completedSectionCount / SSSP_SECTIONS.length) * 100)
+
+  function selectAdjacentSection(direction) {
+    const nextSection = SSSP_SECTIONS[activeSectionIndex + direction]
+    if (!nextSection) return
+    setActiveSection(nextSection.id)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
 
   function updateRecord(patch) {
     setRecord((prev) => syncIndexedFieldsFromRecordData({ ...prev, ...patch }))
@@ -342,6 +361,27 @@ export function SsspEditorView({
       {loading && <p className="progress">Loading SSSP…</p>}
       {draftNotice && <p className="sssp-editor__draft-notice">{draftNotice}</p>}
 
+      <section className="sssp-editor__overview" aria-label="SSSP completion">
+        <div className="sssp-editor__overview-copy">
+          <div>
+            <span className="sssp-editor__eyebrow">Document progress</span>
+            <strong>{completedSectionCount} of {SSSP_SECTIONS.length} sections started</strong>
+          </div>
+          <span className={`sssp-status-badge sssp-status-badge--${record.status.replaceAll('_', '-')}`}>
+            {getSsspStatusLabel(record.status)}
+          </span>
+        </div>
+        <div
+          className="sssp-editor__progress-track"
+          role="progressbar"
+          aria-valuemin="0"
+          aria-valuemax="100"
+          aria-valuenow={progressPercent}
+        >
+          <span style={{ width: `${progressPercent}%` }} />
+        </div>
+      </section>
+
       {!readOnly && (
         <div className="sssp-editor__meta">
           <FormField label="SSSP number" required>
@@ -371,6 +411,7 @@ export function SsspEditorView({
 
       {errors.length > 0 && (
         <div className="validation-summary" role="alert">
+          <strong>Complete the following before continuing:</strong>
           {errors.map((err) => (
             <ValidationMessage key={err} message={err} />
           ))}
@@ -385,6 +426,7 @@ export function SsspEditorView({
 
       <div className="sssp-editor sssp-editor--layout">
         <aside className="sssp-editor__nav-panel">
+          <p className="sssp-editor__nav-title">Plan sections</p>
           <SsspSectionNav
           sections={SSSP_SECTIONS}
           activeSectionId={activeSection}
@@ -395,6 +437,10 @@ export function SsspEditorView({
         </aside>
 
         <div className="sssp-editor__content">
+          <header className="sssp-editor__section-header">
+            <span>Section {activeSectionIndex + 1} of {SSSP_SECTIONS.length}</span>
+            <h2>{SSSP_SECTIONS[activeSectionIndex]?.title}</h2>
+          </header>
           <SsspSectionForm
             sectionId={activeSection}
             recordData={record.recordData}
@@ -419,6 +465,26 @@ export function SsspEditorView({
               Action Register
             </button>
           </p>
+
+          <nav className="sssp-editor__section-actions" aria-label="Move between SSSP sections">
+            <button
+              type="button"
+              className="btn btn--secondary"
+              disabled={activeSectionIndex <= 0}
+              onClick={() => selectAdjacentSection(-1)}
+            >
+              Previous section
+            </button>
+            <span>{activeSectionIndex + 1} / {SSSP_SECTIONS.length}</span>
+            <button
+              type="button"
+              className="btn btn--secondary"
+              disabled={activeSectionIndex >= SSSP_SECTIONS.length - 1}
+              onClick={() => selectAdjacentSection(1)}
+            >
+              Next section
+            </button>
+          </nav>
         </div>
       </div>
 

@@ -1,26 +1,21 @@
 /**
  * Supabase table: public.visitor_sign_in_records
  *
- * Expected columns (create in Supabase if not exists):
- *   id              uuid PRIMARY KEY DEFAULT gen_random_uuid()
- *   user_id         uuid NOT NULL REFERENCES auth.users(id)  -- staff who signed visitor in
- *   record_data     jsonb NOT NULL                            -- full local record snapshot
- *   visitor_name    text
- *   site_name       text
- *   purpose         text
- *   company         text
- *   phone           text
- *   person_visited  text
- *   vehicle_reg     text
- *   arrival_time    timestamptz NOT NULL
- *   departure_time  timestamptz                               -- null = still on site
- *   signed_out_by   uuid REFERENCES auth.users(id)            -- staff who signed visitor out
- *   created_at      timestamptz DEFAULT now()
- *   updated_at      timestamptz DEFAULT now()
+ * Explicit columns only (no record_data jsonb):
+ *   id, visitor_name, company, phone, person_visiting, site_name, purpose,
+ *   vehicle_registration, arrival_time, departure_time,
+ *   induction_acknowledged, critical_risks_acknowledged,
+ *   emergency_procedure_acknowledged, ppe_acknowledged,
+ *   hazards_reported, notes, signed_in_by, signed_out_by, created_at, updated_at
  *
- * RLS (recommended): authenticated users with active profile can SELECT all rows;
- * INSERT/UPDATE allowed for authenticated users. Enforce via user_profiles check in policies.
- * All approved active users need shared visibility for roll-call / on-site lists.
+ * UI acknowledgement keys → columns:
+ *   siteRules → induction_acknowledged
+ *   ppeRequired → ppe_acknowledged
+ *   emergencyProcedures → emergency_procedure_acknowledged
+ *   criticalRisksReviewed → critical_risks_acknowledged
+ *
+ * RLS: authenticated active users SELECT/INSERT (signed_in_by = auth.uid());
+ * UPDATE allowed for sign-out; trigger limits staff to departure fields.
  */
 
 import { supabase, isSupabaseConfigured } from '../supabaseClient.js'
@@ -37,58 +32,69 @@ export {
   getSyncStatusLabel,
   getSyncStatusModifier,
   resolveRecordSyncStatus,
+  formatCloudSaveError,
 } from './cloudSyncStatus.js'
+
+function blankToNull(value) {
+  if (value == null) return null
+  const trimmed = String(value).trim()
+  return trimmed === '' ? null : trimmed
+}
 
 function withCloudOwnership(record, row) {
   return {
     ...record,
     cloudId: row.id,
-    cloudUserId: row.user_id ?? null,
+    cloudUserId: row.signed_in_by ?? null,
     storageSource: 'cloud',
     syncStatus: record.syncStatus ?? SYNC_STATUS.CLOUD,
   }
 }
 
+function acknowledgementsToColumns(acknowledgements) {
+  const ack = acknowledgements ?? {}
+  return {
+    induction_acknowledged: Boolean(ack.siteRules),
+    ppe_acknowledged: Boolean(ack.ppeRequired),
+    emergency_procedure_acknowledged: Boolean(ack.emergencyProcedures),
+    critical_risks_acknowledged: Boolean(ack.criticalRisksReviewed),
+  }
+}
+
+function columnsToAcknowledgements(row) {
+  return {
+    siteRules: Boolean(row.induction_acknowledged),
+    ppeRequired: Boolean(row.ppe_acknowledged),
+    emergencyProcedures: Boolean(row.emergency_procedure_acknowledged),
+    criticalRisksReviewed: Boolean(row.critical_risks_acknowledged),
+  }
+}
+
 export function mapVisitorToRow(record, userId) {
   const normalized = normalizeVisitorRecord(record)
+  const now = new Date().toISOString()
 
   return {
-    user_id: userId,
-    record_data: {
-      ...normalized,
-      syncStatus: normalized.syncStatus ?? SYNC_STATUS.CLOUD,
-    },
-    visitor_name: normalized.visitorName?.trim() || null,
-    site_name: normalized.siteName?.trim() || null,
-    purpose: normalized.purpose?.trim() || null,
-    company: normalized.company?.trim() || null,
-    phone: normalized.phone?.trim() || null,
-    person_visited: normalized.personVisited?.trim() || null,
-    vehicle_reg: normalized.vehicleReg?.trim() || null,
+    visitor_name: normalized.visitorName?.trim() || '',
+    company: blankToNull(normalized.company),
+    phone: blankToNull(normalized.phone),
+    person_visiting: blankToNull(normalized.personVisited),
+    site_name: normalized.siteName?.trim() || '',
+    purpose: blankToNull(normalized.purpose),
+    vehicle_registration: blankToNull(normalized.vehicleReg),
     arrival_time: normalized.arrivalTime,
     departure_time: normalized.departureTime || null,
+    ...acknowledgementsToColumns(normalized.acknowledgements),
+    hazards_reported: blankToNull(normalized.hazardsReported),
+    notes: blankToNull(normalized.notes),
+    signed_in_by: userId,
     signed_out_by: normalized.signedOutBy || null,
+    created_at: normalized.createdAt ?? normalized.arrivalTime ?? now,
+    updated_at: now,
   }
 }
 
 export function rowToVisitorRecord(row) {
-  const data = row.record_data
-  if (data && typeof data === 'object' && data.visitorName != null) {
-    return withSyncStatus(
-      normalizeVisitorRecord(
-        withCloudOwnership(
-          {
-            ...data,
-            arrivalTime: row.arrival_time ?? data.arrivalTime,
-            departureTime: row.departure_time ?? data.departureTime ?? null,
-            signedOutBy: row.signed_out_by ?? data.signedOutBy ?? null,
-          },
-          row,
-        ),
-      ),
-    )
-  }
-
   return withSyncStatus(
     normalizeVisitorRecord(
       withCloudOwnership(
@@ -99,14 +105,14 @@ export function rowToVisitorRecord(row) {
           purpose: row.purpose ?? '',
           company: row.company ?? '',
           phone: row.phone ?? '',
-          personVisited: row.person_visited ?? '',
-          vehicleReg: row.vehicle_reg ?? '',
-          hazardsReported: '',
-          notes: '',
+          personVisited: row.person_visiting ?? '',
+          vehicleReg: row.vehicle_registration ?? '',
+          hazardsReported: row.hazards_reported ?? '',
+          notes: row.notes ?? '',
           arrivalTime: row.arrival_time ?? row.created_at ?? new Date().toISOString(),
           departureTime: row.departure_time ?? null,
           signedOutBy: row.signed_out_by ?? null,
-          acknowledgements: {},
+          acknowledgements: columnsToAcknowledgements(row),
           declarationName: '',
           createdAt: row.created_at ?? new Date().toISOString(),
         },
@@ -273,22 +279,12 @@ export async function updateVisitorSignInRecord(user, record) {
     return saveVisitorSignInRecord(user, record)
   }
 
-  const row = mapVisitorToRow(record, userId)
-
+  // Sign-out path: only columns staff are allowed to change (RLS trigger).
   const { data, error } = await supabase
     .from('visitor_sign_in_records')
     .update({
-      record_data: row.record_data,
-      visitor_name: row.visitor_name,
-      site_name: row.site_name,
-      purpose: row.purpose,
-      company: row.company,
-      phone: row.phone,
-      person_visited: row.person_visited,
-      vehicle_reg: row.vehicle_reg,
-      arrival_time: row.arrival_time,
-      departure_time: row.departure_time,
-      signed_out_by: row.signed_out_by,
+      departure_time: record.departureTime || null,
+      signed_out_by: record.signedOutBy || userId,
       updated_at: new Date().toISOString(),
     })
     .eq('id', record.cloudId)

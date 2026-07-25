@@ -111,6 +111,11 @@ export function SsspAcknowledgementView({
 
       {record && (
         <section className="sssp-acknowledge">
+          <header className="sssp-acknowledge__header">
+            <span className="sssp-acknowledge__eyebrow">Current plan</span>
+            <h2>{record.project || 'Site-Specific Safety Plan'}</h2>
+            <p>Review the plan details and confirm the current revision below.</p>
+          </header>
           <dl className="sssp-acknowledge__summary">
             <div><dt>SSSP</dt><dd>{record.ssspNumber}</dd></div>
             <div><dt>Project</dt><dd>{record.project}</dd></div>

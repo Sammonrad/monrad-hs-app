@@ -83,6 +83,7 @@ export function PreStartView({
   const [completedRecord, setCompletedRecord] = useState(null)
   const [fieldErrors, setFieldErrors] = useState({})
   const [completedSyncStatus, setCompletedSyncStatus] = useState(null)
+  const [completedCloudError, setCompletedCloudError] = useState('')
   const [cloudLoadWarning, setCloudLoadWarning] = useState(null)
   const [cloudSaving, setCloudSaving] = useState(false)
   const [selectedEquipmentId, setSelectedEquipmentId] = useState('')
@@ -339,6 +340,7 @@ export function PreStartView({
     setSavedRecords(nextRecords)
     setCompletedRecord(record)
     setCompletedSyncStatus(null)
+    setCompletedCloudError('')
     onRecordSaved?.(record)
 
     if (isCloudSaveUnavailable(user)) {
@@ -355,6 +357,7 @@ export function PreStartView({
     if (error) {
       patchSavedPreStartRecord(record.id, { syncStatus: SYNC_STATUS.CLOUD_FAILED })
       setCompletedSyncStatus(SYNC_STATUS.CLOUD_FAILED)
+      setCompletedCloudError(error.message)
       return
     }
 
@@ -364,6 +367,7 @@ export function PreStartView({
     }
     patchSavedPreStartRecord(record.id, cloudPatch)
     setCompletedSyncStatus(SYNC_STATUS.CLOUD)
+    setCompletedCloudError('')
 
     if (cloudRecord) {
       setCloudPreStarts((prev) => {
@@ -663,7 +667,14 @@ export function PreStartView({
             </p>
           ) : (
             completedSyncStatus && (
-              <CloudSyncBadge syncStatus={completedSyncStatus} className="cloud-sync-status--block" />
+              <>
+                <CloudSyncBadge syncStatus={completedSyncStatus} className="cloud-sync-status--block" />
+                {completedCloudError && (
+                  <p className="validation-message validation-message--error" role="alert">
+                    {completedCloudError}
+                  </p>
+                )}
+              </>
             )
           )}
 

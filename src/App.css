@@ -78,7 +78,7 @@
 }
 
 html {
-  overflow-x: hidden;
+  max-width: 100%;
 }
 
 body {
@@ -87,7 +87,7 @@ body {
   background: var(--bg-app);
   color: var(--text-primary);
   -webkit-font-smoothing: antialiased;
-  overflow-x: hidden;
+  max-width: 100%;
 }
 
 .app {
@@ -95,7 +95,8 @@ body {
   margin: 0 auto;
   padding: var(--spacing-lg) var(--spacing-md) var(--spacing-2xl);
   min-height: 100dvh;
-  overflow-x: hidden;
+  width: 100%;
+  min-width: 0;
 }
 
 .back-btn {
@@ -757,6 +758,13 @@ body {
   margin: 0.5rem 0 1rem;
   font-size: 0.9rem;
   line-height: 1.4;
+  color: var(--text-muted);
+}
+
+.auth-card__hint {
+  margin: 0 0 1rem;
+  font-size: 0.85rem;
+  line-height: 1.45;
   color: var(--text-muted);
 }
 
@@ -5303,7 +5311,11 @@ body {
 }
 
 .data-table-scroll {
+  width: 100%;
+  max-width: 100%;
   overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  -webkit-overflow-scrolling: touch;
   border: 1px solid var(--border-subtle);
   border-radius: var(--card-radius);
   background: var(--bg-card);
@@ -5443,6 +5455,7 @@ body {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  max-width: 100%;
 }
 
 .side-menu__item--active {
@@ -6114,11 +6127,23 @@ body {
 
 .equipment-summary-card__actions {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--spacing-sm);
 }
 
 .equipment-summary-card__actions .btn {
   min-height: var(--tap-min);
+}
+
+.equipment-section__subtitle {
+  margin: var(--spacing-lg) 0 var(--spacing-sm);
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.equipment-section__subtitle:first-child {
+  margin-top: 0;
 }
 
 .equipment-modal-overlay {
@@ -6282,9 +6307,344 @@ body {
   margin-bottom: var(--spacing-sm);
 }
 
+.equipment-defect-card header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--spacing-sm);
+  margin-bottom: 0.35rem;
+}
+
+.equipment-defect-card .btn {
+  min-height: var(--tap-min);
+  margin-top: var(--spacing-sm);
+}
+
 .equipment-defect-card--critical {
   border-color: #f5c2c7;
   background: #fff5f6;
+}
+
+/* SSSP workspace redesign */
+.sssp-dashboard__summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-lg);
+}
+
+.sssp-summary-card {
+  min-width: 0;
+  min-height: 5.25rem;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-rows: auto auto;
+  align-items: center;
+  gap: 0.1rem var(--spacing-sm);
+  padding: var(--spacing-md);
+  border: 1px solid var(--color-grey-300);
+  border-radius: var(--card-radius);
+  background: var(--color-white);
+  color: var(--text-primary);
+  text-align: left;
+  cursor: pointer;
+}
+
+.sssp-summary-card:hover,
+.sssp-summary-card:focus-visible {
+  border-color: var(--monrad-red);
+}
+
+.sssp-summary-card svg {
+  grid-row: 1 / 3;
+  color: var(--monrad-red);
+}
+
+.sssp-summary-card__value {
+  font-size: 1.35rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.sssp-summary-card__label {
+  color: var(--color-grey-700);
+  font-size: 0.76rem;
+}
+
+.sssp-card {
+  box-shadow: none;
+  border-left: 3px solid var(--monrad-red);
+}
+
+.sssp-section-select {
+  display: grid;
+  gap: var(--spacing-xs);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.sssp-section-select select {
+  width: 100%;
+  min-height: var(--tap-min);
+}
+
+.sssp-section-nav {
+  display: none;
+}
+
+.sssp-section-nav__state {
+  margin-left: auto;
+  color: #166534;
+  font-weight: 800;
+}
+
+.sssp-editor,
+.sssp-editor__content {
+  min-width: 0;
+}
+
+.sssp-editor__overview {
+  margin-bottom: var(--spacing-md);
+  padding: var(--spacing-md);
+  border: 1px solid var(--color-grey-300);
+  border-radius: var(--card-radius);
+  background: var(--color-white);
+}
+
+.sssp-editor__overview-copy {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--spacing-md);
+  margin-bottom: var(--spacing-sm);
+}
+
+.sssp-editor__overview-copy strong,
+.sssp-editor__eyebrow {
+  display: block;
+}
+
+.sssp-editor__eyebrow,
+.sssp-editor__section-header span,
+.sssp-acknowledge__eyebrow {
+  margin-bottom: 0.2rem;
+  color: var(--color-grey-600);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.sssp-editor__progress-track {
+  height: 0.45rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--color-grey-200);
+}
+
+.sssp-editor__progress-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--monrad-red);
+  transition: width 180ms ease;
+}
+
+.sssp-editor__nav-title {
+  display: none;
+}
+
+.sssp-editor__section-header {
+  margin-bottom: var(--spacing-md);
+  padding-bottom: var(--spacing-sm);
+  border-bottom: 1px solid var(--color-grey-200);
+}
+
+.sssp-editor__section-header h2 {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.sssp-editor__section-actions {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-lg);
+  padding-top: var(--spacing-md);
+  border-top: 1px solid var(--color-grey-200);
+  color: var(--color-grey-600);
+  font-size: 0.78rem;
+  text-align: center;
+}
+
+.sssp-editor__section-actions .btn:last-child {
+  justify-self: end;
+}
+
+.sssp-risk-register__card {
+  background: var(--color-white);
+  border-left: 3px solid var(--color-grey-400);
+}
+
+.sssp-risk-register__card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-sm);
+}
+
+.sssp-risk-register__card-header h4 {
+  margin: 0;
+}
+
+.sssp-risk-register__row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-xs);
+}
+
+.sssp-risk-register__row-actions button {
+  min-height: 2.25rem;
+}
+
+.sssp-acknowledge {
+  max-width: 54rem;
+  padding: var(--spacing-lg);
+  border: 1px solid var(--color-grey-300);
+  border-radius: var(--card-radius);
+  background: var(--color-white);
+}
+
+.sssp-acknowledge__header {
+  margin-bottom: var(--spacing-lg);
+  padding-bottom: var(--spacing-md);
+  border-bottom: 1px solid var(--color-grey-200);
+}
+
+.sssp-acknowledge__header h2,
+.sssp-acknowledge__header p {
+  margin: 0;
+}
+
+.sssp-acknowledge__header p {
+  margin-top: var(--spacing-xs);
+  color: var(--color-grey-700);
+}
+
+.sssp-acknowledge__summary {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.sssp-acknowledge__summary div {
+  min-width: 0;
+  padding: var(--spacing-sm);
+  border-radius: calc(var(--card-radius) * 0.7);
+  background: var(--color-grey-100);
+}
+
+.sssp-acknowledge__summary dt {
+  color: var(--color-grey-600);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.sssp-acknowledge__summary dd {
+  margin: 0.2rem 0 0;
+  overflow-wrap: anywhere;
+}
+
+@media (min-width: 640px) {
+  .sssp-dashboard__summary {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1024px) {
+  .sssp-dashboard__summary {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+
+  .sssp-section-select {
+    display: none;
+  }
+
+  .sssp-section-nav {
+    display: flex;
+  }
+
+  .sssp-editor__nav-panel {
+    padding: var(--spacing-md);
+    border: 1px solid var(--color-grey-300);
+    border-radius: var(--card-radius);
+    background: var(--color-white);
+  }
+
+  .sssp-editor__nav-title {
+    display: block;
+    margin: 0 0 var(--spacing-sm);
+    color: var(--color-grey-700);
+    font-size: 0.75rem;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .sssp-section-nav__btn {
+    border-color: transparent;
+    border-radius: calc(var(--card-radius) * 0.7);
+  }
+
+  .sssp-section-nav__btn--active {
+    border-color: rgba(196, 30, 58, 0.25);
+  }
+
+  .sssp-editor__content {
+    padding: var(--spacing-lg);
+    border: 1px solid var(--color-grey-300);
+    border-radius: var(--card-radius);
+    background: var(--color-white);
+  }
+
+  .sssp-risk-register__desktop {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .sssp-risk-register__table {
+    min-width: 72rem;
+  }
+
+  .sssp-risk-register__table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: var(--color-grey-100);
+  }
+}
+
+@media (max-width: 639px) {
+  .sssp-editor__section-actions {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .sssp-editor__section-actions span {
+    grid-column: 1 / -1;
+    grid-row: 1;
+  }
+
+  .sssp-acknowledge {
+    padding: var(--spacing-md);
+  }
+
+  .sssp-acknowledge__summary {
+    grid-template-columns: 1fr;
+  }
 }
 
 .print-equipment {
