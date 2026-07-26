@@ -41,6 +41,7 @@ export function mapMeetingToRow(record, userId) {
     next_meeting_date: normalized.nextMeetingDate?.trim() || null,
     schedule_frequency: normalized.scheduleFrequency?.trim() || null,
     updated_at: new Date().toISOString(),
+    ...(typeof normalized.archived === 'boolean' ? { archived: normalized.archived } : {}),
   }
 }
 
@@ -249,6 +250,7 @@ export async function updateGeneralMeetingRecord(user, record) {
       next_meeting_date: row.next_meeting_date,
       schedule_frequency: row.schedule_frequency,
       updated_at: row.updated_at,
+      ...(typeof row.archived === 'boolean' ? { archived: row.archived } : {}),
     })
     .eq('id', record.cloudId)
     .select()

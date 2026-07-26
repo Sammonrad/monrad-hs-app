@@ -111,6 +111,12 @@ export const NAV_ITEMS = {
     adminOnly: true,
     pageTitle: 'Admin Reports',
   },
+  'archived-records': {
+    id: 'archived-records',
+    title: 'Archived Records',
+    adminOnly: true,
+    pageTitle: 'Archived Records',
+  },
   'weekly-timesheet-summary': {
     id: 'weekly-timesheet-summary',
     title: 'Weekly Summary',
@@ -191,6 +197,7 @@ export const DESKTOP_SIDEBAR_GROUPS = [
       'records-dashboard',
       'action-register',
       'admin-reports',
+      'archived-records',
       'weekly-timesheet-summary',
     ],
   },
@@ -206,7 +213,13 @@ export const SIDEBAR_GROUPS = [
   {
     id: 'records-actions',
     title: 'Records & Actions',
-    cardIds: ['records-dashboard', 'action-register', 'admin-reports', 'weekly-timesheet-summary'],
+    cardIds: [
+      'records-dashboard',
+      'action-register',
+      'admin-reports',
+      'archived-records',
+      'weekly-timesheet-summary',
+    ],
   },
   {
     id: 'setup-admin',
@@ -356,6 +369,14 @@ export const DASHBOARD_CARDS = [
   {
     id: 'admin-reports',
     title: 'Admin Reports',
+    group: 'records-actions',
+    placement: 'sidebar',
+    available: true,
+    adminOnly: true,
+  },
+  {
+    id: 'archived-records',
+    title: 'Archived Records',
     group: 'records-actions',
     placement: 'sidebar',
     available: true,

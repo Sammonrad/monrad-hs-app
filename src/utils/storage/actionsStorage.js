@@ -41,6 +41,7 @@ export function normalizeAction(action) {
     completedAt:
       action.completedAt ??
       (status === 'completed' ? action.updatedAt ?? null : null),
+    ...(typeof action.archived === 'boolean' ? { archived: action.archived } : {}),
   }
   return normalized
 }

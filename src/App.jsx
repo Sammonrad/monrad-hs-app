@@ -9,6 +9,7 @@ import { BackupRestoreView } from './pages/BackupRestoreView.jsx'
 import { AccessBlockedView } from './pages/AccessBlockedView.jsx'
 import { StaffManagementView } from './pages/StaffManagementView.jsx'
 import { AdminReportsView } from './pages/AdminReportsView.jsx'
+import { ArchivedRecordsView } from './pages/ArchivedRecordsView.jsx'
 import { HelpAppSetupView } from './pages/HelpAppSetupView.jsx'
 import { SafetyAlertsView } from './pages/SafetyAlertsView.jsx'
 import { JobStartView } from './pages/JobStartView.jsx'
@@ -624,6 +625,12 @@ function App() {
     prevShowMainAppRef.current = showMainApp
   }, [showMainApp])
 
+  useEffect(() => {
+    if (currentView === 'archived-records' && !isAdminProfile(profile)) {
+      setCurrentView('dashboard')
+    }
+  }, [currentView, profile])
+
   return (
     <div className="app">
       {!authReady && (
@@ -785,6 +792,31 @@ function App() {
           onBack={goToDashboard}
           user={session?.user ?? null}
           profile={profile}
+        />
+      )}
+
+      {currentView === 'archived-records' && (
+        <ArchivedRecordsView
+          onBack={goToDashboard}
+          onNavigate={handleNavigate}
+          user={session?.user ?? null}
+          profile={profile}
+          savedRecords={savedRecords}
+          setSavedRecords={setSavedRecords}
+          actions={actions}
+          setActions={setActions}
+          visitorRecords={visitorRecords}
+          setVisitorRecords={setVisitorRecords}
+          setCloudEquipment={setCloudEquipment}
+          setCloudSsspRecords={setCloudSsspRecords}
+          setCloudGeneralMeetings={setCloudGeneralMeetings}
+          setCloudActions={setCloudActions}
+          setCloudVisitorRecords={setCloudVisitorRecords}
+          setCloudJobStarts={setCloudJobStarts}
+          setCloudPreStarts={setCloudPreStarts}
+          setCloudToolboxRecords={setCloudToolboxRecords}
+          setCloudIncidents={setCloudIncidents}
+          setCloudTimesheets={setCloudTimesheets}
         />
       )}
 

@@ -286,6 +286,7 @@ export async function updateActionRecord(user, action) {
         ? action.completedAt || row.completed_at || new Date().toISOString()
         : null,
       updated_at: new Date().toISOString(),
+      ...(typeof action.archived === 'boolean' ? { archived: action.archived } : {}),
     })
     .eq('id', action.cloudId)
     .select()

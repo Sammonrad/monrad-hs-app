@@ -93,6 +93,7 @@ export function normalizeVisitorRecord(record) {
     cloudUserId: record.cloudUserId ?? record.signed_in_by ?? null,
     storageSource: record.storageSource ?? (record.cloudId ? 'cloud' : 'local'),
     syncStatus: record.syncStatus ?? null,
+    ...(typeof record.archived === 'boolean' ? { archived: record.archived } : {}),
   }
 }
 

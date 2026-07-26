@@ -6952,3 +6952,44 @@ body {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+/* Archived Records (admin) */
+.archived-records__list {
+  margin-top: var(--spacing-md);
+}
+
+.archived-records__card {
+  margin-bottom: var(--spacing-sm);
+}
+
+.archived-records__type {
+  margin: 0 0 0.15rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--color-grey-600);
+}
+
+.archived-records__detail {
+  margin-bottom: var(--spacing-sm);
+  padding-top: var(--spacing-sm);
+  border-top: 1px solid var(--color-grey-200);
+}
+
+.archived-records__detail-dl {
+  margin-bottom: var(--spacing-sm);
+}
+
+.archived-records__detail-row {
+  display: contents;
+}
+
+.archived-records__detail-note {
+  margin: 0 0 var(--spacing-sm);
+}
+
+.archived-records__card .equipment-summary-card__actions .btn {
+  min-height: var(--tap-min);
+  min-width: var(--tap-min);
+}
