@@ -5,6 +5,7 @@ import {
   SYNC_STATUS,
   withSyncStatus,
 } from './cloudSyncStatus.js'
+import { ARCHIVE_RECORD_TYPES, filterArchived } from './archiveFilter.js'
 
 export {
   SYNC_STATUS,
@@ -43,6 +44,7 @@ function withCloudOwnership(record, row) {
     cloudUserId: row.user_id ?? null,
     storageSource: 'cloud',
     syncStatus: record.syncStatus ?? SYNC_STATUS.CLOUD,
+    ...(typeof row.archived === 'boolean' ? { archived: row.archived } : {}),
   }
 }
 
@@ -175,12 +177,13 @@ export function mergeTimesheetRecords(localTimesheets, cloudTimesheets) {
   return [...byId.values()].sort((a, b) => (b.submittedAt || '').localeCompare(a.submittedAt || ''))
 }
 
-export function getMergedTimesheetRecords(savedRecords, cloudTimesheets) {
+export function getMergedTimesheetRecords(savedRecords, cloudTimesheets, { includeArchived = false } = {}) {
   const localTimesheets = savedRecords.filter((record) => record.formType === 'timesheet')
-  return mergeTimesheetRecords(localTimesheets, cloudTimesheets ?? [])
+  const merged = mergeTimesheetRecords(localTimesheets, cloudTimesheets ?? [])
+  return filterArchived(merged, ARCHIVE_RECORD_TYPES.TIMESHEET, includeArchived)
 }
 
-export async function fetchTimesheetRecords(userId, { isAdmin = false } = {}) {
+export async function fetchTimesheetRecords(userId, { isAdmin = false, includeArchived = false } = {}) {
   if (!isSupabaseConfigured || !supabase || !userId) {
     return { records: [], error: null }
   }
@@ -201,7 +204,11 @@ export async function fetchTimesheetRecords(userId, { isAdmin = false } = {}) {
     return { records: [], error }
   }
 
-  const records = (data ?? []).map(rowToTimesheetRecord)
+  const records = filterArchived(
+    (data ?? []).map(rowToTimesheetRecord),
+    ARCHIVE_RECORD_TYPES.TIMESHEET,
+    includeArchived,
+  )
   return { records, error: null }
 }
 

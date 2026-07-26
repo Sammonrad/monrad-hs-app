@@ -5,6 +5,7 @@
 import { supabase, isSupabaseConfigured } from '../supabaseClient.js'
 import { normalizeMeeting } from './generalMeetingStorage.js'
 import { SYNC_STATUS, withSyncStatus } from './cloudSyncStatus.js'
+import { ARCHIVE_RECORD_TYPES, filterArchived } from './archiveFilter.js'
 
 export {
   SYNC_STATUS,
@@ -22,6 +23,7 @@ function withCloudOwnership(record, row) {
     cloudUserId: row.user_id ?? null,
     storageSource: 'cloud',
     syncStatus: SYNC_STATUS.CLOUD,
+    ...(typeof row.archived === 'boolean' ? { archived: row.archived } : {}),
   }
 }
 
@@ -173,11 +175,12 @@ export function mergeMeetings(localMeetings, cloudMeetings) {
   return [...byId.values()].sort((a, b) => (b.meetingDate || '').localeCompare(a.meetingDate || ''))
 }
 
-export function getMergedMeetings(localMeetings, cloudMeetings) {
-  return mergeMeetings(localMeetings ?? [], cloudMeetings ?? [])
+export function getMergedMeetings(localMeetings, cloudMeetings, { includeArchived = false } = {}) {
+  const merged = mergeMeetings(localMeetings ?? [], cloudMeetings ?? [])
+  return filterArchived(merged, ARCHIVE_RECORD_TYPES.GENERAL_MEETING, includeArchived)
 }
 
-export async function fetchGeneralMeetingRecords(userId, { isAdmin = false } = {}) {
+export async function fetchGeneralMeetingRecords(userId, { isAdmin = false, includeArchived = false } = {}) {
   if (!isSupabaseConfigured || !supabase || !userId) {
     return { records: [], error: null }
   }
@@ -194,7 +197,14 @@ export async function fetchGeneralMeetingRecords(userId, { isAdmin = false } = {
 
   const { data, error } = await query
   if (error) return { records: [], error }
-  return { records: (data ?? []).map(rowToMeeting), error: null }
+  return {
+    records: filterArchived(
+      (data ?? []).map(rowToMeeting),
+      ARCHIVE_RECORD_TYPES.GENERAL_MEETING,
+      includeArchived,
+    ),
+    error: null,
+  }
 }
 
 export async function saveGeneralMeetingRecord(user, record) {

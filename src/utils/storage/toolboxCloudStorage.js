@@ -5,6 +5,7 @@ import {
   SYNC_STATUS,
   withSyncStatus,
 } from './cloudSyncStatus.js'
+import { ARCHIVE_RECORD_TYPES, filterArchived } from './archiveFilter.js'
 
 export {
   SYNC_STATUS,
@@ -47,6 +48,7 @@ function withCloudOwnership(record, row) {
     cloudUserId: row.user_id ?? null,
     storageSource: 'cloud',
     syncStatus: record.syncStatus ?? SYNC_STATUS.CLOUD,
+    ...(typeof row.archived === 'boolean' ? { archived: row.archived } : {}),
   }
 }
 
@@ -186,12 +188,13 @@ export function mergeToolboxRecords(localToolboxRecords, cloudToolboxRecords) {
   return [...byId.values()].sort((a, b) => (b.submittedAt || '').localeCompare(a.submittedAt || ''))
 }
 
-export function getMergedToolboxRecords(savedRecords, cloudToolboxRecords) {
+export function getMergedToolboxRecords(savedRecords, cloudToolboxRecords, { includeArchived = false } = {}) {
   const localToolboxRecords = savedRecords.filter((record) => record.formType === 'toolbox')
-  return mergeToolboxRecords(localToolboxRecords, cloudToolboxRecords ?? [])
+  const merged = mergeToolboxRecords(localToolboxRecords, cloudToolboxRecords ?? [])
+  return filterArchived(merged, ARCHIVE_RECORD_TYPES.TOOLBOX, includeArchived)
 }
 
-export async function fetchToolboxRecords(userId, { isAdmin = false } = {}) {
+export async function fetchToolboxRecords(userId, { isAdmin = false, includeArchived = false } = {}) {
   if (!isSupabaseConfigured || !supabase || !userId) {
     return { records: [], error: null }
   }
@@ -212,7 +215,11 @@ export async function fetchToolboxRecords(userId, { isAdmin = false } = {}) {
     return { records: [], error }
   }
 
-  const records = (data ?? []).map(rowToToolboxRecord)
+  const records = filterArchived(
+    (data ?? []).map(rowToToolboxRecord),
+    ARCHIVE_RECORD_TYPES.TOOLBOX,
+    includeArchived,
+  )
   return { records, error: null }
 }
 

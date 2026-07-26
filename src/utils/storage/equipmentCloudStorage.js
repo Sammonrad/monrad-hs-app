@@ -16,6 +16,7 @@ import {
   AUTH_REQUIRED_CODE,
   isAuthRequiredError,
 } from './cloudSyncStatus.js'
+import { ARCHIVE_RECORD_TYPES, filterArchived } from './archiveFilter.js'
 
 export {
   SYNC_STATUS,
@@ -251,11 +252,12 @@ export function mergeEquipmentRecords(localRecords, cloudRecords) {
   )
 }
 
-export function getMergedEquipmentRecords(localRecords, cloudRecords) {
-  return mergeEquipmentRecords(localRecords ?? [], cloudRecords ?? [])
+export function getMergedEquipmentRecords(localRecords, cloudRecords, { includeArchived = false } = {}) {
+  const merged = mergeEquipmentRecords(localRecords ?? [], cloudRecords ?? [])
+  return filterArchived(merged, ARCHIVE_RECORD_TYPES.EQUIPMENT, includeArchived)
 }
 
-export async function fetchEquipmentRecords(userId) {
+export async function fetchEquipmentRecords(userId, { includeArchived = false } = {}) {
   if (!isSupabaseConfigured || !supabase || !userId) {
     return { records: [], error: null }
   }
@@ -267,7 +269,14 @@ export async function fetchEquipmentRecords(userId) {
 
   if (error) return { records: [], error }
 
-  return { records: (data ?? []).map(rowToEquipment), error: null }
+  return {
+    records: filterArchived(
+      (data ?? []).map(rowToEquipment),
+      ARCHIVE_RECORD_TYPES.EQUIPMENT,
+      includeArchived,
+    ),
+    error: null,
+  }
 }
 
 export async function checkAssetNumberExists(assetNumber, excludeCloudId = null) {

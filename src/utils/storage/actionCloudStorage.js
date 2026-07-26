@@ -4,6 +4,7 @@ import {
   SYNC_STATUS,
   withSyncStatus,
 } from './cloudSyncStatus.js'
+import { ARCHIVE_RECORD_TYPES, filterArchived } from './archiveFilter.js'
 
 export {
   SYNC_STATUS,
@@ -21,6 +22,7 @@ function withCloudOwnership(action, row) {
     cloudUserId: row.user_id ?? null,
     storageSource: 'cloud',
     syncStatus: action.syncStatus ?? SYNC_STATUS.CLOUD,
+    ...(typeof row.archived === 'boolean' ? { archived: row.archived } : {}),
   }
 }
 
@@ -192,11 +194,12 @@ export function mergeActions(localActions, cloudActions) {
   )
 }
 
-export function getMergedActions(localActions, cloudActions) {
-  return mergeActions(localActions ?? [], cloudActions ?? [])
+export function getMergedActions(localActions, cloudActions, { includeArchived = false } = {}) {
+  const merged = mergeActions(localActions ?? [], cloudActions ?? [])
+  return filterArchived(merged, ARCHIVE_RECORD_TYPES.ACTION, includeArchived)
 }
 
-export async function fetchActionRecords(userId, { isAdmin = false } = {}) {
+export async function fetchActionRecords(userId, { isAdmin = false, includeArchived = false } = {}) {
   if (!isSupabaseConfigured || !supabase || !userId) {
     return { records: [], error: null }
   }
@@ -216,7 +219,11 @@ export async function fetchActionRecords(userId, { isAdmin = false } = {}) {
     return { records: [], error }
   }
 
-  const records = (data ?? []).map(rowToActionRecord)
+  const records = filterArchived(
+    (data ?? []).map(rowToActionRecord),
+    ARCHIVE_RECORD_TYPES.ACTION,
+    includeArchived,
+  )
   return { records, error: null }
 }
 

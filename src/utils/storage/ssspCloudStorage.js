@@ -11,6 +11,7 @@ import {
   syncIndexedFieldsFromRecordData,
 } from './ssspStorage.js'
 import { SYNC_STATUS, withSyncStatus } from './cloudSyncStatus.js'
+import { ARCHIVE_RECORD_TYPES, filterArchived } from './archiveFilter.js'
 
 export {
   SYNC_STATUS,
@@ -168,7 +169,7 @@ async function fetchAcknowledgementsForSsspIds(ssspIds) {
   return bySssp
 }
 
-export async function fetchSsspRecords(userId, { isAdmin = false } = {}) {
+export async function fetchSsspRecords(userId, { isAdmin = false, includeArchived = false } = {}) {
   if (!isSupabaseConfigured || !supabase || !userId) {
     return { records: [], error: null }
   }
@@ -179,6 +180,7 @@ export async function fetchSsspRecords(userId, { isAdmin = false } = {}) {
     .order('updated_at', { ascending: false })
 
   if (!isAdmin) {
+    // Staff allow-list already excludes archived/draft/ready; keep as-is.
     query = query.in('status', SSSP_STAFF_VISIBLE_STATUSES)
   }
 
@@ -193,12 +195,16 @@ export async function fetchSsspRecords(userId, { isAdmin = false } = {}) {
   const hazardsBySssp = await fetchHazardsForSsspIds(ids)
   const acksBySssp = await fetchAcknowledgementsForSsspIds(ids)
 
-  const records = rows.map((row) =>
-    rowToSsspRecord(
-      row,
-      hazardsBySssp.get(row.id) ?? [],
-      acksBySssp.get(row.id) ?? [],
+  const records = filterArchived(
+    rows.map((row) =>
+      rowToSsspRecord(
+        row,
+        hazardsBySssp.get(row.id) ?? [],
+        acksBySssp.get(row.id) ?? [],
+      ),
     ),
+    ARCHIVE_RECORD_TYPES.SSSP,
+    includeArchived,
   )
 
   return { records, error: null }
@@ -342,7 +348,10 @@ export async function saveSsspRecord(user, record) {
     return { record: null, error: hazardSync.error }
   }
 
-  const { records: refreshed } = await fetchSsspRecords(userId, { isAdmin: true })
+  const { records: refreshed } = await fetchSsspRecords(userId, {
+    isAdmin: true,
+    includeArchived: true,
+  })
   const saved = refreshed.find((r) => r.cloudId === data.id)
   return { record: saved ?? rowToSsspRecord(data, record.hazards ?? []), error: null }
 }

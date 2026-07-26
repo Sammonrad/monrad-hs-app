@@ -5,6 +5,7 @@ import {
   SYNC_STATUS,
   withSyncStatus,
 } from './cloudSyncStatus.js'
+import { ARCHIVE_RECORD_TYPES, filterArchived } from './archiveFilter.js'
 
 export {
   SYNC_STATUS,
@@ -60,6 +61,7 @@ function withCloudOwnership(record, row) {
     cloudUserId: row.user_id ?? null,
     storageSource: 'cloud',
     syncStatus: record.syncStatus ?? SYNC_STATUS.CLOUD,
+    ...(typeof row.archived === 'boolean' ? { archived: row.archived } : {}),
   }
 }
 
@@ -219,12 +221,13 @@ export function mergePreStartRecords(localPreStarts, cloudPreStarts) {
   return [...byId.values()].sort((a, b) => (b.submittedAt || '').localeCompare(a.submittedAt || ''))
 }
 
-export function getMergedPreStartRecords(savedRecords, cloudPreStarts) {
+export function getMergedPreStartRecords(savedRecords, cloudPreStarts, { includeArchived = false } = {}) {
   const localPreStarts = savedRecords.filter((record) => record.formType === 'pre-start')
-  return mergePreStartRecords(localPreStarts, cloudPreStarts ?? [])
+  const merged = mergePreStartRecords(localPreStarts, cloudPreStarts ?? [])
+  return filterArchived(merged, ARCHIVE_RECORD_TYPES.PRE_START, includeArchived)
 }
 
-export async function fetchPreStartRecords(userId, { isAdmin = false } = {}) {
+export async function fetchPreStartRecords(userId, { isAdmin = false, includeArchived = false } = {}) {
   if (!isSupabaseConfigured || !supabase || !userId) {
     return { records: [], error: null }
   }
@@ -245,7 +248,11 @@ export async function fetchPreStartRecords(userId, { isAdmin = false } = {}) {
     return { records: [], error }
   }
 
-  const records = (data ?? []).map(rowToPreStartRecord)
+  const records = filterArchived(
+    (data ?? []).map(rowToPreStartRecord),
+    ARCHIVE_RECORD_TYPES.PRE_START,
+    includeArchived,
+  )
   return { records, error: null }
 }
 

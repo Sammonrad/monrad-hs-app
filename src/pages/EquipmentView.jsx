@@ -128,7 +128,7 @@ export function EquipmentView({
   }, [initialDefectPrefill])
 
   const equipment = useMemo(
-    () => getMergedEquipmentRecords(localEquipment, cloudEquipment),
+    () => getMergedEquipmentRecords(localEquipment, cloudEquipment, { includeArchived: true }),
     [localEquipment, cloudEquipment],
   )
   const serviceRecords = useMemo(

@@ -24,6 +24,7 @@ import {
   SYNC_STATUS,
   withSyncStatus,
 } from './cloudSyncStatus.js'
+import { ARCHIVE_RECORD_TYPES, filterArchived } from './archiveFilter.js'
 
 export {
   SYNC_STATUS,
@@ -48,6 +49,7 @@ function withCloudOwnership(record, row) {
     cloudUserId: row.signed_in_by ?? null,
     storageSource: 'cloud',
     syncStatus: record.syncStatus ?? SYNC_STATUS.CLOUD,
+    ...(typeof row.archived === 'boolean' ? { archived: row.archived } : {}),
   }
 }
 
@@ -217,11 +219,12 @@ export function mergeVisitorRecords(localRecords, cloudRecords) {
   )
 }
 
-export function getMergedVisitorRecords(localRecords, cloudRecords) {
-  return mergeVisitorRecords(localRecords ?? [], cloudRecords ?? [])
+export function getMergedVisitorRecords(localRecords, cloudRecords, { includeArchived = false } = {}) {
+  const merged = mergeVisitorRecords(localRecords ?? [], cloudRecords ?? [])
+  return filterArchived(merged, ARCHIVE_RECORD_TYPES.VISITOR, includeArchived)
 }
 
-export async function fetchVisitorSignInRecords(userId) {
+export async function fetchVisitorSignInRecords(userId, { includeArchived = false } = {}) {
   if (!isSupabaseConfigured || !supabase || !userId) {
     return { records: [], error: null }
   }
@@ -236,7 +239,11 @@ export async function fetchVisitorSignInRecords(userId) {
     return { records: [], error }
   }
 
-  const records = (data ?? []).map(rowToVisitorRecord)
+  const records = filterArchived(
+    (data ?? []).map(rowToVisitorRecord),
+    ARCHIVE_RECORD_TYPES.VISITOR,
+    includeArchived,
+  )
   return { records, error: null }
 }
 

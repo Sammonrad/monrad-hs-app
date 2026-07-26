@@ -115,7 +115,7 @@ function App() {
   const prevShowMainAppRef = useRef(false)
 
   const mergedEquipment = useMemo(
-    () => getMergedEquipmentRecords(localEquipment, cloudEquipment),
+    () => getMergedEquipmentRecords(localEquipment, cloudEquipment, { includeArchived: true }),
     [localEquipment, cloudEquipment],
   )
   const mergedServiceRecords = useMemo(
@@ -467,7 +467,11 @@ function App() {
 
     async function loadCloudSsspRecords() {
       setSsspLoading(true)
-      const { records, error } = await fetchSsspRecords(session.user.id, { isAdmin })
+      // Admins need archived SSSPs for the existing SSSP Archived tab.
+      const { records, error } = await fetchSsspRecords(session.user.id, {
+        isAdmin,
+        includeArchived: isAdmin,
+      })
       if (isMounted) {
         setCloudSsspRecords(records)
         setSsspLoadError(error?.message ?? null)
@@ -476,7 +480,10 @@ function App() {
     }
 
     async function loadCloudEquipment() {
-      const { records } = await fetchEquipmentRecords(session.user.id)
+      // Include archived so EquipmentView's existing Archived filter keeps working.
+      const { records } = await fetchEquipmentRecords(session.user.id, {
+        includeArchived: true,
+      })
       if (isMounted) setCloudEquipment(records)
     }
 
