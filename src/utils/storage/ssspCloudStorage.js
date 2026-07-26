@@ -76,7 +76,8 @@ export function rowToSsspRecord(row, hazards = [], acknowledgements = []) {
               id: h.id,
               cloudId: h.id,
               ssspCloudId: h.sssp_id,
-              archived: h.archived ?? h.hazard_data?.archived ?? false,
+              // Live sssp_hazards has no archived column — flag lives in hazard_data JSON.
+              archived: Boolean(h.hazard_data?.archived),
               sortOrder: h.hazard_index ?? h.hazard_data?.sortOrder ?? i,
             },
             i,
@@ -203,26 +204,115 @@ export async function fetchSsspRecords(userId, { isAdmin = false } = {}) {
   return { records, error: null }
 }
 
-async function syncHazards(ssspId, hazards) {
-  const activeHazards = (hazards ?? []).filter((h) => !h.archived)
-
-  await supabase.from('sssp_hazards').delete().eq('sssp_id', ssspId)
-
-  if (activeHazards.length === 0) return { error: null }
-
-  const rows = activeHazards.map((hazard, index) => ({
+/**
+ * Map a client hazard to sssp_hazards columns.
+ * Soft-archive state is stored only in hazard_data.archived (no archived DB column).
+ */
+export function mapHazardToRow(ssspId, hazard, hazardIndex) {
+  const normalized = normalizeHazard(hazard, hazardIndex)
+  return {
     sssp_id: ssspId,
-    hazard_index: index,
-    hazard_data: normalizeHazard(hazard, index),
-    activity: hazard.activity?.trim() || null,
-    hazard: hazard.hazard?.trim() || null,
-    initial_risk: hazard.initialRisk ?? null,
-    residual_risk: hazard.residualRisk ?? null,
-    archived: Boolean(hazard.archived),
-  }))
+    hazard_index: hazardIndex,
+    hazard_data: normalized,
+    activity: normalized.activity?.trim() || null,
+    hazard: normalized.hazard?.trim() || null,
+    initial_risk: normalized.initialRisk ?? null,
+    residual_risk: normalized.residualRisk ?? null,
+    updated_at: new Date().toISOString(),
+  }
+}
 
-  const { error } = await supabase.from('sssp_hazards').insert(rows)
-  return { error }
+function resolveExistingHazardId(hazard, existingById) {
+  if (hazard.cloudId && existingById.has(hazard.cloudId)) return hazard.cloudId
+  if (hazard.id && existingById.has(hazard.id)) return hazard.id
+  return null
+}
+
+/**
+ * Non-destructive hazard sync: update by cloud id, insert new rows, soft-archive
+ * orphans inside hazard_data. Never DELETEs from sssp_hazards.
+ */
+async function syncHazards(ssspId, hazards) {
+  const list = hazards ?? []
+
+  const { data: existingRows, error: fetchError } = await supabase
+    .from('sssp_hazards')
+    .select('id, hazard_data')
+    .eq('sssp_id', ssspId)
+
+  if (fetchError) return { error: fetchError }
+
+  const existingById = new Map((existingRows ?? []).map((row) => [row.id, row]))
+  const seenIds = new Set()
+
+  const ordered = [...list].sort((a, b) => {
+    const aArchived = Boolean(a.archived)
+    const bArchived = Boolean(b.archived)
+    if (aArchived !== bArchived) return aArchived ? 1 : -1
+    return (a.sortOrder ?? 0) - (b.sortOrder ?? 0)
+  })
+
+  for (let index = 0; index < ordered.length; index += 1) {
+    const hazard = ordered[index]
+    const row = mapHazardToRow(ssspId, hazard, index)
+    const existingId = resolveExistingHazardId(hazard, existingById)
+
+    if (existingId) {
+      const { error } = await supabase
+        .from('sssp_hazards')
+        .update({
+          hazard_index: row.hazard_index,
+          hazard_data: row.hazard_data,
+          activity: row.activity,
+          hazard: row.hazard,
+          initial_risk: row.initial_risk,
+          residual_risk: row.residual_risk,
+          updated_at: row.updated_at,
+        })
+        .eq('id', existingId)
+        .eq('sssp_id', ssspId)
+
+      if (error) return { error }
+      seenIds.add(existingId)
+      continue
+    }
+
+    const { error } = await supabase.from('sssp_hazards').insert({
+      sssp_id: row.sssp_id,
+      hazard_index: row.hazard_index,
+      hazard_data: row.hazard_data,
+      activity: row.activity,
+      hazard: row.hazard,
+      initial_risk: row.initial_risk,
+      residual_risk: row.residual_risk,
+      updated_at: row.updated_at,
+    })
+
+    if (error) return { error }
+  }
+
+  for (const [id, existing] of existingById) {
+    if (seenIds.has(id)) continue
+
+    const prev =
+      existing.hazard_data && typeof existing.hazard_data === 'object'
+        ? existing.hazard_data
+        : {}
+    if (prev.archived === true) continue
+
+    const { error } = await supabase
+      .from('sssp_hazards')
+      .update({
+        hazard_data: { ...prev, archived: true },
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id)
+      .eq('sssp_id', ssspId)
+
+    if (error) return { error }
+  }
+
+  return { error: null }
 }
 
 export async function saveSsspRecord(user, record) {
