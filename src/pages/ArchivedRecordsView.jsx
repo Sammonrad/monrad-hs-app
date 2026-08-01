@@ -4,8 +4,13 @@ import { getEquipmentReadableName } from '../constants/equipmentConfig.js'
 import { getSsspStatusLabel } from '../constants/ssspStatuses.js'
 import { formatSubmittedAt } from '../utils/formatting.js'
 import { getFormTypeLabel, getRecordTitle } from '../utils/records.js'
+import { PermanentDeleteModal } from '../components/PermanentDeleteModal.jsx'
 import { ARCHIVE_RECORD_TYPES, isArchived } from '../utils/storage/archiveFilter.js'
-import { restoreArchivedRecord } from '../utils/storage/archiveActions.js'
+import {
+  canPermanentlyDelete,
+  permanentlyDeleteArchivedRecord,
+  restoreArchivedRecord,
+} from '../utils/storage/archiveActions.js'
 import { fetchJobStartRecords, getMergedJobStartRecords } from '../utils/storage/jobStartCloudStorage.js'
 import { fetchPreStartRecords, getMergedPreStartRecords } from '../utils/storage/preStartCloudStorage.js'
 import { fetchToolboxRecords, getMergedToolboxRecords } from '../utils/storage/toolboxCloudStorage.js'
@@ -465,6 +470,10 @@ export function ArchivedRecordsView({
   const [searchQuery, setSearchQuery] = useState('')
   const [expandedKey, setExpandedKey] = useState(null)
   const [restoringKey, setRestoringKey] = useState(null)
+  const [deleteTarget, setDeleteTarget] = useState(null)
+  const [deleteConfirmText, setDeleteConfirmText] = useState('')
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
 
   const loadArchived = useCallback(async () => {
     if (!isAdmin || !user?.id) {
@@ -651,7 +660,7 @@ export function ArchivedRecordsView({
   }
 
   async function handleRestore(item) {
-    if (!user?.id || restoringKey) return
+    if (!user?.id || restoringKey || deleting) return
     setRestoringKey(item.key)
     setActionError('')
     setActionMessage('')
@@ -684,6 +693,86 @@ export function ArchivedRecordsView({
     syncAppStateAfterRestore(item.recordType, restored ?? { ...item.record, archived: false })
     setItems((prev) => prev.filter((row) => row.key !== item.key))
     if (expandedKey === item.key) setExpandedKey(null)
+  }
+
+  function syncAppStateAfterDelete(type, deleted) {
+    if (!deleted) return
+    const match = (row) =>
+      (deleted.cloudId && row.cloudId === deleted.cloudId) ||
+      (deleted.id && row.id === deleted.id)
+
+    if (
+      type === ARCHIVE_RECORD_TYPES.JOB_START ||
+      type === ARCHIVE_RECORD_TYPES.PRE_START ||
+      type === ARCHIVE_RECORD_TYPES.TOOLBOX ||
+      type === ARCHIVE_RECORD_TYPES.TIMESHEET
+    ) {
+      setSavedRecords?.(loadSavedRecords())
+      const cloudSetters = {
+        [ARCHIVE_RECORD_TYPES.JOB_START]: setCloudJobStarts,
+        [ARCHIVE_RECORD_TYPES.PRE_START]: setCloudPreStarts,
+        [ARCHIVE_RECORD_TYPES.TOOLBOX]: setCloudToolboxRecords,
+        [ARCHIVE_RECORD_TYPES.TIMESHEET]: setCloudTimesheets,
+      }
+      cloudSetters[type]?.((prev) => (prev ?? []).filter((row) => !match(row)))
+      return
+    }
+
+    if (type === ARCHIVE_RECORD_TYPES.ACTION) {
+      setActions?.(loadActions())
+      setCloudActions?.((prev) => (prev ?? []).filter((row) => !match(row)))
+      return
+    }
+
+    if (type === ARCHIVE_RECORD_TYPES.GENERAL_MEETING) {
+      setCloudGeneralMeetings?.((prev) => (prev ?? []).filter((row) => !match(row)))
+    }
+  }
+
+  function openDeleteModal(item) {
+    if (deleting || restoringKey) return
+    setActionError('')
+    setActionMessage('')
+    setDeleteError('')
+    setDeleteConfirmText('')
+    setDeleteTarget(item)
+  }
+
+  function closeDeleteModal() {
+    if (deleting) return
+    setDeleteTarget(null)
+    setDeleteConfirmText('')
+    setDeleteError('')
+  }
+
+  async function handlePermanentDelete() {
+    if (!deleteTarget || deleting || deleteConfirmText !== 'DELETE') return
+    setDeleting(true)
+    setDeleteError('')
+    setActionError('')
+    setActionMessage('')
+
+    const { ok, error } = await permanentlyDeleteArchivedRecord(
+      deleteTarget.recordType,
+      deleteTarget.record,
+      user,
+    )
+
+    if (!ok) {
+      setDeleting(false)
+      setDeleteError(error?.message || 'Delete failed.')
+      return
+    }
+
+    syncAppStateAfterDelete(deleteTarget.recordType, deleteTarget.record)
+    setItems((prev) => prev.filter((row) => row.key !== deleteTarget.key))
+    if (expandedKey === deleteTarget.key) setExpandedKey(null)
+    setActionMessage(`Permanently deleted: ${deleteTarget.title}`)
+    setDeleting(false)
+    setDeleteTarget(null)
+    setDeleteConfirmText('')
+    setDeleteError('')
+    await loadArchived()
   }
 
   function handleViewToggle(item) {
@@ -761,7 +850,8 @@ export function ArchivedRecordsView({
         )}
         <p className="form-hint">
           Admin-only archive register. Use View for details on this page; Restore returns the record
-          to active lists. No permanent delete.
+          to active lists. Permanently Delete is available only for allowed archived types and
+          requires typing DELETE.
         </p>
       </header>
 
@@ -856,6 +946,7 @@ export function ArchivedRecordsView({
                     className="btn btn--secondary"
                     onClick={() => handleViewToggle(item)}
                     aria-expanded={expanded}
+                    disabled={deleting}
                   >
                     {expanded ? 'Hide' : 'View'}
                   </button>
@@ -863,16 +954,37 @@ export function ArchivedRecordsView({
                     type="button"
                     className="btn btn--primary"
                     onClick={() => handleRestore(item)}
-                    disabled={restoringKey === item.key}
+                    disabled={restoringKey === item.key || deleting}
                   >
                     {restoringKey === item.key ? 'Restoring…' : 'Restore'}
                   </button>
+                  {canPermanentlyDelete(item.recordType, item.record) ? (
+                    <button
+                      type="button"
+                      className="btn btn--secondary btn--danger-text archived-records__delete-btn"
+                      onClick={() => openDeleteModal(item)}
+                      disabled={deleting || Boolean(restoringKey)}
+                    >
+                      Permanently Delete
+                    </button>
+                  ) : null}
                 </div>
               </article>
             )
           })
         )}
       </section>
+
+      <PermanentDeleteModal
+        open={Boolean(deleteTarget)}
+        onCancel={closeDeleteModal}
+        onConfirm={handlePermanentDelete}
+        deleting={deleting}
+        error={deleteError}
+        recordLabel={deleteTarget?.title || ''}
+        confirmText={deleteConfirmText}
+        onConfirmTextChange={setDeleteConfirmText}
+      />
     </>
   )
 }

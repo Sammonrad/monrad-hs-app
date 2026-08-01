@@ -1,11 +1,11 @@
 /**
- * Archive / restore soft-archive helpers. No permanent delete.
+ * Archive / restore soft-archive helpers, plus permanent delete for allowed archived types.
  * Form tables may not have an `archived` column yet — cloud update errors are returned.
  */
 
 import { supabase, isSupabaseConfigured } from '../supabaseClient.js'
 import { SSSP_STATUS } from '../../constants/ssspStatuses.js'
-import { ARCHIVE_RECORD_TYPES } from './archiveFilter.js'
+import { ARCHIVE_RECORD_TYPES, isArchived } from './archiveFilter.js'
 import { formatCloudSaveError } from './cloudSyncStatus.js'
 import { persistSavedRecords, loadSavedRecords } from './recordsStorage.js'
 import { persistActions, loadActions, normalizeAction } from './actionsStorage.js'
@@ -33,6 +33,18 @@ export const FORM_ARCHIVE_TABLES = {
   [ARCHIVE_RECORD_TYPES.INCIDENT]: 'incident_near_miss_records',
   [ARCHIVE_RECORD_TYPES.TIMESHEET]: 'timesheet_records',
 }
+
+/** Cloud tables eligible for hard delete (subset of archiveable types). */
+export const PERMANENT_DELETE_TABLES = {
+  [ARCHIVE_RECORD_TYPES.JOB_START]: 'job_start_records',
+  [ARCHIVE_RECORD_TYPES.PRE_START]: 'machine_prestart_records',
+  [ARCHIVE_RECORD_TYPES.TOOLBOX]: 'toolbox_meeting_records',
+  [ARCHIVE_RECORD_TYPES.TIMESHEET]: 'timesheet_records',
+  [ARCHIVE_RECORD_TYPES.ACTION]: 'action_register_records',
+  [ARCHIVE_RECORD_TYPES.GENERAL_MEETING]: 'hs_general_meeting_records',
+}
+
+const PERMANENT_DELETE_TYPES = new Set(Object.keys(PERMANENT_DELETE_TABLES))
 
 function patchLocalSavedRecord(recordId, cloudId, patch) {
   const records = loadSavedRecords()
@@ -412,4 +424,124 @@ export function matchesArchiveTarget(item, target) {
   if (target.cloudId && item.cloudId === target.cloudId) return true
   if (target.id && item.id === target.id) return true
   return false
+}
+
+/**
+ * Whether Permanently Delete may be offered for this archived row.
+ * Protected types (incident, visitor, SSSP, equipment, completed GM, etc.) always return false.
+ *
+ * @param {string} type ARCHIVE_RECORD_TYPES value
+ * @param {object} record
+ * @returns {boolean}
+ */
+export function canPermanentlyDelete(type, record) {
+  if (!record || !PERMANENT_DELETE_TYPES.has(type)) return false
+  if (!isArchived(record, type)) return false
+
+  if (type === ARCHIVE_RECORD_TYPES.GENERAL_MEETING) {
+    return String(record.status || '').toLowerCase() === 'draft'
+  }
+
+  return true
+}
+
+function removeLocalSavedRecord(recordId, cloudId) {
+  const records = loadSavedRecords()
+  const next = records.filter(
+    (item) =>
+      !((recordId && item.id === recordId) || (cloudId && item.cloudId === cloudId)),
+  )
+  if (next.length !== records.length) persistSavedRecords(next)
+  return next
+}
+
+function removeLocalAction(recordId, cloudId) {
+  const actions = loadActions()
+  const next = actions.filter(
+    (item) =>
+      !((recordId && item.id === recordId) || (cloudId && item.cloudId === cloudId)),
+  )
+  if (next.length !== actions.length) persistActions(next)
+  return next
+}
+
+function removeLocalMeeting(recordId, cloudId) {
+  const meetings = loadMeetings()
+  const next = meetings.filter(
+    (item) =>
+      !((recordId && item.id === recordId) || (cloudId && item.cloudId === cloudId)),
+  )
+  if (next.length !== meetings.length) persistMeetings(next)
+  return next
+}
+
+async function deleteCloudRow(table, cloudId) {
+  if (!isSupabaseConfigured || !supabase) {
+    return { error: new Error('Supabase is not configured.') }
+  }
+  if (!cloudId) {
+    return { error: new Error('Missing cloud record id.') }
+  }
+
+  const { error } = await supabase.from(table).delete().eq('id', cloudId)
+  if (error) return { error }
+  return { error: null }
+}
+
+/**
+ * Permanently delete an allowed archived record.
+ * Cloud rows must succeed in Supabase before local copies are removed.
+ * Local-only rows (no cloudId) are removed from device storage only.
+ *
+ * @param {string} type ARCHIVE_RECORD_TYPES value
+ * @param {object} record
+ * @param {object} user
+ * @returns {Promise<{ ok: boolean, error: Error|null, localOnly?: boolean }>}
+ */
+export async function permanentlyDeleteArchivedRecord(type, record, user) {
+  if (!user?.id) {
+    return { ok: false, error: new Error('You must be signed in to delete records.') }
+  }
+  if (!canPermanentlyDelete(type, record)) {
+    return {
+      ok: false,
+      error: new Error('This record type cannot be permanently deleted.'),
+    }
+  }
+
+  const cloudId = record.cloudId ?? null
+  const recordId = record.id ?? null
+  const table = PERMANENT_DELETE_TABLES[type]
+
+  try {
+    if (cloudId) {
+      const { error } = await deleteCloudRow(table, cloudId)
+      if (error) {
+        return {
+          ok: false,
+          error: new Error(formatCloudSaveError(error) || 'Cloud delete failed.'),
+        }
+      }
+    }
+
+    if (
+      type === ARCHIVE_RECORD_TYPES.JOB_START ||
+      type === ARCHIVE_RECORD_TYPES.PRE_START ||
+      type === ARCHIVE_RECORD_TYPES.TOOLBOX ||
+      type === ARCHIVE_RECORD_TYPES.TIMESHEET
+    ) {
+      removeLocalSavedRecord(recordId, cloudId)
+    } else if (type === ARCHIVE_RECORD_TYPES.ACTION) {
+      removeLocalAction(recordId, cloudId)
+    } else if (type === ARCHIVE_RECORD_TYPES.GENERAL_MEETING) {
+      removeLocalMeeting(recordId, cloudId)
+    }
+
+    return { ok: true, error: null, localOnly: !cloudId }
+  } catch (error) {
+    return {
+      ok: false,
+      error: new Error(formatCloudSaveError(error) || error?.message || 'Delete failed.'),
+    }
+  }
 }

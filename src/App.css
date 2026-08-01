@@ -4800,8 +4800,34 @@ body {
   color: var(--color-white);
 }
 
+.btn--danger {
+  background: var(--monrad-red);
+  border-color: var(--monrad-red);
+  color: var(--color-white);
+}
+
+.btn--danger:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  filter: none;
+}
+
+.btn--danger-text {
+  color: var(--color-error);
+  border-color: var(--color-error-border);
+  background: var(--color-white);
+}
+
+.btn--danger-text:hover:not(:disabled) {
+  background: var(--color-error-bg);
+  border-color: var(--color-error);
+  color: var(--monrad-red-dark, var(--color-error));
+  filter: none;
+}
+
 .btn--secondary:hover,
-.btn--primary:hover {
+.btn--primary:hover,
+.btn--danger:hover:not(:disabled) {
   filter: brightness(0.95);
 }
 
@@ -6992,6 +7018,21 @@ body {
 .archived-records__card .equipment-summary-card__actions .btn {
   min-height: var(--tap-min);
   min-width: var(--tap-min);
+}
+
+.archived-records__delete-btn {
+  font-size: 0.8rem;
+  padding: 0.35rem 0.65rem;
+  min-width: auto;
+}
+
+.permanent-delete-modal__confirm-field {
+  margin-bottom: var(--spacing-sm);
+}
+
+.permanent-delete-modal__hint {
+  margin: 0 0 var(--spacing-md);
+  color: var(--color-error);
 }
 
 /* Archive Record (admin) modal + action */
