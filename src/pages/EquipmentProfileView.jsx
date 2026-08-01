@@ -31,6 +31,8 @@ import {
   requireEquipmentCloudUser,
   SYNC_STATUS,
 } from '../utils/storage/equipmentCloudStorage.js'
+import { ARCHIVE_RECORD_TYPES } from '../utils/storage/archiveFilter.js'
+import { AdminArchiveAction } from '../components/AdminArchiveAction.jsx'
 import {
   getServicesForEquipment,
   saveServiceRecord,
@@ -89,6 +91,7 @@ export function EquipmentProfileView({
   const [modal, setModal] = useState(null)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
+  const [archiveMessage, setArchiveMessage] = useState('')
 
   const asset = useMemo(() => getEquipmentById(equipment, equipmentId), [equipment, equipmentId])
   const assetKey = asset?.cloudId ?? asset?.id
@@ -297,9 +300,29 @@ export function EquipmentProfileView({
     return { ok: true }
   }
 
-  async function handleArchive() {
-    if (!window.confirm(`Archive ${getEquipmentReadableName(asset)}?`)) return
-    await persistEquipmentPatch({ ...asset, archived: true })
+  function handleEquipmentArchived(archived, { localOnly } = {}) {
+    if (archived.cloudId) {
+      setCloudEquipment((prev) =>
+        prev.map((item) =>
+          item.cloudId === archived.cloudId ? { ...item, ...archived, archived: true } : item,
+        ),
+      )
+    }
+    setLocalEquipment((prev) => {
+      const next = prev.map((item) =>
+        item.id === archived.id || (archived.cloudId && item.cloudId === archived.cloudId)
+          ? { ...item, archived: true }
+          : item,
+      )
+      persistLocalEquipmentRecords(next)
+      return next
+    })
+    setSaveError('')
+    setArchiveMessage(
+      localOnly
+        ? 'Asset archived on this device (Local). Find it under Archived Records.'
+        : 'Asset archived. Find it under Archived Records.',
+    )
   }
 
   async function handleReactivate() {
@@ -463,6 +486,11 @@ export function EquipmentProfileView({
           {saveError}
         </p>
       )}
+      {archiveMessage && !modal && (
+        <p className="form-hint" role="status">
+          {archiveMessage}
+        </p>
+      )}
 
       <div className="equipment-profile-actions no-print">
         <button type="button" className="btn btn--secondary" onClick={() => setModal({ type: 'report-defect' })}>
@@ -483,7 +511,14 @@ export function EquipmentProfileView({
             {asset.archived ? (
               <button type="button" className="btn btn--secondary" onClick={handleReactivate}>Reactivate</button>
             ) : (
-              <button type="button" className="btn btn--secondary" onClick={handleArchive}>Archive asset</button>
+              <AdminArchiveAction
+                recordType={ARCHIVE_RECORD_TYPES.EQUIPMENT}
+                record={asset}
+                user={user}
+                profile={profile}
+                onArchived={handleEquipmentArchived}
+                buttonClassName="btn btn--secondary archive-record-action"
+              />
             )}
           </>
         )}

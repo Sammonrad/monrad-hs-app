@@ -1,5 +1,8 @@
 /**
  * Supabase table: public.hs_general_meeting_records
+ *
+ * Ownership columns: created_by / updated_by (defaults/triggers via auth.uid()).
+ * No user_id column — do not send or filter on user_id.
  */
 
 import { supabase, isSupabaseConfigured } from '../supabaseClient.js'
@@ -14,23 +17,25 @@ export {
   getSyncStatusLabel,
   getSyncStatusModifier,
   resolveRecordSyncStatus,
+  formatCloudSaveError,
 } from './cloudSyncStatus.js'
 
 function withCloudOwnership(record, row) {
   return {
     ...record,
     cloudId: row.id,
-    cloudUserId: row.user_id ?? null,
+    cloudUserId: row.created_by ?? null,
+    createdBy: row.created_by ?? null,
+    updatedBy: row.updated_by ?? null,
     storageSource: 'cloud',
     syncStatus: SYNC_STATUS.CLOUD,
     ...(typeof row.archived === 'boolean' ? { archived: row.archived } : {}),
   }
 }
 
-export function mapMeetingToRow(record, userId) {
+export function mapMeetingToRow(record) {
   const normalized = normalizeMeeting(record)
   return {
-    user_id: userId,
     record_data: { ...normalized, syncStatus: SYNC_STATUS.CLOUD },
     meeting_date: normalized.meetingDate?.trim() || null,
     meeting_time: normalized.meetingTime?.trim() || null,
@@ -186,15 +191,15 @@ export async function fetchGeneralMeetingRecords(userId, { isAdmin = false, incl
     return { records: [], error: null }
   }
 
-  let query = supabase
+  // RLS allows authenticated SELECT for all rows; do not filter by user_id
+  // (column does not exist). isAdmin kept for call-site compatibility.
+  void isAdmin
+
+  const query = supabase
     .from('hs_general_meeting_records')
     .select('*')
     .order('meeting_date', { ascending: false })
     .order('created_at', { ascending: false })
-
-  if (!isAdmin) {
-    query = query.eq('user_id', userId)
-  }
 
   const { data, error } = await query
   if (error) return { records: [], error }
@@ -216,7 +221,7 @@ export async function saveGeneralMeetingRecord(user, record) {
     return { record: null, error: new Error('You must be signed in to save to the cloud.') }
   }
 
-  const row = mapMeetingToRow(record, user.id)
+  const row = mapMeetingToRow(record)
   const { data, error } = await supabase
     .from('hs_general_meeting_records')
     .insert(row)
@@ -236,7 +241,7 @@ export async function updateGeneralMeetingRecord(user, record) {
   }
   if (!record.cloudId) return saveGeneralMeetingRecord(user, record)
 
-  const row = mapMeetingToRow(record, user.id)
+  const row = mapMeetingToRow(record)
   const { data, error } = await supabase
     .from('hs_general_meeting_records')
     .update({
@@ -258,13 +263,4 @@ export async function updateGeneralMeetingRecord(user, record) {
 
   if (error) return { record: null, error }
   return { record: rowToMeeting(data), error: null }
-}
-
-export async function deleteGeneralMeetingRecord(record) {
-  if (!isSupabaseConfigured || !supabase || !record.cloudId) {
-    return { error: null }
-  }
-
-  const { error } = await supabase.from('hs_general_meeting_records').delete().eq('id', record.cloudId)
-  return { error }
 }

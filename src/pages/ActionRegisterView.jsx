@@ -26,6 +26,8 @@ import {
   getUnavailableSyncStatus,
 } from '../utils/storage/actionCloudStorage.js'
 import { isAdminProfile } from '../utils/storage/userProfileStorage.js'
+import { matchesArchiveTarget } from '../utils/storage/archiveActions.js'
+import { ARCHIVE_RECORD_TYPES, withPreservedArchived } from '../utils/storage/archiveFilter.js'
 import {
   filterActionsByRegisterFilter,
   sortActiveActions,
@@ -55,8 +57,29 @@ export function ActionRegisterView({
   const [printAction, setPrintAction] = useState(null)
   const [cloudLoading, setCloudLoading] = useState(false)
   const [cloudError, setCloudError] = useState('')
+  const [archiveMessage, setArchiveMessage] = useState('')
 
   const isAdmin = isAdminProfile(profile)
+
+  function handleActionArchived(archived, { localOnly } = {}) {
+    setActions((prev) => {
+      const next = prev.map((item) =>
+        matchesArchiveTarget(item, archived) ? { ...item, archived: true } : item,
+      )
+      persistActions(next)
+      return next
+    })
+    setCloudActions((prev) =>
+      prev.map((item) =>
+        matchesArchiveTarget(item, archived) ? { ...item, archived: true } : item,
+      ),
+    )
+    setArchiveMessage(
+      localOnly
+        ? 'Action archived on this device (Local). Find it under Archived Records.'
+        : 'Action archived. Find it under Archived Records.',
+    )
+  }
 
   useEffect(() => {
     if (!initialActionFilter) return
@@ -86,13 +109,15 @@ export function ActionRegisterView({
 
       setCloudActions(records)
       setActions((prev) => {
-        const merged = getMergedActions(prev, records)
+        const activeMerged = getMergedActions(prev, records)
+        const merged = withPreservedArchived(prev, activeMerged, ARCHIVE_RECORD_TYPES.ACTION)
         const changed =
           merged.length !== prev.length ||
           merged.some(
             (action, index) =>
               action.cloudId !== prev[index]?.cloudId ||
-              action.id !== prev[index]?.id,
+              action.id !== prev[index]?.id ||
+              action.archived !== prev[index]?.archived,
           )
         if (changed) {
           persistActions(merged)
@@ -284,6 +309,11 @@ export function ActionRegisterView({
             {cloudError} Showing local actions only.
           </p>
         )}
+        {archiveMessage && (
+          <p className="form-hint" role="status">
+            {archiveMessage}
+          </p>
+        )}
       </header>
 
       <section className="actions-register no-print" aria-labelledby="actions-open-heading">
@@ -412,6 +442,9 @@ export function ActionRegisterView({
                   onUpdate={handleUpdateAction}
                   onComplete={handleCompleteAction}
                   onPrint={setPrintAction}
+                  user={user}
+                  profile={profile}
+                  onArchived={handleActionArchived}
                 />
               ))}
             </ul>
@@ -432,6 +465,9 @@ export function ActionRegisterView({
                 onUpdate={handleUpdateAction}
                 onComplete={handleCompleteAction}
                 onPrint={setPrintAction}
+                user={user}
+                profile={profile}
+                onArchived={handleActionArchived}
               />
             ))}
           </ul>

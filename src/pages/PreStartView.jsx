@@ -6,6 +6,7 @@ import { PhotoUpload } from '../components/PhotoUpload.jsx'
 import { DefectWarning } from '../components/DefectWarning.jsx'
 import { RecordDetails } from '../components/RecordDetails.jsx'
 import { RecordActions } from '../components/RecordActions.jsx'
+import { AdminArchiveAction } from '../components/AdminArchiveAction.jsx'
 import { SavedRecordSignature } from '../components/SavedRecordSignature.jsx'
 import { CloudSyncBadge } from '../components/CloudSyncBadge.jsx'
 import { FormSection } from '../components/forms/FormSection.jsx'
@@ -46,6 +47,8 @@ import {
   SYNC_STATUS,
 } from '../utils/storage/preStartCloudStorage.js'
 import { isAdminProfile } from '../utils/storage/userProfileStorage.js'
+import { ARCHIVE_RECORD_TYPES } from '../utils/storage/archiveFilter.js'
+import { matchesArchiveTarget } from '../utils/storage/archiveActions.js'
 import { getEquipmentReadableName, isPreStartSelectable } from '../constants/equipmentConfig.js'
 import { getEquipmentByReadableName } from '../utils/storage/equipmentCloudStorage.js'
 import { getMergedDefectRecords, findDefectBySource } from '../utils/storage/equipmentDefectStorage.js'
@@ -89,6 +92,7 @@ export function PreStartView({
   const [selectedEquipmentId, setSelectedEquipmentId] = useState('')
   const [preSubmitWarnings, setPreSubmitWarnings] = useState([])
   const [preSubmitAcknowledged, setPreSubmitAcknowledged] = useState(false)
+  const [archiveMessage, setArchiveMessage] = useState('')
   const recordRef = useRef(null)
 
   const {
@@ -120,6 +124,25 @@ export function PreStartView({
     () => getMergedPreStartRecords(savedRecords, cloudPreStarts),
     [savedRecords, cloudPreStarts],
   )
+
+  function handleRecordArchived(archived, { localOnly } = {}) {
+    setSavedRecords((prev) => {
+      const next = prev.map((item) =>
+        matchesArchiveTarget(item, archived) ? { ...item, archived: true } : item,
+      )
+      persistSavedRecords(next)
+      return next
+    })
+    setCloudPreStarts((prev) =>
+      prev.map((item) => (matchesArchiveTarget(item, archived) ? { ...item, archived: true } : item)),
+    )
+    setCompletedRecord((prev) => (matchesArchiveTarget(prev, archived) ? null : prev))
+    setArchiveMessage(
+      localOnly
+        ? 'Record archived on this device (Local). Find it under Archived Records.'
+        : 'Record archived. Find it under Archived Records.',
+    )
+  }
 
   const preStartEquipment = useMemo(
     () => equipment.filter(isPreStartSelectable),
@@ -691,6 +714,15 @@ export function PreStartView({
             </div>
           )}
           <RecordActions record={completedRecord} onPrint={setPrintRecord} />
+          <div className="record__actions record__actions--saved no-print">
+            <AdminArchiveAction
+              recordType={ARCHIVE_RECORD_TYPES.PRE_START}
+              record={completedRecord}
+              user={user}
+              profile={profile}
+              onArchived={handleRecordArchived}
+            />
+          </div>
         </section>
       )}
 
@@ -702,6 +734,11 @@ export function PreStartView({
       )}
 
       <section className="saved-records no-print" aria-labelledby="prestart-saved-heading">
+        {archiveMessage && (
+          <p className="form-hint" role="status">
+            {archiveMessage}
+          </p>
+        )}
         <div className="saved-records__header">
           <div>
             <h2 id="prestart-saved-heading" className="saved-records__title">
@@ -827,6 +864,15 @@ export function PreStartView({
 
                 <p className="saved-record__meta">Saved {formatSubmittedAt(record.submittedAt)}</p>
                 <RecordActions record={record} onPrint={setPrintRecord} variant="saved" />
+                <div className="record__actions record__actions--saved no-print">
+                  <AdminArchiveAction
+                    recordType={ARCHIVE_RECORD_TYPES.PRE_START}
+                    record={record}
+                    user={user}
+                    profile={profile}
+                    onArchived={handleRecordArchived}
+                  />
+                </div>
               </li>
             )})}
           </ul>

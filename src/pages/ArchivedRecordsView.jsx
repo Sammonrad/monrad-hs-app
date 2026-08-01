@@ -92,7 +92,7 @@ function toFormItem(record, type) {
     sortDate: date || record.submittedAt || record.createdAt || '',
     title,
     meta: [person, site].filter(Boolean).join(' · ') || '—',
-    statusLabel: 'Archived',
+    statusLabel: record.cloudId ? 'Archived' : 'Local',
     record,
     searchText: [title, person, site, type, record.cloudId, record.id]
       .filter(Boolean)
@@ -152,7 +152,7 @@ function buildArchivedItems({
       sortDate: action.date || action.createdAt || '',
       title,
       meta: [action.personResponsible, action.site].filter(Boolean).join(' · ') || '—',
-      statusLabel: 'Archived',
+      statusLabel: action.cloudId ? 'Archived' : 'Local',
       record: action,
       searchText: [title, action.personResponsible, action.site, action.notes]
         .filter(Boolean)
@@ -174,7 +174,7 @@ function buildArchivedItems({
       meta: [visitor.siteName, visitor.company, visitor.personVisited]
         .filter(Boolean)
         .join(' · ') || '—',
-      statusLabel: 'Archived',
+      statusLabel: visitor.cloudId ? 'Archived' : 'Local',
       record: visitor,
       searchText: [title, visitor.siteName, visitor.company, visitor.purpose]
         .filter(Boolean)
@@ -196,7 +196,7 @@ function buildArchivedItems({
       sortDate: meeting.meetingDate || meeting.createdAt || '',
       title,
       meta: [meeting.location, meeting.chairperson].filter(Boolean).join(' · ') || '—',
-      statusLabel: 'Archived',
+      statusLabel: meeting.cloudId ? 'Archived' : 'Local',
       record: meeting,
       searchText: [title, meeting.location, meeting.chairperson, meeting.status]
         .filter(Boolean)
@@ -216,7 +216,7 @@ function buildArchivedItems({
       sortDate: item.updatedAt || item.createdAt || '',
       title,
       meta: [item.assetType, item.operationalStatus].filter(Boolean).join(' · ') || '—',
-      statusLabel: 'Archived',
+      statusLabel: item.cloudId ? 'Archived' : 'Local',
       record: item,
       searchText: [title, item.assetType, item.make, item.model, item.serialNumber]
         .filter(Boolean)

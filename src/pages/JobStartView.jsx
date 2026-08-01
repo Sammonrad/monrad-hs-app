@@ -5,6 +5,7 @@ import { SignatureConfirmationField } from '../components/SignatureConfirmationF
 import { PhotoUpload } from '../components/PhotoUpload.jsx'
 import { RecordDetails } from '../components/RecordDetails.jsx'
 import { RecordActions } from '../components/RecordActions.jsx'
+import { AdminArchiveAction } from '../components/AdminArchiveAction.jsx'
 import { SavedRecordSignature } from '../components/SavedRecordSignature.jsx'
 import { CloudSyncBadge } from '../components/CloudSyncBadge.jsx'
 import { FormSection } from '../components/forms/FormSection.jsx'
@@ -37,6 +38,8 @@ import {
   SYNC_STATUS,
 } from '../utils/storage/jobStartCloudStorage.js'
 import { isAdminProfile } from '../utils/storage/userProfileStorage.js'
+import { ARCHIVE_RECORD_TYPES } from '../utils/storage/archiveFilter.js'
+import { matchesArchiveTarget } from '../utils/storage/archiveActions.js'
 import {
   scrollToFirstInvalid,
   hasValidationErrors,
@@ -66,6 +69,7 @@ export function JobStartView({
   const [cloudLoadWarning, setCloudLoadWarning] = useState(null)
   const [cloudSaving, setCloudSaving] = useState(false)
   const [recordFilter, setRecordFilter] = useState('job-start')
+  const [archiveMessage, setArchiveMessage] = useState('')
   const recordRef = useRef(null)
 
   const { fields, checked, signatureConfirmation, photos } = draft
@@ -88,13 +92,36 @@ export function JobStartView({
   const filteredRecords = useMemo(() => {
     if (recordFilter === 'job-start') return mergedJobStarts
     if (recordFilter === 'all') {
-      const otherRecords = savedRecords.filter((record) => record.formType !== 'job-start')
+      const otherRecords = savedRecords.filter(
+        (record) => record.formType !== 'job-start' && record.archived !== true,
+      )
       return [...mergedJobStarts, ...otherRecords].sort((a, b) =>
         (b.submittedAt || '').localeCompare(a.submittedAt || ''),
       )
     }
-    return savedRecords.filter((record) => record.formType === recordFilter)
+    return savedRecords.filter(
+      (record) => record.formType === recordFilter && record.archived !== true,
+    )
   }, [recordFilter, mergedJobStarts, savedRecords])
+
+  function handleRecordArchived(archived, { localOnly } = {}) {
+    setSavedRecords((prev) => {
+      const next = prev.map((item) =>
+        matchesArchiveTarget(item, archived) ? { ...item, archived: true } : item,
+      )
+      persistSavedRecords(next)
+      return next
+    })
+    setCloudJobStarts((prev) =>
+      prev.map((item) => (matchesArchiveTarget(item, archived) ? { ...item, archived: true } : item)),
+    )
+    setCompletedRecord((prev) => (matchesArchiveTarget(prev, archived) ? null : prev))
+    setArchiveMessage(
+      localOnly
+        ? 'Record archived on this device (Local). Find it under Archived Records.'
+        : 'Record archived. Find it under Archived Records.',
+    )
+  }
 
   function patchSavedJobStartRecord(recordId, patch) {
     setSavedRecords((prev) => {
@@ -379,6 +406,15 @@ export function JobStartView({
 
           <RecordDetails record={completedRecord} />
           <RecordActions record={completedRecord} onPrint={setPrintRecord} />
+          <div className="record__actions record__actions--saved no-print">
+            <AdminArchiveAction
+              recordType={ARCHIVE_RECORD_TYPES.JOB_START}
+              record={completedRecord}
+              user={user}
+              profile={profile}
+              onArchived={handleRecordArchived}
+            />
+          </div>
         </section>
       )}
 
@@ -390,6 +426,11 @@ export function JobStartView({
       )}
 
       <section className="saved-records no-print" aria-labelledby="saved-records-heading">
+        {archiveMessage && (
+          <p className="form-hint" role="status">
+            {archiveMessage}
+          </p>
+        )}
         <div className="saved-records__header">
           <div>
             <h2 id="saved-records-heading" className="saved-records__title">
@@ -537,6 +578,17 @@ export function JobStartView({
 
                 <p className="saved-record__meta">Saved {formatSubmittedAt(record.submittedAt)}</p>
                 <RecordActions record={record} onPrint={setPrintRecord} variant="saved" />
+                {record.formType === 'job-start' && (
+                  <div className="record__actions record__actions--saved no-print">
+                    <AdminArchiveAction
+                      recordType={ARCHIVE_RECORD_TYPES.JOB_START}
+                      record={record}
+                      user={user}
+                      profile={profile}
+                      onArchived={handleRecordArchived}
+                    />
+                  </div>
+                )}
               </li>
             )})}
           </ul>

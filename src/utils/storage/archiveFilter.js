@@ -64,3 +64,28 @@ export function filterArchived(records, type, includeArchived = false) {
   if (includeArchived) return records
   return excludeArchived(records, type)
 }
+
+/**
+ * Re-attach archived rows from `previous` after an active-only merge,
+ * so persist() does not wipe local archived copies.
+ *
+ * @param {object[]} previous
+ * @param {object[]} activeMerged
+ * @param {string} type
+ * @returns {object[]}
+ */
+export function withPreservedArchived(previous, activeMerged, type) {
+  const active = Array.isArray(activeMerged) ? activeMerged : []
+  const archived = (Array.isArray(previous) ? previous : []).filter((record) =>
+    isArchived(record, type),
+  )
+  if (archived.length === 0) return active
+
+  const keys = new Set(
+    active.map((record) => `${record.cloudId || ''}:${record.id || ''}`),
+  )
+  const extras = archived.filter(
+    (record) => !keys.has(`${record.cloudId || ''}:${record.id || ''}`),
+  )
+  return extras.length ? [...active, ...extras] : active
+}

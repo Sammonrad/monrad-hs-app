@@ -38,12 +38,15 @@ import {
   fetchGeneralMeetingRecords,
   saveGeneralMeetingRecord,
   updateGeneralMeetingRecord,
-  deleteGeneralMeetingRecord,
   isCloudSaveUnavailable,
   getUnavailableSyncStatus,
+  formatCloudSaveError,
   SYNC_STATUS,
 } from '../utils/storage/generalMeetingCloudStorage.js'
 import { isAdminProfile } from '../utils/storage/userProfileStorage.js'
+import { ARCHIVE_RECORD_TYPES } from '../utils/storage/archiveFilter.js'
+import { matchesArchiveTarget } from '../utils/storage/archiveActions.js'
+import { AdminArchiveAction } from '../components/AdminArchiveAction.jsx'
 import { downloadFile } from '../utils/export.js'
 
 export function GeneralMeetingView({
@@ -71,6 +74,7 @@ export function GeneralMeetingView({
   const [cloudLoadWarning, setCloudLoadWarning] = useState(null)
   const [printMeeting, setPrintMeeting] = useState(null)
   const [nextMeetingManual, setNextMeetingManual] = useState(false)
+  const [archiveMessage, setArchiveMessage] = useState('')
 
   const mergedMeetings = useMemo(
     () => getMergedMeetings(meetings, cloudMeetings),
@@ -107,7 +111,7 @@ export function GeneralMeetingView({
       const { records, error } = await fetchGeneralMeetingRecords(user.id, { isAdmin })
       if (!isMounted) return
       if (error) {
-        setCloudLoadWarning(`Could not load cloud meeting records: ${error.message}. Showing device records only.`)
+        setCloudLoadWarning(`Could not load cloud meeting records: ${formatCloudSaveError(error)}. Showing device records only.`)
         return
       }
       setCloudLoadWarning(null)
@@ -139,12 +143,28 @@ export function GeneralMeetingView({
     })
   }
 
-  function removeLocalMeeting(recordId) {
+  function handleMeetingArchived(archived, { localOnly } = {}) {
     setMeetings((prev) => {
-      const next = prev.filter((item) => item.id !== recordId)
+      const next = prev.map((item) =>
+        matchesArchiveTarget(item, archived) ? { ...item, archived: true } : item,
+      )
       persistMeetings(next)
       return next
     })
+    setCloudMeetings((prev) =>
+      prev.map((item) =>
+        matchesArchiveTarget(item, archived) ? { ...item, archived: true } : item,
+      ),
+    )
+    if (selectedId === archived.id || (archived.cloudId && selectedMeeting?.cloudId === archived.cloudId)) {
+      setSelectedId(null)
+      setMode('list')
+    }
+    setArchiveMessage(
+      localOnly
+        ? 'Meeting archived on this device (Local). Find it under Archived Records.'
+        : 'Meeting archived. Find it under Archived Records.',
+    )
   }
 
   function updateDraftField(field, value) {
@@ -221,7 +241,7 @@ export function GeneralMeetingView({
     if (error) {
       payload = { ...payload, syncStatus: SYNC_STATUS.CLOUD_FAILED, storageSource: 'local' }
       patchLocalMeeting(payload)
-      setSaveError(`Cloud save failed — saved on this device. ${error.message}`)
+      setSaveError(`Cloud save failed — saved on this device. ${formatCloudSaveError(error)}`)
     } else if (cloudRecord) {
       payload = cloudRecord
       patchLocalMeeting(payload)
@@ -255,19 +275,6 @@ export function GeneralMeetingView({
       return
     }
     await persistMeeting({ ...draft, status: 'completed' }, { complete: true })
-  }
-
-  async function handleDelete(record) {
-    if (!window.confirm('Delete this H&S General Meeting record?')) return
-    removeLocalMeeting(record.id)
-    if (record.cloudId) {
-      await deleteGeneralMeetingRecord(record)
-      setCloudMeetings((prev) => prev.filter((item) => item.cloudId !== record.cloudId))
-    }
-    if (selectedId === record.id) {
-      setSelectedId(null)
-      setMode('list')
-    }
   }
 
   function handleDuplicate(record) {
@@ -447,7 +454,14 @@ export function GeneralMeetingView({
           <button type="button" className="btn btn--secondary" onClick={() => handleDuplicate(selectedMeeting)}>Duplicate</button>
           <button type="button" className="btn btn--secondary" onClick={() => setPrintMeeting(selectedMeeting)}>Print / Save PDF</button>
           <button type="button" className="btn btn--secondary" onClick={() => exportMeetingJson(selectedMeeting)}>Export JSON</button>
-          <button type="button" className="btn btn--secondary" onClick={() => handleDelete(selectedMeeting)}>Delete</button>
+          <AdminArchiveAction
+            recordType={ARCHIVE_RECORD_TYPES.GENERAL_MEETING}
+            record={selectedMeeting}
+            user={user}
+            profile={profile}
+            onArchived={handleMeetingArchived}
+            buttonClassName="btn btn--secondary archive-record-action"
+          />
         </div>
 
         <section className="gm-detail-summary">
@@ -475,6 +489,11 @@ export function GeneralMeetingView({
 
       {cloudLoadWarning && (
         <p className="validation-message validation-message--warning" role="alert">{cloudLoadWarning}</p>
+      )}
+      {archiveMessage && (
+        <p className="form-hint" role="status">
+          {archiveMessage}
+        </p>
       )}
 
       <div className="gm-dashboard">

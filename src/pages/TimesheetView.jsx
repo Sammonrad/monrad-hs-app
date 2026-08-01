@@ -4,6 +4,7 @@ import { BackButton } from '../components/BackButton.jsx'
 import { SignatureConfirmationField } from '../components/SignatureConfirmationField.jsx'
 import { RecordDetails } from '../components/RecordDetails.jsx'
 import { RecordActions } from '../components/RecordActions.jsx'
+import { AdminArchiveAction } from '../components/AdminArchiveAction.jsx'
 import { SavedRecordSignature } from '../components/SavedRecordSignature.jsx'
 import { TimesheetCloudSyncBadge } from '../components/TimesheetCloudSyncBadge.jsx'
 import { FormSection } from '../components/forms/FormSection.jsx'
@@ -37,6 +38,8 @@ import {
   SYNC_STATUS,
 } from '../utils/storage/timesheetCloudStorage.js'
 import { isAdminProfile } from '../utils/storage/userProfileStorage.js'
+import { ARCHIVE_RECORD_TYPES } from '../utils/storage/archiveFilter.js'
+import { matchesArchiveTarget } from '../utils/storage/archiveActions.js'
 import {
   calculateLabourHours,
   calculateAutoChargeableHours,
@@ -71,6 +74,7 @@ export function TimesheetView({
   const [cloudLoadWarning, setCloudLoadWarning] = useState(null)
   const [cloudSaving, setCloudSaving] = useState(false)
   const [chargeableEdited, setChargeableEdited] = useState(false)
+  const [archiveMessage, setArchiveMessage] = useState('')
   const recordRef = useRef(null)
 
   const { fields, signatureConfirmation } = draft
@@ -97,6 +101,25 @@ export function TimesheetView({
     (record) => resolveRecordSyncStatus(record) === SYNC_STATUS.CLOUD,
   ).length
   const isAdmin = isAdminProfile(profile)
+
+  function handleRecordArchived(archived, { localOnly } = {}) {
+    setSavedRecords((prev) => {
+      const next = prev.map((item) =>
+        matchesArchiveTarget(item, archived) ? { ...item, archived: true } : item,
+      )
+      persistSavedRecords(next)
+      return next
+    })
+    setCloudTimesheets((prev) =>
+      prev.map((item) => (matchesArchiveTarget(item, archived) ? { ...item, archived: true } : item)),
+    )
+    setCompletedRecord((prev) => (matchesArchiveTarget(prev, archived) ? null : prev))
+    setArchiveMessage(
+      localOnly
+        ? 'Record archived on this device (Local). Find it under Archived Records.'
+        : 'Record archived. Find it under Archived Records.',
+    )
+  }
 
   function patchSavedTimesheetRecord(recordId, patch) {
     setSavedRecords((prev) => {
@@ -472,6 +495,15 @@ export function TimesheetView({
 
           <RecordDetails record={completedRecord} />
           <RecordActions record={completedRecord} onPrint={setPrintRecord} />
+          <div className="record__actions record__actions--saved no-print">
+            <AdminArchiveAction
+              recordType={ARCHIVE_RECORD_TYPES.TIMESHEET}
+              record={completedRecord}
+              user={user}
+              profile={profile}
+              onArchived={handleRecordArchived}
+            />
+          </div>
         </section>
       )}
 
@@ -483,6 +515,11 @@ export function TimesheetView({
       )}
 
       <section className="saved-records no-print" aria-labelledby="timesheet-saved-heading">
+        {archiveMessage && (
+          <p className="form-hint" role="status">
+            {archiveMessage}
+          </p>
+        )}
         <div className="saved-records__header">
           <div>
             <h2 id="timesheet-saved-heading" className="saved-records__title">
@@ -562,6 +599,15 @@ export function TimesheetView({
                   Saved {formatSubmittedAt(record.submittedAt)}
                 </p>
                 <RecordActions record={record} onPrint={setPrintRecord} variant="saved" />
+                <div className="record__actions record__actions--saved no-print">
+                  <AdminArchiveAction
+                    recordType={ARCHIVE_RECORD_TYPES.TIMESHEET}
+                    record={record}
+                    user={user}
+                    profile={profile}
+                    onArchived={handleRecordArchived}
+                  />
+                </div>
               </li>
             )})}
           </ul>

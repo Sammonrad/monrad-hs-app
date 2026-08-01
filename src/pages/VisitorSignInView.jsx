@@ -47,6 +47,9 @@ import {
   scrollToFirstInvalid,
   getValidationSummary,
 } from '../utils/formValidation.js'
+import { AdminArchiveAction } from '../components/AdminArchiveAction.jsx'
+import { ARCHIVE_RECORD_TYPES } from '../utils/storage/archiveFilter.js'
+import { matchesArchiveTarget } from '../utils/storage/archiveActions.js'
 
 const TABS = [
   { id: 'sign-in', label: 'Sign In' },
@@ -94,6 +97,7 @@ export function VisitorSignInView({
   setVisitorRecords,
   settings,
   user,
+  profile,
   cloudVisitorRecords,
   setCloudVisitorRecords,
 }) {
@@ -113,6 +117,28 @@ export function VisitorSignInView({
   const [selectedRecord, setSelectedRecord] = useState(null)
   const [printRecord, setPrintRecord] = useState(null)
   const [printRollCall, setPrintRollCall] = useState(false)
+  const [archiveMessage, setArchiveMessage] = useState('')
+
+  function handleVisitorArchived(archived, { localOnly } = {}) {
+    setVisitorRecords((prev) => {
+      const next = prev.map((item) =>
+        matchesArchiveTarget(item, archived) ? { ...item, archived: true } : item,
+      )
+      persistVisitorRecords(next)
+      return next
+    })
+    setCloudVisitorRecords((prev) =>
+      prev.map((item) =>
+        matchesArchiveTarget(item, archived) ? { ...item, archived: true } : item,
+      ),
+    )
+    setSelectedRecord((prev) => (matchesArchiveTarget(prev, archived) ? null : prev))
+    setArchiveMessage(
+      localOnly
+        ? 'Visitor record archived on this device (Local). Find it under Archived Records.'
+        : 'Visitor record archived. Find it under Archived Records.',
+    )
+  }
 
   const comboOptions = getSettingsOptions(settings)
 
@@ -699,6 +725,11 @@ export function VisitorSignInView({
 
       {activeTab === 'history' && (
         <section className="visitor-sign-in__history no-print" aria-labelledby="history-heading">
+          {archiveMessage && (
+            <p className="form-hint" role="status">
+              {archiveMessage}
+            </p>
+          )}
           <h2 id="history-heading" className="saved-records__title">
             Visitor history
           </h2>
@@ -809,7 +840,7 @@ export function VisitorSignInView({
                 </p>
               </section>
 
-              <div className="record__actions record__actions--full">
+              <div className="record__actions record__actions--full visitor-sign-in__history-actions">
                 <button
                   type="button"
                   className="print-record-btn"
@@ -817,6 +848,13 @@ export function VisitorSignInView({
                 >
                   Print
                 </button>
+                <AdminArchiveAction
+                  recordType={ARCHIVE_RECORD_TYPES.VISITOR}
+                  record={selectedRecord}
+                  user={user}
+                  profile={profile}
+                  onArchived={handleVisitorArchived}
+                />
                 <button
                   type="button"
                   className="action-btn"

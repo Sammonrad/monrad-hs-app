@@ -6993,3 +6993,42 @@ body {
   min-height: var(--tap-min);
   min-width: var(--tap-min);
 }
+
+/* Archive Record (admin) modal + action */
+.archive-record-modal {
+  width: min(100%, 28rem);
+}
+
+.archive-record-modal__title {
+  margin: 0 0 var(--spacing-sm);
+  font-size: 1.25rem;
+}
+
+.archive-record-modal__message {
+  margin: 0 0 var(--spacing-md);
+  color: var(--color-grey-700);
+  line-height: 1.45;
+}
+
+.archive-record-modal__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+
+.archive-record-modal__actions .btn {
+  min-height: var(--tap-min);
+  min-width: var(--tap-min);
+}
+
+.archive-record-action {
+  min-height: var(--tap-min);
+}
+
+.record__actions .archive-record-action,
+.action-card__actions .archive-record-action,
+.gm-detail-actions .archive-record-action,
+.visitor-sign-in__history-actions .archive-record-action {
+  min-height: var(--tap-min);
+}

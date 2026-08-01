@@ -51,6 +51,7 @@ import {
   fetchVisitorSignInRecords,
   getMergedVisitorRecords,
 } from './utils/storage/visitorSignInCloudStorage.js'
+import { ARCHIVE_RECORD_TYPES, withPreservedArchived } from './utils/storage/archiveFilter.js'
 import { fetchSsspRecords } from './utils/storage/ssspCloudStorage.js'
 import { fetchEquipmentRecords, loadLocalEquipmentRecords, getMergedEquipmentRecords } from './utils/storage/equipmentCloudStorage.js'
 import { fetchServiceRecords, loadLocalServiceRecords, getMergedServiceRecords } from './utils/storage/equipmentServiceCloudStorage.js'
@@ -531,12 +532,15 @@ function App() {
     if (!session?.user?.id) return undefined
 
     setActions((prev) => {
-      const merged = getMergedActions(prev, cloudActions)
+      const activeMerged = getMergedActions(prev, cloudActions)
+      const merged = withPreservedArchived(prev, activeMerged, ARCHIVE_RECORD_TYPES.ACTION)
       const changed =
         merged.length !== prev.length ||
         merged.some(
           (action, index) =>
-            action.cloudId !== prev[index]?.cloudId || action.id !== prev[index]?.id,
+            action.cloudId !== prev[index]?.cloudId ||
+            action.id !== prev[index]?.id ||
+            action.archived !== prev[index]?.archived,
         )
       if (changed) {
         persistActions(merged)
@@ -550,12 +554,15 @@ function App() {
     if (!session?.user?.id) return undefined
 
     setVisitorRecords((prev) => {
-      const merged = getMergedVisitorRecords(prev, cloudVisitorRecords)
+      const activeMerged = getMergedVisitorRecords(prev, cloudVisitorRecords)
+      const merged = withPreservedArchived(prev, activeMerged, ARCHIVE_RECORD_TYPES.VISITOR)
       const changed =
         merged.length !== prev.length ||
         merged.some(
           (record, index) =>
-            record.cloudId !== prev[index]?.cloudId || record.id !== prev[index]?.id,
+            record.cloudId !== prev[index]?.cloudId ||
+            record.id !== prev[index]?.id ||
+            record.archived !== prev[index]?.archived,
         )
       if (changed) {
         persistVisitorRecords(merged)
@@ -914,6 +921,7 @@ function App() {
           setVisitorRecords={setVisitorRecords}
           settings={settings}
           user={session?.user ?? null}
+          profile={profile}
           cloudVisitorRecords={cloudVisitorRecords}
           setCloudVisitorRecords={setCloudVisitorRecords}
         />

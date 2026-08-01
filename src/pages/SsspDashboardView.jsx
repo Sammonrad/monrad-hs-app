@@ -3,6 +3,7 @@ import { Archive, CheckCircle2, Clock3, FileCheck2, FileText, Plus, Search, Send
 import { BackButton } from '../components/BackButton.jsx'
 import { FormPageHeader } from '../components/forms/FormPageHeader.jsx'
 import { PrintableSSSP } from '../components/PrintableSSSP.jsx'
+import { ArchiveRecordModal } from '../components/ArchiveRecordModal.jsx'
 import {
   SSSP_DASHBOARD_TABS,
   getSsspStatusLabel,
@@ -17,6 +18,9 @@ import {
 import { formatSubmittedAt } from '../utils/formatting.js'
 import { SSSP_STATUS } from '../constants/ssspStatuses.js'
 import { updateSsspRecord } from '../utils/storage/ssspCloudStorage.js'
+import { ARCHIVE_RECORD_TYPES } from '../utils/storage/archiveFilter.js'
+import { archiveRecord } from '../utils/storage/archiveActions.js'
+import { formatCloudSaveError } from '../utils/storage/cloudSyncStatus.js'
 
 export function SsspDashboardView({
   onBack,
@@ -33,7 +37,10 @@ export function SsspDashboardView({
   const [search, setSearch] = useState('')
   const [printRecord, setPrintRecord] = useState(null)
   const [actionError, setActionError] = useState('')
+  const [actionSuccess, setActionSuccess] = useState('')
   const [actionLoadingId, setActionLoadingId] = useState(null)
+  const [archiveTarget, setArchiveTarget] = useState(null)
+  const [archiveModalError, setArchiveModalError] = useState('')
 
   const preparedByName = profile?.full_name?.trim() || user?.email?.split('@')[0] || ''
 
@@ -86,23 +93,23 @@ export function SsspDashboardView({
     window.setTimeout(() => window.print(), 350)
   }
 
-  async function handleArchiveToggle(record) {
+  async function handleReactivate(record) {
     if (!user?.id || !record.cloudId) return
     setActionLoadingId(record.cloudId)
     setActionError('')
+    setActionSuccess('')
 
     const now = new Date().toISOString()
-    const archiving = record.status !== SSSP_STATUS.ARCHIVED
     let next = syncIndexedFieldsFromRecordData({
       ...record,
-      status: archiving ? SSSP_STATUS.ARCHIVED : SSSP_STATUS.DRAFT,
-      archivedAt: archiving ? now : null,
+      status: SSSP_STATUS.DRAFT,
+      archivedAt: null,
       updatedAt: now,
     })
 
     next = appendChangeLog(next, {
-      action: archiving ? 'archived' : 'reactivated',
-      detail: archiving ? 'SSSP archived from dashboard' : 'SSSP reactivated to draft',
+      action: 'reactivated',
+      detail: 'SSSP reactivated to draft',
       userName: preparedByName,
     })
 
@@ -110,7 +117,7 @@ export function SsspDashboardView({
     setActionLoadingId(null)
 
     if (error) {
-      setActionError(error.message)
+      setActionError(formatCloudSaveError(error) || error.message)
       return
     }
 
@@ -118,6 +125,37 @@ export function SsspDashboardView({
       const without = prev.filter((r) => r.cloudId !== saved.cloudId)
       return [saved, ...without]
     })
+    setActionSuccess('SSSP reactivated to draft.')
+  }
+
+  async function confirmArchiveSssp() {
+    if (!archiveTarget || actionLoadingId) return
+    setActionLoadingId(archiveTarget.cloudId)
+    setArchiveModalError('')
+    setActionError('')
+    setActionSuccess('')
+
+    const { record: saved, error } = await archiveRecord(
+      ARCHIVE_RECORD_TYPES.SSSP,
+      archiveTarget,
+      user,
+      profile,
+      { preparedByName },
+    )
+
+    setActionLoadingId(null)
+
+    if (error || !saved) {
+      setArchiveModalError(error?.message || 'Archive failed.')
+      return
+    }
+
+    setSsspRecords((prev) => {
+      const without = prev.filter((r) => r.cloudId !== saved.cloudId)
+      return [saved, ...without]
+    })
+    setArchiveTarget(null)
+    setActionSuccess('SSSP archived. Find it under Archived Records.')
   }
 
   return (
@@ -137,6 +175,11 @@ export function SsspDashboardView({
 
       {actionError && (
         <p className="validation-message" role="alert">{actionError}</p>
+      )}
+      {actionSuccess && (
+        <p className="form-hint" role="status">
+          {actionSuccess}
+        </p>
       )}
 
       {loadError && (
@@ -252,18 +295,21 @@ export function SsspDashboardView({
                       {record.status !== 'archived' ? (
                         <button
                           type="button"
-                          className="btn btn--secondary"
+                          className="btn btn--secondary archive-record-action"
                           disabled={actionLoadingId === record.cloudId}
-                          onClick={() => handleArchiveToggle(record)}
+                          onClick={() => {
+                            setArchiveModalError('')
+                            setArchiveTarget(record)
+                          }}
                         >
-                          Archive
+                          Archive Record
                         </button>
                       ) : (
                         <button
                           type="button"
                           className="btn btn--secondary"
                           disabled={actionLoadingId === record.cloudId}
-                          onClick={() => handleArchiveToggle(record)}
+                          onClick={() => handleReactivate(record)}
                         >
                           Reactivate
                         </button>
@@ -288,6 +334,18 @@ export function SsspDashboardView({
           </ul>
         )}
       </div>
+
+      <ArchiveRecordModal
+        open={Boolean(archiveTarget)}
+        onCancel={() => {
+          if (actionLoadingId) return
+          setArchiveTarget(null)
+          setArchiveModalError('')
+        }}
+        onConfirm={confirmArchiveSssp}
+        archiving={Boolean(archiveTarget && actionLoadingId === archiveTarget.cloudId)}
+        error={archiveModalError}
+      />
     </>
   )
 }

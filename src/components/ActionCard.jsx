@@ -6,11 +6,21 @@ import {
 } from '../constants/index.js'
 import { isOverdue } from '../utils/storage/actionsStorage.js'
 import { isCriticalAction } from '../utils/safetyAlerts.js'
+import { ARCHIVE_RECORD_TYPES } from '../utils/storage/archiveFilter.js'
 import { SummaryRow } from './FormFields.jsx'
 import { CloudSyncBadge } from './CloudSyncBadge.jsx'
+import { AdminArchiveAction } from './AdminArchiveAction.jsx'
 import { exportActionJson, exportActionText } from '../utils/export.js'
 
-export function ActionCard({ action, onUpdate, onComplete, onPrint }) {
+export function ActionCard({
+  action,
+  onUpdate,
+  onComplete,
+  onPrint,
+  user,
+  profile,
+  onArchived,
+}) {
   const overdue = isOverdue(action)
   const critical = isCriticalAction(action)
   const serious = action.serious && action.status !== 'completed'
@@ -123,6 +133,13 @@ export function ActionCard({ action, onUpdate, onComplete, onPrint }) {
         <button type="button" className="action-btn" onClick={() => exportActionText(action)}>
           Export text
         </button>
+        <AdminArchiveAction
+          recordType={ARCHIVE_RECORD_TYPES.ACTION}
+          record={action}
+          user={user}
+          profile={profile}
+          onArchived={onArchived}
+        />
       </div>
 
       <label className="field">

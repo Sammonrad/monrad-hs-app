@@ -5,6 +5,7 @@ import { SignatureConfirmationField } from '../components/SignatureConfirmationF
 import { PhotoUpload } from '../components/PhotoUpload.jsx'
 import { RecordDetails } from '../components/RecordDetails.jsx'
 import { RecordActions } from '../components/RecordActions.jsx'
+import { AdminArchiveAction } from '../components/AdminArchiveAction.jsx'
 import { SavedRecordSignature } from '../components/SavedRecordSignature.jsx'
 import { CloudSyncBadge } from '../components/CloudSyncBadge.jsx'
 import { FormSection } from '../components/forms/FormSection.jsx'
@@ -38,6 +39,8 @@ import {
   SYNC_STATUS,
 } from '../utils/storage/incidentCloudStorage.js'
 import { isAdminProfile } from '../utils/storage/userProfileStorage.js'
+import { ARCHIVE_RECORD_TYPES } from '../utils/storage/archiveFilter.js'
+import { matchesArchiveTarget } from '../utils/storage/archiveActions.js'
 import {
   scrollToFirstInvalid,
   hasValidationErrors,
@@ -69,6 +72,7 @@ export function IncidentView({
   const [completedCloudError, setCompletedCloudError] = useState('')
   const [cloudLoadWarning, setCloudLoadWarning] = useState(null)
   const [cloudSaving, setCloudSaving] = useState(false)
+  const [archiveMessage, setArchiveMessage] = useState('')
   const recordRef = useRef(null)
 
   const { fields, checked, signatureConfirmation, photos } = draft
@@ -87,6 +91,25 @@ export function IncidentView({
   const cloudIncidentCount = incidentRecords.filter(
     (record) => resolveRecordSyncStatus(record) === SYNC_STATUS.CLOUD,
   ).length
+
+  function handleRecordArchived(archived, { localOnly } = {}) {
+    setSavedRecords((prev) => {
+      const next = prev.map((item) =>
+        matchesArchiveTarget(item, archived) ? { ...item, archived: true } : item,
+      )
+      persistSavedRecords(next)
+      return next
+    })
+    setCloudIncidents((prev) =>
+      prev.map((item) => (matchesArchiveTarget(item, archived) ? { ...item, archived: true } : item)),
+    )
+    setCompletedRecord((prev) => (matchesArchiveTarget(prev, archived) ? null : prev))
+    setArchiveMessage(
+      localOnly
+        ? 'Record archived on this device (Local). Find it under Archived Records.'
+        : 'Record archived. Find it under Archived Records.',
+    )
+  }
 
   function patchSavedIncidentRecord(recordId, patch) {
     setSavedRecords((prev) => {
@@ -441,6 +464,15 @@ export function IncidentView({
 
           <RecordDetails record={completedRecord} />
           <RecordActions record={completedRecord} onPrint={setPrintRecord} />
+          <div className="record__actions record__actions--saved no-print">
+            <AdminArchiveAction
+              recordType={ARCHIVE_RECORD_TYPES.INCIDENT}
+              record={completedRecord}
+              user={user}
+              profile={profile}
+              onArchived={handleRecordArchived}
+            />
+          </div>
         </section>
       )}
 
@@ -452,6 +484,11 @@ export function IncidentView({
       )}
 
       <section className="saved-records no-print" aria-labelledby="incident-saved-heading">
+        {archiveMessage && (
+          <p className="form-hint" role="status">
+            {archiveMessage}
+          </p>
+        )}
         <div className="saved-records__header">
           <div>
             <h2 id="incident-saved-heading" className="saved-records__title">
@@ -547,6 +584,15 @@ export function IncidentView({
 
                 <p className="saved-record__meta">Saved {formatSubmittedAt(record.submittedAt)}</p>
                 <RecordActions record={record} onPrint={setPrintRecord} variant="saved" />
+                <div className="record__actions record__actions--saved no-print">
+                  <AdminArchiveAction
+                    recordType={ARCHIVE_RECORD_TYPES.INCIDENT}
+                    record={record}
+                    user={user}
+                    profile={profile}
+                    onArchived={handleRecordArchived}
+                  />
+                </div>
               </li>
               )
             })}
