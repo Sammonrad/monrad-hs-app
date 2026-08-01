@@ -69,6 +69,9 @@
   --content-padding-tablet: 1.5rem;
   --content-padding-desktop: 2rem;
   --content-padding-large: 2.5rem;
+
+  /* Sticky form footer (hint + submit + padding); used for scroll clearance */
+  --form-actions-sticky-space: 8rem;
 }
 
 *,
@@ -2708,7 +2711,11 @@ body {
   display: flex;
   flex-direction: column;
   gap: 1rem;
-  padding-bottom: 5rem;
+  min-width: 0;
+  max-width: 100%;
+  /* Extra scroll room so content can clear the sticky FormActions overlay */
+  padding-bottom: calc(var(--form-actions-sticky-space, 8rem) + env(safe-area-inset-bottom, 0px));
+  scroll-padding-bottom: calc(var(--form-actions-sticky-space, 8rem) + env(safe-area-inset-bottom, 0px));
 }
 
 .job-form__fieldset {
@@ -2720,6 +2727,8 @@ body {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .job-form__legend {
@@ -2773,15 +2782,26 @@ input[type='date'].form-input,
 .form-input[type='date'] {
   display: block;
   width: 100%;
+  inline-size: 100%;
   max-width: 100%;
   min-width: 0;
   box-sizing: border-box;
+  overflow: hidden;
+  -webkit-appearance: none;
+  appearance: none;
 }
 
-/* Allow the date text segment to shrink; keep the calendar picker visible */
+/* iOS/WebKit: shrink the value/edit segments so the control matches sibling fields */
+input[type='date']::-webkit-date-and-time-value {
+  min-width: 0;
+  width: 100%;
+  text-align: left;
+}
+
 input[type='date']::-webkit-datetime-edit {
   min-width: 0;
   max-width: 100%;
+  overflow: hidden;
 }
 
 .field__input::placeholder,
@@ -3354,6 +3374,8 @@ input[type='date']::-webkit-datetime-edit {
   border: 1px solid var(--color-grey-150);
   border-radius: var(--card-radius-sm);
   background: var(--bg-card);
+  min-width: 0;
+  max-width: 100%;
 }
 
 .form-section__title {
@@ -3376,6 +3398,8 @@ input[type='date']::-webkit-datetime-edit {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .form-section--defect-fail {
@@ -3535,6 +3559,9 @@ input[type='date']::-webkit-datetime-edit {
     var(--bg-app) 70%,
     rgba(255, 255, 255, 0)
   );
+  /* Measure sticky stack for form clearance (hint + gap + submit + paddings) */
+  min-height: 0;
+  box-sizing: border-box;
 }
 
 .form-actions__inner {
@@ -7745,10 +7772,29 @@ input[type='date']::-webkit-datetime-edit {
     width: 100%;
     max-width: 100%;
     min-width: 0;
+    overflow: hidden;
+    -webkit-appearance: none;
+    appearance: none;
   }
 
+  input[type='date']::-webkit-date-and-time-value {
+    min-width: 0;
+    width: 100%;
+    text-align: left;
+  }
+
+  input[type='date']::-webkit-datetime-edit {
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+  }
+
+  .form-section,
+  .form-section__body,
+  .job-form__fieldset,
   .field,
   .form-field,
+  .form-grid,
   .form-grid > *,
   .records-search__filter,
   .weekly-filters__grid > *,
@@ -7770,8 +7816,23 @@ input[type='date']::-webkit-datetime-edit {
     max-width: 100%;
   }
 
+  /* Sticky bar is taller on phone (hint wrap + 48px submit + safe-area) */
+  .job-form {
+    --form-actions-sticky-space: 9.5rem;
+    padding-bottom: calc(var(--form-actions-sticky-space, 9.5rem) + env(safe-area-inset-bottom, 0px));
+    scroll-padding-bottom: calc(var(--form-actions-sticky-space, 9.5rem) + env(safe-area-inset-bottom, 0px));
+  }
+
   /* Date cells in two-up filter grids: full track so UA min-content cannot overflow */
   .records-search__filters .records-search__filter:has(> input[type='date']) {
     grid-column: 1 / -1;
+  }
+}
+
+/* Desktop: keep sticky actions but don't force the larger mobile clearance */
+@media (min-width: 641px) {
+  .job-form {
+    --form-actions-sticky-space: 6rem;
+    padding-bottom: calc(var(--form-actions-sticky-space, 6rem) + env(safe-area-inset-bottom, 0px));
   }
 }
