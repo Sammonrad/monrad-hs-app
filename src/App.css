@@ -4110,12 +4110,23 @@ input[type='date']::-webkit-datetime-edit {
   align-items: stretch;
 }
 
+/* Grow horizontally when side-by-side; use min-width (not flex-basis)
+   so column layout on mobile does not turn 12rem into button height. */
 .timesheet-form-actions .submit-btn {
-  flex: 1 1 12rem;
+  flex: 1 1 auto;
+  min-width: 12rem;
+  height: auto;
+  min-height: 52px;
+  padding: 14px 20px;
+  line-height: 1.2;
 }
 
 .timesheet-form-actions .btn {
-  min-height: var(--tap-min);
+  flex: 0 0 auto;
+  height: auto;
+  min-height: 52px;
+  padding: 14px 20px;
+  line-height: 1.2;
 }
 
 .saved-records__header {
@@ -4853,11 +4864,19 @@ input[type='date']::-webkit-datetime-edit {
 
   .timesheet-form-actions {
     flex-direction: column;
+    align-items: stretch;
   }
 
   .timesheet-form-actions .submit-btn,
   .timesheet-form-actions .btn {
     width: 100%;
+    flex: 0 0 auto;
+    flex-grow: 0;
+    min-width: 0;
+    height: auto;
+    min-height: 52px;
+    padding: 14px 20px;
+    line-height: 1.2;
   }
 
   .cloud-sync-status--small {
