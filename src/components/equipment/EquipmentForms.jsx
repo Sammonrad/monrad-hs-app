@@ -2,7 +2,12 @@ import { useState } from 'react'
 import { FormField } from '../forms/FormField.jsx'
 import { FormSection } from '../forms/FormSection.jsx'
 import { FormGrid, FormGridFull } from '../layout/FormGrid.jsx'
-import { TextField, SelectField, DateField, NotesField } from '../FormFields.jsx'
+import { TextField, SelectField, DateField, TimeField, NotesField } from '../FormFields.jsx'
+import {
+  isoToLocalDatePart,
+  isoToLocalTimePart,
+  localDateAndTimeToIso,
+} from '../../utils/time12Hour.js'
 import { FormActions } from '../forms/FormActions.jsx'
 import {
   ASSET_TYPES,
@@ -171,14 +176,27 @@ export function DefectForm({
             includeManual={false}
           />
         </FormField>
-        <FormField label="Date and time reported">
-          <input
-            type="datetime-local"
-            className="form-input"
-            value={form.reportedAt?.slice(0, 16) ?? ''}
-            onChange={(e) => updateField('reportedAt', new Date(e.target.value).toISOString())}
-          />
-        </FormField>
+        <DateField
+          label="Date reported"
+          field="reportedAtDate"
+          value={isoToLocalDatePart(form.reportedAt)}
+          onChange={(_, dateValue) => {
+            updateField(
+              'reportedAt',
+              localDateAndTimeToIso(dateValue, isoToLocalTimePart(form.reportedAt)) || form.reportedAt,
+            )
+          }}
+        />
+        <TimeField
+          label="Time reported"
+          field="reportedAtTime"
+          value={isoToLocalTimePart(form.reportedAt)}
+          onChange={(_, timeValue) => {
+            const datePart = isoToLocalDatePart(form.reportedAt)
+            if (!datePart) return
+            updateField('reportedAt', localDateAndTimeToIso(datePart, timeValue) || form.reportedAt)
+          }}
+        />
         <SelectField label="Severity" field="severity" value={form.severity} onChange={updateField} options={DEFECT_SEVERITIES.map((v) => ({ value: v, label: v }))} />
         <FormGridFull>
           <label className="field">

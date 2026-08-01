@@ -6,7 +6,8 @@ import { FormSection } from '../components/forms/FormSection.jsx'
 import { FormField } from '../components/forms/FormField.jsx'
 import { FormActions } from '../components/forms/FormActions.jsx'
 import { FormGrid, FormGridFull } from '../components/layout/FormGrid.jsx'
-import { TextField, DateField, SelectField, NotesField } from '../components/FormFields.jsx'
+import { TextField, DateField, TimeField, SelectField, NotesField } from '../components/FormFields.jsx'
+import { formatTime12Hour } from '../utils/time12Hour.js'
 import { CloudSyncBadge } from '../components/CloudSyncBadge.jsx'
 import { PrintableGeneralMeeting } from '../components/generalMeeting/PrintableGeneralMeeting.jsx'
 import {
@@ -305,7 +306,7 @@ export function GeneralMeetingView({
           <FormSection title="Meeting details" id="gm-details">
             <FormGrid>
               <DateField label="Meeting date" field="meetingDate" value={draft.meetingDate} onChange={updateDraftField} />
-              <TextField label="Meeting time" field="meetingTime" value={draft.meetingTime} onChange={updateDraftField} type="time" />
+              <TimeField label="Meeting time" field="meetingTime" value={draft.meetingTime} onChange={updateDraftField} />
               <TextField label="Location" field="location" value={draft.location} onChange={updateDraftField} />
               <SelectField
                 label="Meeting type"
@@ -466,7 +467,7 @@ export function GeneralMeetingView({
 
         <section className="gm-detail-summary">
           <dl className="gm-detail-summary__dl">
-            <div><dt>Date / time</dt><dd>{selectedMeeting.meetingDate} {selectedMeeting.meetingTime}</dd></div>
+            <div><dt>Date / time</dt><dd>{selectedMeeting.meetingDate} {formatTime12Hour(selectedMeeting.meetingTime) || '—'}</dd></div>
             <div><dt>Location</dt><dd>{selectedMeeting.location || '—'}</dd></div>
             <div><dt>Chairperson</dt><dd>{selectedMeeting.chairperson || '—'}</dd></div>
             <div><dt>Attendees</dt><dd>{selectedMeeting.attendees || '—'}</dd></div>

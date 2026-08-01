@@ -5,6 +5,7 @@ import {
   getMeetingDisplayTitle,
 } from '../../constants/generalMeetingConfig.js'
 import { ACTION_PRIORITY_LABELS, ACTION_STATUS_LABELS } from '../../constants/index.js'
+import { formatTime12Hour } from '../../utils/time12Hour.js'
 
 function Section({ title, children }) {
   if (!children) return null
@@ -36,7 +37,7 @@ export function PrintableGeneralMeeting({ meeting }) {
       <Section title="Meeting details">
         <dl className="print-general-meeting__dl">
           <div><dt>Date</dt><dd>{meeting.meetingDate || '—'}</dd></div>
-          <div><dt>Time</dt><dd>{meeting.meetingTime || '—'}</dd></div>
+          <div><dt>Time</dt><dd>{formatTime12Hour(meeting.meetingTime) || '—'}</dd></div>
           <div><dt>Location</dt><dd>{meeting.location || '—'}</dd></div>
           <div><dt>Type</dt><dd>{MEETING_TYPE_LABELS[meeting.meetingType] || meeting.meetingType || '—'}</dd></div>
           <div><dt>Status</dt><dd>{MEETING_STATUS_LABELS[meeting.status] || meeting.status || '—'}</dd></div>

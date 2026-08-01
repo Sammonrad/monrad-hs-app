@@ -1,4 +1,7 @@
 import { REPORT_TYPE_LABELS, DEFECT_SEVERITY_LABELS } from '../constants/index.js'
+import { formatTime12Hour } from './time12Hour.js'
+
+const TIME_DISPLAY_KEYS = new Set(['startTime', 'finishTime', 'time', 'meetingTime'])
 
 export function formatReportType(value) {
   return REPORT_TYPE_LABELS[value] ?? value ?? '—'
@@ -34,6 +37,7 @@ export function formatFieldDisplayValue(key, value) {
   if (key === 'machineOperableSafely') return formatMachineOperable(value)
   if (key === 'chargeableHours' && value) return formatDecimalHoursDisplay(value)
   if (key === 'nonChargeableHours' && value) return formatDecimalHoursDisplay(value)
+  if (TIME_DISPLAY_KEYS.has(key)) return formatTime12Hour(value) || '—'
   return value || '—'
 }
 

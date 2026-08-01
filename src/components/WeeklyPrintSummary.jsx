@@ -1,5 +1,6 @@
 import { formatHoursTotal } from '../utils/weeklyTimesheet.js'
 import { formatDecimalHoursDisplay } from '../utils/formatting.js'
+import { formatTime12Hour } from '../utils/time12Hour.js'
 import { MonradLogo } from './MonradLogo.jsx'
 
 export function WeeklyPrintSummary({ totals, weekGroups, filterDescription, generatedAt }) {
@@ -68,8 +69,8 @@ export function WeeklyPrintSummary({ totals, weekGroups, filterDescription, gene
                     <td>{fields.jobProjectName || '—'}</td>
                     <td>{fields.siteLocation || '—'}</td>
                     <td>{fields.machineUsed || '—'}</td>
-                    <td>{fields.startTime || '—'}</td>
-                    <td>{fields.finishTime || '—'}</td>
+                    <td>{formatTime12Hour(fields.startTime) || '—'}</td>
+                    <td>{formatTime12Hour(fields.finishTime) || '—'}</td>
                     <td>{fields.breakMinutes ? `${fields.breakMinutes}m` : '—'}</td>
                     <td>{fields.totalHoursWorked || '—'}</td>
                     <td>{formatDecimalHoursDisplay(fields.chargeableHours) || '—'}</td>

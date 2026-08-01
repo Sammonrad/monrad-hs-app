@@ -18,6 +18,7 @@ import {
   ComboField,
   TextField,
   DateField,
+  TimeField,
   NotesField,
   SelectField,
   SummaryRow,
@@ -308,7 +309,7 @@ export function IncidentView({
             <FormField label="Date" fieldId="date" required error={fieldErrors.date}>
               <DateField label="" value={fields.date} onChange={updateField} />
             </FormField>
-            <TextField label="Time" field="time" value={fields.time} onChange={updateField} placeholder="e.g. 14:30" />
+            <TimeField label="Time" field="time" value={fields.time} onChange={updateField} />
             <FormField label="Site / job location" fieldId="siteLocation" required error={fieldErrors.siteLocation}>
               <ComboField label="" field="siteLocation" value={fields.siteLocation} onChange={updateField} placeholder="Where it occurred" options={comboOptions.sites} listId="incident-sites" />
             </FormField>

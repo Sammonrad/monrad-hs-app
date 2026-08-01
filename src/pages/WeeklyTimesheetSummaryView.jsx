@@ -3,6 +3,7 @@ import { BackButton } from '../components/BackButton.jsx'
 import { WeeklyPrintSummary } from '../components/WeeklyPrintSummary.jsx'
 import { ComboField } from '../components/FormFields.jsx'
 import { formatDecimalHoursDisplay } from '../utils/formatting.js'
+import { formatTime12Hour } from '../utils/time12Hour.js'
 import {
   EMPTY_WEEKLY_FILTERS,
   filterTimesheets,
@@ -272,11 +273,11 @@ export function WeeklyTimesheetSummaryView({
                       </div>
                       <div className="weekly-record__row">
                         <dt>Start</dt>
-                        <dd>{fields.startTime || '—'}</dd>
+                        <dd>{formatTime12Hour(fields.startTime) || '—'}</dd>
                       </div>
                       <div className="weekly-record__row">
                         <dt>Finish</dt>
-                        <dd>{fields.finishTime || '—'}</dd>
+                        <dd>{formatTime12Hour(fields.finishTime) || '—'}</dd>
                       </div>
                       <div className="weekly-record__row">
                         <dt>Break</dt>

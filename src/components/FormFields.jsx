@@ -1,3 +1,5 @@
+import { TimePicker12Hour } from './TimePicker12Hour.jsx'
+
 export function ComboField({ label, field, value, onChange, placeholder, options = [], listId }) {
   const datalistId = listId || `combo-${field}`
   const hasOptions = options.length > 0
@@ -57,17 +59,34 @@ export function DateField({ value, onChange, field = 'date', label = 'Date' }) {
   )
 }
 
-export function TimeField({ value, onChange, field, label }) {
+export function TimeField({
+  value,
+  onChange,
+  field,
+  label,
+  id,
+  required = false,
+  disabled = false,
+  ariaLabel,
+}) {
+  const accessibleName = ariaLabel || label || undefined
   return (
-    <label className="field">
-      {label ? <span className="field__label">{label}</span> : null}
-      <input
-        type="time"
-        className="field__input"
+    <div className="field">
+      {label ? (
+        <span className="field__label" id={id ? `${id}-label` : undefined}>
+          {label}
+        </span>
+      ) : null}
+      <TimePicker12Hour
+        id={id || (field ? `time-${field}` : undefined)}
         value={value}
-        onChange={(e) => onChange(field, e.target.value)}
+        onChange={(next) => onChange(field, next)}
+        aria-label={accessibleName}
+        aria-labelledby={label && id ? `${id}-label` : undefined}
+        required={required}
+        disabled={disabled}
       />
-    </label>
+    </div>
   )
 }
 

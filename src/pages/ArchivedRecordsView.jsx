@@ -3,6 +3,7 @@ import { BackButton } from '../components/BackButton.jsx'
 import { getEquipmentReadableName } from '../constants/equipmentConfig.js'
 import { getSsspStatusLabel } from '../constants/ssspStatuses.js'
 import { formatSubmittedAt } from '../utils/formatting.js'
+import { formatTime12Hour } from '../utils/time12Hour.js'
 import { getFormTypeLabel, getRecordTitle } from '../utils/records.js'
 import { PermanentDeleteModal } from '../components/PermanentDeleteModal.jsx'
 import { ARCHIVE_RECORD_TYPES, isArchived } from '../utils/storage/archiveFilter.js'
@@ -359,7 +360,7 @@ function DetailRows({ item }) {
         </div>
         <div className="archived-records__detail-row">
           <dt>Time</dt>
-          <dd>{record.meetingTime || '—'}</dd>
+          <dd>{formatTime12Hour(record.meetingTime) || '—'}</dd>
         </div>
         <div className="archived-records__detail-row">
           <dt>Location</dt>

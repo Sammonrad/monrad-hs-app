@@ -355,10 +355,24 @@ export function TimesheetView({
         <FormSection title="Hours" id="timesheet-hours">
           <FormGrid>
             <FormField label="Start time" fieldId="startTime" required error={fieldErrors.startTime}>
-              <TimeField label="" field="startTime" value={fields.startTime} onChange={updateField} />
+              <TimeField
+                label=""
+                field="startTime"
+                value={fields.startTime}
+                onChange={updateField}
+                ariaLabel="Start time"
+                required
+              />
             </FormField>
             <FormField label="Finish time" fieldId="finishTime" required error={fieldErrors.finishTime}>
-              <TimeField label="" field="finishTime" value={fields.finishTime} onChange={updateField} />
+              <TimeField
+                label=""
+                field="finishTime"
+                value={fields.finishTime}
+                onChange={updateField}
+                ariaLabel="Finish time"
+                required
+              />
             </FormField>
             <FormGridFull>
               <div className="timesheet-calc" aria-live="polite" data-field-id="labourTime">

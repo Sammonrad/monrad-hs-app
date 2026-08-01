@@ -1,6 +1,7 @@
 import { getFormTypeLabel } from './records.js'
 import {
   formatSubmittedAt,
+  formatFieldDisplayValue,
   formatReportType,
   formatDefectsFound,
   formatDefectSeverity,
@@ -24,7 +25,8 @@ export function buildTextSummary(record) {
 
   Object.entries(record.fields ?? {}).forEach(([key, value]) => {
     if (value) {
-      lines.push(`${key.replace(/([A-Z])/g, ' $1').replace(/^./, (s) => s.toUpperCase())}: ${value}`)
+      const label = key.replace(/([A-Z])/g, ' $1').replace(/^./, (s) => s.toUpperCase())
+      lines.push(`${label}: ${formatFieldDisplayValue(key, value)}`)
     }
   })
 
