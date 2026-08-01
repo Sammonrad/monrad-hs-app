@@ -2736,6 +2736,8 @@ body {
   display: flex;
   flex-direction: column;
   gap: 0.375rem;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .field__label {
@@ -2746,9 +2748,11 @@ body {
 
 .field__input,
 .form-input {
+  display: block;
   width: 100%;
   max-width: 100%;
   min-width: 0;
+  box-sizing: border-box;
   min-height: var(--tap-min);
   padding: var(--spacing-md) 0.875rem;
   font-size: 1rem;
@@ -2762,11 +2766,22 @@ body {
 }
 
 /* Native date controls have a large intrinsic min-width; keep them in-cell */
+input[type='date'],
 input[type='date'].field__input,
-input[type='date'].form-input {
+input[type='date'].form-input,
+.field__input[type='date'],
+.form-input[type='date'] {
+  display: block;
   width: 100%;
   max-width: 100%;
   min-width: 0;
+  box-sizing: border-box;
+}
+
+/* Allow the date text segment to shrink; keep the calendar picker visible */
+input[type='date']::-webkit-datetime-edit {
+  min-width: 0;
+  max-width: 100%;
 }
 
 .field__input::placeholder,
@@ -3378,6 +3393,8 @@ input[type='date'].form-input {
   display: flex;
   flex-direction: column;
   gap: 0.375rem;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .form-field--error .field__input,
@@ -5822,8 +5839,15 @@ input[type='date'].form-input {
 
 .form-grid {
   display: grid;
-  grid-template-columns: 1fr;
+  /* minmax(0, 1fr) — plain 1fr is minmax(auto, 1fr) and won't shrink below date min-content */
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--spacing-md);
+}
+
+.form-grid > *,
+.form-grid__full {
+  min-width: 0;
+  max-width: 100%;
 }
 
 .form-grid__full {
@@ -6562,6 +6586,14 @@ input[type='date'].form-input {
 
 .equipment-toolbar .form-input {
   flex: 1 1 10rem;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.equipment-toolbar input.form-input[type='date'] {
+  flex: 1 1 100%;
+  width: 100%;
+  max-width: 100%;
   min-width: 0;
 }
 
@@ -7305,6 +7337,14 @@ input[type='date'].form-input {
 .gm-dashboard__filters .form-input {
   flex: 1 1 10rem;
   min-width: 0;
+  max-width: 100%;
+}
+
+.gm-dashboard__filters input.form-input[type='date'] {
+  flex: 1 1 100%;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
 }
 
 .gm-dashboard__tabs {
@@ -7489,7 +7529,13 @@ input[type='date'].form-input {
 
 .gm-action-rows__grid {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--spacing-sm);
+}
+
+.gm-action-rows__grid > * {
+  min-width: 0;
+  max-width: 100%;
 }
 
 .gm-action-rows .btn {
@@ -7647,7 +7693,7 @@ input[type='date'].form-input {
   min-height: var(--tap-min);
 }
 
-/* Shared mobile card date/text containment (320–430px and up) */
+/* Shared mobile card / date containment (320–430px viewports) */
 .equipment-summary-card,
 .gm-history-card,
 .archived-records__card,
@@ -7664,22 +7710,55 @@ input[type='date'].form-input {
 }
 
 .field:has(> input[type='date']),
+.form-field:has(input[type='date']),
 .records-search__filter:has(> input[type='date']),
 .weekly-filters__grid .field:has(> input[type='date']),
-.visitor-sign-in__filters .field:has(> input[type='date']) {
+.visitor-sign-in__filters .field:has(> input[type='date']),
+.visitor-sign-in__filters .form-field:has(input[type='date']),
+.sssp-editor__meta .form-field:has(input[type='date']),
+.action-card__status-field:has(> input[type='date']),
+.gm-action-rows__grid .field:has(> input[type='date']) {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.equipment-summary-card__details > *,
+.gm-detail-summary__dl > *,
+.search-result__meta > *,
+.saved-record__row > *,
+.weekly-record__details > * {
   min-width: 0;
   max-width: 100%;
 }
 
 @media (max-width: 640px) {
+  input[type='date'],
   .field__input[type='date'],
   .form-input[type='date'],
   input[type='date'].field__input,
   input[type='date'].form-input {
+    display: block;
+    box-sizing: border-box;
+    inline-size: 100%;
+    max-inline-size: 100%;
+    min-inline-size: 0;
     width: 100%;
     max-width: 100%;
     min-width: 0;
-    box-sizing: border-box;
+  }
+
+  .field,
+  .form-field,
+  .form-grid > *,
+  .records-search__filter,
+  .weekly-filters__grid > *,
+  .visitor-sign-in__filters > *,
+  .sssp-editor__meta > *,
+  .gm-action-rows__grid > *,
+  .equipment-toolbar input.form-input[type='date'],
+  .gm-dashboard__filters input.form-input[type='date'] {
+    min-width: 0;
+    max-width: 100%;
   }
 
   .records-search__filters,
@@ -7689,5 +7768,10 @@ input[type='date'].form-input {
   .gm-detail-summary__dl {
     min-width: 0;
     max-width: 100%;
+  }
+
+  /* Date cells in two-up filter grids: full track so UA min-content cannot overflow */
+  .records-search__filters .records-search__filter:has(> input[type='date']) {
+    grid-column: 1 / -1;
   }
 }
