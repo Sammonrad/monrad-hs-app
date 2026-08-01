@@ -241,9 +241,10 @@ export async function saveTimesheetRecord(user, record) {
 
 /**
  * Update an existing cloud timesheet. Does not change user_id or created_at
- * (ownership and original create time stay with the row).
+ * (ownership and original create time stay with the row). Never sends user_id
+ * in the UPDATE payload. Admins may update any row; staff only their own.
  */
-export async function updateTimesheetRecord(user, record) {
+export async function updateTimesheetRecord(user, record, { isAdmin = false } = {}) {
   if (!isSupabaseConfigured || !supabase) {
     return { record: null, error: new Error('Supabase is not configured.') }
   }
@@ -257,10 +258,11 @@ export async function updateTimesheetRecord(user, record) {
     return { record: null, error: new Error('Missing cloud record id for update.') }
   }
 
-  if (record.cloudUserId && record.cloudUserId !== userId) {
+  if (!isAdmin && record.cloudUserId && record.cloudUserId !== userId) {
     return { record: null, error: new Error('You can only edit your own timesheets.') }
   }
 
+  // Map for field columns only — ownership column is intentionally omitted below.
   const row = mapTimesheetToRow(record, record.cloudUserId || userId)
 
   const { data, error } = await supabase
@@ -294,9 +296,10 @@ export async function updateTimesheetRecord(user, record) {
 
 /**
  * Permanently delete a timesheet from the cloud (hard delete, not archive).
+ * Admins may delete any row (active or archived); staff only their own.
  * Local copies must be removed by the caller so they are not merged back.
  */
-export async function deleteTimesheetRecord(user, record) {
+export async function deleteTimesheetRecord(user, record, { isAdmin = false } = {}) {
   if (!isSupabaseConfigured || !supabase) {
     return { ok: false, error: new Error('Supabase is not configured.') }
   }
@@ -310,7 +313,7 @@ export async function deleteTimesheetRecord(user, record) {
     return { ok: true, error: null, localOnly: true }
   }
 
-  if (record.cloudUserId && record.cloudUserId !== userId) {
+  if (!isAdmin && record.cloudUserId && record.cloudUserId !== userId) {
     return { ok: false, error: new Error('You can only delete your own timesheets.') }
   }
 

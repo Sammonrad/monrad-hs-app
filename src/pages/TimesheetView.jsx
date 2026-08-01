@@ -63,6 +63,15 @@ function isOwnTimesheetRecord(record, user) {
   return true
 }
 
+function canManageTimesheetRecord(record, user, isAdmin) {
+  if (isAdmin) return Boolean(record)
+  return isOwnTimesheetRecord(record, user)
+}
+
+function getTimesheetEmployeeLabel(record) {
+  return record?.fields?.employeeName?.trim() || 'Employee'
+}
+
 function matchesTimesheetIdentity(item, record) {
   if (!item || !record) return false
   if (record.cloudId && item.cloudId === record.cloudId) return true
@@ -306,7 +315,7 @@ export function TimesheetView({
     const isEditing = Boolean(editingRecord)
 
     if (isEditing) {
-      if (!isOwnTimesheetRecord(editingRecord, user)) {
+      if (!canManageTimesheetRecord(editingRecord, user, isAdmin)) {
         setFormStatusError('You can only edit your own timesheets.')
         return
       }
@@ -322,7 +331,7 @@ export function TimesheetView({
         allComplete: true,
         signatureConfirmation: signatureConfirmation.trim(),
         photos: editingRecord.photos ?? [],
-        // Preserve original submittedAt / owner metadata
+        // Preserve original submittedAt / owner metadata — never reassign user_id
         submittedAt: editingRecord.submittedAt,
         cloudId: editingRecord.cloudId ?? null,
         cloudUserId: editingRecord.cloudUserId ?? null,
@@ -385,7 +394,9 @@ export function TimesheetView({
       }
 
       setCloudSaving(true)
-      const { record: cloudRecord, error } = await updateTimesheetRecord(user, updatedRecord)
+      const { record: cloudRecord, error } = await updateTimesheetRecord(user, updatedRecord, {
+        isAdmin,
+      })
       setCloudSaving(false)
 
       if (error) {
@@ -486,7 +497,7 @@ export function TimesheetView({
   }
 
   function handleStartEdit(record) {
-    if (!isOwnTimesheetRecord(record, user) || cloudSaving || deleting) return
+    if (!canManageTimesheetRecord(record, user, isAdmin) || cloudSaving || deleting) return
 
     setEditingRecord(record)
     setViewingRecordId(null)
@@ -527,7 +538,7 @@ export function TimesheetView({
   }
 
   function openDeleteModal(record) {
-    if (!isOwnTimesheetRecord(record, user) || deleting || cloudSaving) return
+    if (!canManageTimesheetRecord(record, user, isAdmin) || deleting || cloudSaving) return
     setDeleteError('')
     setDeleteTarget(record)
   }
@@ -540,7 +551,7 @@ export function TimesheetView({
 
   async function handleConfirmDelete() {
     if (!deleteTarget || deleting) return
-    if (!isOwnTimesheetRecord(deleteTarget, user)) {
+    if (!canManageTimesheetRecord(deleteTarget, user, isAdmin)) {
       setDeleteError('You can only delete your own timesheets.')
       return
     }
@@ -556,7 +567,7 @@ export function TimesheetView({
           return
         }
 
-        const { ok, error } = await deleteTimesheetRecord(user, deleteTarget)
+        const { ok, error } = await deleteTimesheetRecord(user, deleteTarget, { isAdmin })
         if (!ok) {
           setDeleteError(
             error?.message
@@ -656,13 +667,21 @@ export function TimesheetView({
 
       <FormPageHeader
         title={formConfig.title}
-        subtitle={editingRecord ? 'Edit your timesheet record' : 'Daily work and hours record'}
+        subtitle={
+          editingRecord
+            ? isAdmin && !isOwnTimesheetRecord(editingRecord, user)
+              ? `Edit timesheet for ${getTimesheetEmployeeLabel(editingRecord)}`
+              : 'Edit your timesheet record'
+            : 'Daily work and hours record'
+        }
       />
 
       <form ref={formRef} className="job-form no-print" onSubmit={handleSubmit} noValidate>
         {editingRecord && (
           <p className="form-hint" role="status">
-            Editing a saved timesheet. Changes update the same record (owner and original save date are kept).
+            {isAdmin && !isOwnTimesheetRecord(editingRecord, user)
+              ? `Editing timesheet for ${getTimesheetEmployeeLabel(editingRecord)}. Changes update the same record (owner and original save date are kept).`
+              : 'Editing a saved timesheet. Changes update the same record (owner and original save date are kept).'}
           </p>
         )}
         {formStatusMessage && (
@@ -937,7 +956,7 @@ export function TimesheetView({
                 record.cloudUserId &&
                 record.cloudUserId !== user?.id &&
                 resolveRecordSyncStatus(record) === SYNC_STATUS.CLOUD
-              const isOwn = isOwnTimesheetRecord(record, user)
+              const canManage = canManageTimesheetRecord(record, user, isAdmin)
               const isViewing = viewingRecordId === record.id
               const isEditingThis = editingRecord && matchesTimesheetIdentity(editingRecord, record)
 
@@ -977,7 +996,7 @@ export function TimesheetView({
                   Saved {formatSubmittedAt(record.submittedAt)}
                 </p>
 
-                {isOwn && (
+                {canManage && (
                   <div className="saved-record__manage no-print">
                     <button
                       type="button"
@@ -1031,7 +1050,11 @@ export function TimesheetView({
       <ConfirmModal
         open={Boolean(deleteTarget)}
         title="Delete timesheet?"
-        message="Permanently delete this timesheet? This cannot be undone and the record will also be removed from the admin view."
+        message={
+          isAdmin
+            ? 'Permanently delete this timesheet? This cannot be undone and it will also be removed from the employee’s view.'
+            : 'Permanently delete this timesheet? This cannot be undone and the record will also be removed from the admin view.'
+        }
         confirmLabel="Permanently Delete"
         cancelLabel="Cancel"
         processingLabel="Deleting…"
