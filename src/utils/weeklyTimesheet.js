@@ -85,15 +85,116 @@ export function getWeekStartMonday(dateStr) {
 
 export function formatWeekLabel(weekStart) {
   if (!weekStart) return 'Unknown week'
+  const { startLabel, endLabel } = formatWeekRangeParts(weekStart)
+  return `${startLabel} – ${endLabel}`
+}
+
+export function formatWeekRangeParts(weekStart) {
+  if (!weekStart || weekStart === 'unknown') {
+    return { startLabel: '—', endLabel: '—', weekLabel: 'No date' }
+  }
+
   const [y, m, d] = weekStart.split('-').map(Number)
   const start = new Date(y, m - 1, d)
   const end = new Date(y, m - 1, d)
   end.setDate(end.getDate() + 6)
 
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+    return { startLabel: '—', endLabel: '—', weekLabel: 'Unknown week' }
+  }
+
   const opts = { day: 'numeric', month: 'short', year: 'numeric' }
   const startLabel = start.toLocaleDateString('en-NZ', opts)
   const endLabel = end.toLocaleDateString('en-NZ', opts)
-  return `${startLabel} – ${endLabel}`
+  return {
+    startLabel,
+    endLabel,
+    weekLabel: `${startLabel} – ${endLabel}`,
+  }
+}
+
+/** Compact date + weekday for weekly print rows, e.g. "Mon 28 Jul". */
+export function formatTimesheetDateDay(dateStr) {
+  if (!dateStr?.trim()) return '—'
+  const parts = dateStr.trim().split('-').map(Number)
+  if (parts.length < 3 || parts.some(Number.isNaN)) return dateStr
+
+  const date = new Date(parts[0], parts[1] - 1, parts[2])
+  if (Number.isNaN(date.getTime())) return dateStr
+
+  return date.toLocaleDateString('en-NZ', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+  })
+}
+
+/**
+ * Group timesheet records into one printable sheet per employee + week.
+ * Rows within each sheet are sorted Monday → Sunday.
+ */
+export function buildWeeklyPrintSheets(records) {
+  const groups = new Map()
+
+  records.forEach((record) => {
+    const fields = record.fields ?? {}
+    const weekKey = getWeekStartMonday(fields.date) || 'unknown'
+    const employeeName = (fields.employeeName || '').trim() || 'Unnamed employee'
+    const sheetKey = `${weekKey}::${employeeName.toLowerCase()}`
+
+    if (!groups.has(sheetKey)) {
+      groups.set(sheetKey, {
+        sheetKey,
+        weekKey,
+        employeeName,
+        records: [],
+      })
+    }
+    groups.get(sheetKey).records.push(record)
+  })
+
+  return [...groups.values()]
+    .map((group) => {
+      const range = formatWeekRangeParts(group.weekKey)
+      const sorted = [...group.records].sort((a, b) => {
+        const dateA = a.fields?.date || ''
+        const dateB = b.fields?.date || ''
+        return dateA.localeCompare(dateB)
+      })
+
+      return {
+        sheetKey: group.sheetKey,
+        weekKey: group.weekKey,
+        employeeName: group.employeeName,
+        weekLabel: range.weekLabel,
+        weekStartLabel: range.startLabel,
+        weekEndLabel: range.endLabel,
+        records: sorted,
+        totals: calculateTotals(sorted),
+      }
+    })
+    .sort((a, b) => {
+      const weekCmp = b.weekKey.localeCompare(a.weekKey)
+      if (weekCmp !== 0) return weekCmp
+      return a.employeeName.localeCompare(b.employeeName)
+    })
+}
+
+/** Build print sheet(s) for the employee-week containing a selected timesheet record. */
+export function buildWeeklyPrintSheetForRecord(record, allRecords = []) {
+  const fields = record?.fields ?? {}
+  const weekKey = getWeekStartMonday(fields.date) || 'unknown'
+  const employeeKey = (fields.employeeName || '').trim().toLowerCase()
+
+  const weekRecords = (allRecords.length > 0 ? allRecords : [record]).filter((candidate) => {
+    const candidateFields = candidate?.fields ?? {}
+    const sameWeek = (getWeekStartMonday(candidateFields.date) || 'unknown') === weekKey
+    const sameEmployee =
+      (candidateFields.employeeName || '').trim().toLowerCase() === employeeKey
+    return sameWeek && sameEmployee
+  })
+
+  return buildWeeklyPrintSheets(weekRecords.length > 0 ? weekRecords : [record])
 }
 
 export function recordMatchesFilters(record, filters) {

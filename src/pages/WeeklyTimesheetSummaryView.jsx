@@ -12,6 +12,7 @@ import {
   formatHoursTotal,
   getFilterOptions,
   describeActiveFilters,
+  buildWeeklyPrintSheets,
 } from '../utils/weeklyTimesheet.js'
 import { getMergedTimesheetRecords } from '../utils/storage/timesheetCloudStorage.js'
 import { isAdminProfile } from '../utils/storage/userProfileStorage.js'
@@ -59,9 +60,7 @@ export function WeeklyTimesheetSummaryView({
 
   function handlePrint() {
     setPrintPayload({
-      totals,
-      weekGroups,
-      filterDescription,
+      sheets: buildWeeklyPrintSheets(filteredRecords),
       generatedAt: new Date().toLocaleString('en-NZ', {
         dateStyle: 'medium',
         timeStyle: 'short',

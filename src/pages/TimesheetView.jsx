@@ -7,6 +7,8 @@ import { RecordActions } from '../components/RecordActions.jsx'
 import { AdminArchiveAction } from '../components/AdminArchiveAction.jsx'
 import { SavedRecordSignature } from '../components/SavedRecordSignature.jsx'
 import { TimesheetCloudSyncBadge } from '../components/TimesheetCloudSyncBadge.jsx'
+import { WeeklyPrintSummary } from '../components/WeeklyPrintSummary.jsx'
+import { buildWeeklyPrintSheetForRecord } from '../utils/weeklyTimesheet.js'
 import { FormSection } from '../components/forms/FormSection.jsx'
 import { FormField } from '../components/forms/FormField.jsx'
 import { FormActions } from '../components/forms/FormActions.jsx'
@@ -55,7 +57,6 @@ export function TimesheetView({
   onBack,
   savedRecords,
   setSavedRecords,
-  setPrintRecord,
   highlightRecordId,
   onClearHighlight,
   settings,
@@ -75,6 +76,7 @@ export function TimesheetView({
   const [cloudSaving, setCloudSaving] = useState(false)
   const [chargeableEdited, setChargeableEdited] = useState(false)
   const [archiveMessage, setArchiveMessage] = useState('')
+  const [printPayload, setPrintPayload] = useState(null)
   const recordRef = useRef(null)
 
   const { fields, signatureConfirmation } = draft
@@ -323,8 +325,43 @@ export function TimesheetView({
     if (completedRecord) setCompletedRecord(null)
   }
 
+  function handlePrintTimesheet(record) {
+    setPrintPayload({
+      sheets: buildWeeklyPrintSheetForRecord(record, timesheetRecords),
+      generatedAt: new Date().toLocaleString('en-NZ', {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+      }),
+    })
+  }
+
+  useEffect(() => {
+    if (!printPayload) return undefined
+
+    const timer = window.setTimeout(() => {
+      window.print()
+    }, 350)
+
+    function handleAfterPrint() {
+      setPrintPayload(null)
+    }
+
+    window.addEventListener('afterprint', handleAfterPrint)
+
+    return () => {
+      window.clearTimeout(timer)
+      window.removeEventListener('afterprint', handleAfterPrint)
+    }
+  }, [printPayload])
+
   return (
     <>
+      {printPayload && (
+        <div className="print-area" aria-hidden="true">
+          <WeeklyPrintSummary {...printPayload} />
+        </div>
+      )}
+
       <BackButton onClick={onBack} />
 
       <FormPageHeader
@@ -508,7 +545,7 @@ export function TimesheetView({
           )}
 
           <RecordDetails record={completedRecord} />
-          <RecordActions record={completedRecord} onPrint={setPrintRecord} />
+          <RecordActions record={completedRecord} onPrint={handlePrintTimesheet} />
           <div className="record__actions record__actions--saved no-print">
             <AdminArchiveAction
               recordType={ARCHIVE_RECORD_TYPES.TIMESHEET}
@@ -612,7 +649,7 @@ export function TimesheetView({
                 <p className="saved-record__meta">
                   Saved {formatSubmittedAt(record.submittedAt)}
                 </p>
-                <RecordActions record={record} onPrint={setPrintRecord} variant="saved" />
+                <RecordActions record={record} onPrint={handlePrintTimesheet} variant="saved" />
                 <div className="record__actions record__actions--saved no-print">
                   <AdminArchiveAction
                     recordType={ARCHIVE_RECORD_TYPES.TIMESHEET}

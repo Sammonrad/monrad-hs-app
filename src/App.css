@@ -1772,25 +1772,214 @@ body {
   color: var(--text-muted);
 }
 
+/* Weekly timesheet print layout (screen preview hidden via .print-area) */
+.weekly-print {
+  color: #000000;
+  background: #ffffff;
+}
+
+.weekly-print__sheet {
+  color: #000000;
+  background: #ffffff;
+}
+
+.weekly-print__header {
+  margin: 0 0 0.45rem;
+  padding: 0 0 0.35rem;
+  border-bottom: 2px solid var(--monrad-red);
+}
+
+.weekly-print__brand-row {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  margin-bottom: 0.35rem;
+}
+
+.weekly-print__logo.monrad-logo--print,
+.weekly-print__logo {
+  height: 1.65rem;
+  max-width: 5.5rem;
+  margin: 0;
+  flex-shrink: 0;
+}
+
+.weekly-print__brand-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.weekly-print__company {
+  margin: 0;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #444444;
+}
+
+.weekly-print__title {
+  margin: 0.05rem 0 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  line-height: 1.15;
+  color: #000000;
+}
+
+.weekly-print__hours-badge {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.1rem;
+  flex-shrink: 0;
+  text-align: right;
+}
+
+.weekly-print__hours-label {
+  font-size: 0.62rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #444444;
+}
+
+.weekly-print__hours-value {
+  font-size: 0.95rem;
+  font-weight: 700;
+  line-height: 1.1;
+  color: #000000;
+}
+
+.weekly-print__meta {
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.25rem 0.75rem;
+}
+
+.weekly-print__meta-item {
+  min-width: 0;
+}
+
+.weekly-print__meta-item dt {
+  margin: 0;
+  font-size: 0.62rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: #555555;
+}
+
+.weekly-print__meta-item dd {
+  margin: 0.05rem 0 0;
+  font-size: 0.78rem;
+  font-weight: 600;
+  line-height: 1.25;
+  color: #000000;
+  word-break: break-word;
+}
+
 .weekly-print__table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.65rem;
-  line-height: 1.3;
+  table-layout: fixed;
+  font-size: 9.5pt;
+  line-height: 1.25;
 }
 
 .weekly-print__table th,
 .weekly-print__table td {
-  padding: 0.35rem 0.4rem;
+  padding: 0.2rem 0.3rem;
   text-align: left;
   vertical-align: top;
-  border: 1px solid var(--border-subtle);
+  border: 1px solid #cccccc;
   word-break: break-word;
+  color: #000000;
 }
 
 .weekly-print__table th {
   font-weight: 700;
-  background: var(--bg-input);
+  font-size: 8.5pt;
+  background: #f3f3f3;
+}
+
+.weekly-print__col-date {
+  width: 12%;
+}
+
+.weekly-print__col-time {
+  width: 8%;
+}
+
+.weekly-print__col-break {
+  width: 6%;
+}
+
+.weekly-print__col-hours {
+  width: 9%;
+}
+
+.weekly-print__col-job {
+  width: 18%;
+}
+
+.weekly-print__col-notes {
+  width: 39%;
+}
+
+.weekly-print__notes {
+  white-space: pre-wrap;
+}
+
+.weekly-print__totals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 1rem;
+  margin: 0.4rem 0 0;
+  padding: 0.3rem 0;
+  font-size: 9pt;
+  line-height: 1.3;
+  color: #000000;
+  border-top: 1px solid #bbbbbb;
+  border-bottom: 1px solid #bbbbbb;
+}
+
+.weekly-print__totals-emphasis {
+  margin-left: auto;
+  font-weight: 700;
+}
+
+.weekly-print__signoff {
+  display: grid;
+  grid-template-columns: 1.4fr 1.4fr 0.8fr;
+  gap: 0.75rem;
+  margin-top: 0.55rem;
+}
+
+.weekly-print__sign-line {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.weekly-print__sign-label {
+  font-size: 8pt;
+  font-weight: 600;
+  color: #444444;
+}
+
+.weekly-print__sign-rule {
+  display: block;
+  width: 100%;
+  border-bottom: 1px solid #333333;
+  min-height: 1.1rem;
+}
+
+.weekly-print__empty {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #000000;
 }
 
 .backup-intro {
@@ -4674,6 +4863,12 @@ body {
   }
 }
 
+/* Named page keeps weekly timesheets landscape without affecting other prints */
+@page weekly-timesheet {
+  size: A4 landscape;
+  margin: 8mm;
+}
+
 @media print {
   @page {
     margin: 1.2cm;
@@ -4684,23 +4879,65 @@ body {
   body {
     background: #ffffff !important;
     color: #000000 !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
   }
 
   .no-print {
     display: none !important;
   }
 
-  .app {
-    max-width: none;
-    padding: 0;
+  /* Hide app chrome so it cannot reserve empty print pages */
+  .desktop-sidebar,
+  .mobile-header,
+  .side-menu,
+  .side-menu__overlay,
+  .page-header,
+  .page-header--desktop,
+  .app-footer,
+  .app-footer--mobile,
+  .back-btn {
+    display: none !important;
+  }
+
+  .app,
+  .app-shell,
+  .app-shell__layout,
+  .app-shell__main,
+  .app-shell__content,
+  .page-container,
+  .page-container--form {
+    display: block !important;
+    max-width: none !important;
+    width: 100% !important;
+    min-height: 0 !important;
+    height: auto !important;
+    max-height: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
     background: #ffffff !important;
     color: #000000 !important;
+    box-shadow: none !important;
+    border: none !important;
   }
 
   .print-area {
     display: block !important;
     background: #ffffff !important;
     color: #000000 !important;
+    overflow: visible !important;
+    min-height: 0 !important;
+    height: auto !important;
+    max-height: none !important;
+  }
+
+  /* When a dedicated print document is mounted, print only that */
+  body:has(.print-area) .app-shell__content > :not(.print-area),
+  body:has(.print-area) .page-container > :not(.print-area) {
+    display: none !important;
   }
 
   .print-record {
@@ -4742,14 +4979,11 @@ body {
     border-bottom-color: #eeeeee !important;
   }
 
-  .weekly-print__table th,
   .admin-report-print__table th {
     background: #f5f5f5 !important;
     color: #000000 !important;
   }
 
-  .weekly-print__table th,
-  .weekly-print__table td,
   .admin-report-print__table th,
   .admin-report-print__table td {
     border-color: #cccccc !important;
@@ -4794,13 +5028,105 @@ body {
     break-inside: avoid;
   }
 
-  .weekly-print__table {
-    font-size: 0.6rem;
+  /* ── Weekly timesheet: compact one-page A4 landscape ── */
+  .weekly-print {
+    page: weekly-timesheet;
+    color: #000000 !important;
+    background: #ffffff !important;
+    font-size: 9.5pt;
+    line-height: 1.25;
+    overflow: visible !important;
+    min-height: 0 !important;
+    height: auto !important;
+    max-height: none !important;
+  }
+
+  .weekly-print__sheet {
+    page: weekly-timesheet;
     break-inside: auto;
+    page-break-inside: auto;
+    color: #000000 !important;
+    background: #ffffff !important;
+    overflow: visible !important;
+    min-height: 0 !important;
+    height: auto !important;
+  }
+
+  .weekly-print__sheet + .weekly-print__sheet {
+    break-before: page;
+    page-break-before: always;
+  }
+
+  .weekly-print__header,
+  .weekly-print__totals,
+  .weekly-print__signoff {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .weekly-print__header {
+    border-bottom-color: var(--monrad-red) !important;
+  }
+
+  .weekly-print__company,
+  .weekly-print__hours-label,
+  .weekly-print__meta-item dt,
+  .weekly-print__sign-label {
+    color: #444444 !important;
+  }
+
+  .weekly-print__title,
+  .weekly-print__hours-value,
+  .weekly-print__meta-item dd,
+  .weekly-print__totals,
+  .weekly-print__empty {
+    color: #000000 !important;
+  }
+
+  .weekly-print__logo.monrad-logo--print,
+  .weekly-print .monrad-logo--print {
+    height: 1.5rem !important;
+    max-width: 5.25rem !important;
+    margin: 0 !important;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  .weekly-print__table {
+    font-size: 9.5pt;
+    break-inside: auto;
+    page-break-inside: auto;
+  }
+
+  .weekly-print__table thead {
+    display: table-header-group;
+  }
+
+  .weekly-print__table tbody {
+    display: table-row-group;
   }
 
   .weekly-print__table tr {
     break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .weekly-print__table th {
+    background: #f3f3f3 !important;
+    color: #000000 !important;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  .weekly-print__table th,
+  .weekly-print__table td {
+    border-color: #cccccc !important;
+    color: #000000 !important;
+    padding: 0.18rem 0.28rem;
+  }
+
+  .weekly-print__sign-rule {
+    border-bottom-color: #333333 !important;
   }
 
   .admin-report-print__table {
