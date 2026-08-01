@@ -7,8 +7,8 @@ export function PrintableVisitorRecord({ record }) {
 
   return (
     <article className="print-record print-visitor">
-      <header className="print-record__header">
-        <p className="print-record__company">Monrad Earthworx</p>
+      <header className="print-record__header print-header">
+        <p className="print-record__company print-header__company">Monrad Earthworx</p>
         <h1 className="print-record__title">Visitor Sign-In Record</h1>
         <p className="print-record__meta">{status}</p>
       </header>

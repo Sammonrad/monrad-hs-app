@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { BackButton } from '../components/BackButton.jsx'
 import { CloudSyncBadge } from '../components/CloudSyncBadge.jsx'
+import { EmptyState } from '../components/common/EmptyState.jsx'
+import { FilterDisclosure } from '../components/common/FilterDisclosure.jsx'
+import { LoadingState } from '../components/common/LoadingState.jsx'
 import { formatSubmittedAt } from '../utils/formatting.js'
 import { getTimesheetRecords } from '../utils/weeklyTimesheet.js'
 import { isAdminProfile } from '../utils/storage/userProfileStorage.js'
@@ -120,16 +123,18 @@ export function RecordsDashboardView({
     ],
   )
 
-  const hasActiveFilters =
-    searchQuery.trim() ||
-    typeFilter !== 'all' ||
-    dateFrom ||
-    dateTo ||
-    openActionsOnly ||
-    defectsOnly ||
-    incidentsOnly ||
-    cloudOnly ||
-    localOnly
+  const secondaryFilterCount = [
+    typeFilter !== 'all',
+    Boolean(dateFrom),
+    Boolean(dateTo),
+    openActionsOnly,
+    defectsOnly,
+    incidentsOnly,
+    cloudOnly,
+    localOnly,
+  ].filter(Boolean).length
+
+  const hasActiveFilters = Boolean(searchQuery.trim()) || secondaryFilterCount > 0
 
   function clearFilters() {
     setSearchQuery('')
@@ -165,9 +170,9 @@ export function RecordsDashboardView({
     <>
       <BackButton onClick={onBack} />
 
-      <header className="header">
-        <p className="company">Monrad Earthworx</p>
-        <h1 className="title">Records Dashboard</h1>
+      <header className="header form-page-header form-page-header--mobile-compact">
+        <p className="company form-page-header__company">Monrad Earthworx</p>
+        <h1 className="title form-page-header__title">Records Dashboard</h1>
         <p className="progress" aria-live="polite">
           {mergedRecords.length} record{mergedRecords.length === 1 ? '' : 's'}
           {user?.id && !cloudLoading && (
@@ -286,97 +291,107 @@ export function RecordsDashboardView({
           />
         </label>
 
-        <div className="records-search__filters">
-          <label className="field records-search__filter">
-            <span className="field__label">Record type</span>
-            <select
-              className="field__input"
-              value={typeFilter}
-              onChange={(e) => setTypeFilter(e.target.value)}
-            >
-              <option value="all">All</option>
-              <option value="job-start">Job Start</option>
-              <option value="pre-start">Pre-Start</option>
-              <option value="toolbox">Toolbox</option>
-              <option value="incident">Incident</option>
-              <option value="timesheet">Timesheet</option>
-              <option value="action">Actions</option>
-            </select>
-          </label>
+        <FilterDisclosure
+          activeCount={secondaryFilterCount}
+          onReset={clearFilters}
+          resetLabel="Reset"
+        >
+          <div className="records-search__filters">
+            <label className="field records-search__filter">
+              <span className="field__label">Record type</span>
+              <select
+                className="field__input"
+                value={typeFilter}
+                onChange={(e) => setTypeFilter(e.target.value)}
+              >
+                <option value="all">All</option>
+                <option value="job-start">Job Start</option>
+                <option value="pre-start">Pre-Start</option>
+                <option value="toolbox">Toolbox</option>
+                <option value="incident">Incident</option>
+                <option value="timesheet">Timesheet</option>
+                <option value="action">Actions</option>
+              </select>
+            </label>
 
-          <label className="field records-search__filter">
-            <span className="field__label">Date from</span>
-            <input
-              type="date"
-              className="field__input"
-              value={dateFrom}
-              onChange={(e) => setDateFrom(e.target.value)}
-            />
-          </label>
+            <label className="field records-search__filter">
+              <span className="field__label">Date from</span>
+              <input
+                type="date"
+                className="field__input"
+                value={dateFrom}
+                onChange={(e) => setDateFrom(e.target.value)}
+              />
+            </label>
 
-          <label className="field records-search__filter">
-            <span className="field__label">Date to</span>
-            <input
-              type="date"
-              className="field__input"
-              value={dateTo}
-              onChange={(e) => setDateTo(e.target.value)}
-            />
-          </label>
-        </div>
+            <label className="field records-search__filter">
+              <span className="field__label">Date to</span>
+              <input
+                type="date"
+                className="field__input"
+                value={dateTo}
+                onChange={(e) => setDateTo(e.target.value)}
+              />
+            </label>
+          </div>
 
-        <div className="records-search__toggles">
-          <label className="records-search__toggle">
-            <input
-              type="checkbox"
-              checked={cloudOnly}
-              onChange={(e) => handleCloudOnlyChange(e.target.checked)}
-            />
-            <span>Cloud records only</span>
-          </label>
-          <label className="records-search__toggle">
-            <input
-              type="checkbox"
-              checked={localOnly}
-              onChange={(e) => handleLocalOnlyChange(e.target.checked)}
-            />
-            <span>Local records only</span>
-          </label>
-          <label className="records-search__toggle">
-            <input
-              type="checkbox"
-              checked={openActionsOnly}
-              onChange={(e) => setOpenActionsOnly(e.target.checked)}
-            />
-            <span>Open actions only</span>
-          </label>
-          <label className="records-search__toggle">
-            <input
-              type="checkbox"
-              checked={defectsOnly}
-              onChange={(e) => setDefectsOnly(e.target.checked)}
-            />
-            <span>Machine defects only</span>
-          </label>
-          <label className="records-search__toggle">
-            <input
-              type="checkbox"
-              checked={incidentsOnly}
-              onChange={(e) => setIncidentsOnly(e.target.checked)}
-            />
-            <span>Incidents / near misses only</span>
-          </label>
-        </div>
+          <div className="records-search__toggles">
+            <label className="records-search__toggle">
+              <input
+                type="checkbox"
+                checked={cloudOnly}
+                onChange={(e) => handleCloudOnlyChange(e.target.checked)}
+              />
+              <span>Cloud records only</span>
+            </label>
+            <label className="records-search__toggle">
+              <input
+                type="checkbox"
+                checked={localOnly}
+                onChange={(e) => handleLocalOnlyChange(e.target.checked)}
+              />
+              <span>Local records only</span>
+            </label>
+            <label className="records-search__toggle">
+              <input
+                type="checkbox"
+                checked={openActionsOnly}
+                onChange={(e) => setOpenActionsOnly(e.target.checked)}
+              />
+              <span>Open actions only</span>
+            </label>
+            <label className="records-search__toggle">
+              <input
+                type="checkbox"
+                checked={defectsOnly}
+                onChange={(e) => setDefectsOnly(e.target.checked)}
+              />
+              <span>Machine defects only</span>
+            </label>
+            <label className="records-search__toggle">
+              <input
+                type="checkbox"
+                checked={incidentsOnly}
+                onChange={(e) => setIncidentsOnly(e.target.checked)}
+              />
+              <span>Incidents / near misses only</span>
+            </label>
+          </div>
+        </FilterDisclosure>
 
         <p className="records-search__count" aria-live="polite">
           {filteredItems.length} result{filteredItems.length === 1 ? '' : 's'}
           {hasActiveFilters ? ' matching filters' : ''}
         </p>
 
-        {filteredItems.length === 0 ? (
-          <p className="records-search__empty">
-            No records match your search and filters. Try different keywords or clear filters.
-          </p>
+        {cloudLoading && filteredItems.length === 0 ? (
+          <LoadingState label="Loading records…" />
+        ) : filteredItems.length === 0 ? (
+          <EmptyState
+            title="No records found"
+            description="No records match your search and filters. Try different keywords or clear filters."
+            secondaryAction={hasActiveFilters ? { label: 'Clear filters', onClick: clearFilters } : undefined}
+          />
         ) : (
           <div className="responsive-data-list">
             <ul className="records-search__results responsive-data-list__mobile">

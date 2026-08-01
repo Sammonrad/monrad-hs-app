@@ -1,3 +1,5 @@
+import { useEffect } from 'react'
+
 /**
  * In-app confirmation for archiving a record (no window.confirm).
  */
@@ -8,6 +10,15 @@ export function ArchiveRecordModal({
   archiving = false,
   error = '',
 }) {
+  useEffect(() => {
+    if (!open) return undefined
+    const previous = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = previous
+    }
+  }, [open])
+
   if (!open) return null
 
   return (
@@ -18,6 +29,15 @@ export function ArchiveRecordModal({
       aria-labelledby="archive-record-title"
     >
       <div className="equipment-modal archive-record-modal">
+        <button
+          type="button"
+          className="equipment-modal__close"
+          onClick={onCancel}
+          disabled={archiving}
+          aria-label="Close"
+        >
+          ×
+        </button>
         <h2 id="archive-record-title" className="archive-record-modal__title">
           Archive record?
         </h2>
@@ -30,7 +50,7 @@ export function ArchiveRecordModal({
             {error}
           </p>
         ) : null}
-        <div className="archive-record-modal__actions">
+        <div className="archive-record-modal__actions modal-footer-actions">
           <button
             type="button"
             className="btn btn--secondary"

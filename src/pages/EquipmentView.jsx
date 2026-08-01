@@ -57,6 +57,9 @@ import {
 } from '../utils/storage/equipmentDefectStorage.js'
 import { computeEquipmentStats } from '../utils/equipmentStats.js'
 import { CloudSyncBadge } from '../components/CloudSyncBadge.jsx'
+import { EmptyState } from '../components/common/EmptyState.jsx'
+import { FilterDisclosure } from '../components/common/FilterDisclosure.jsx'
+
 
 const TABS = [
   { id: 'register', label: 'Register' },
@@ -118,6 +121,15 @@ export function EquipmentView({
   const [modal, setModal] = useState(null)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
+
+  useEffect(() => {
+    if (!modal) return undefined
+    const previous = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = previous
+    }
+  }, [modal])
   const [serviceUpdatePrompt, setServiceUpdatePrompt] = useState(null)
 
   useEffect(() => {
@@ -562,41 +574,62 @@ export function EquipmentView({
               placeholder="Search assets…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
+              aria-label="Search assets"
             />
-            <select className="form-input" value={filterType} onChange={(e) => setFilterType(e.target.value)}>
-              <option value="">All types</option>
-              {ASSET_TYPES.map((t) => (
-                <option key={t} value={t}>{t}</option>
-              ))}
-            </select>
-            <select className="form-input" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
-              <option value="">All statuses</option>
-              {OPERATIONAL_STATUSES.map((s) => (
-                <option key={s} value={s}>{s}</option>
-              ))}
-            </select>
-            <select className="form-input" value={filterOwnership} onChange={(e) => setFilterOwnership(e.target.value)}>
-              <option value="">All ownership</option>
-              {OWNERSHIP_STATUSES.map((s) => (
-                <option key={s} value={s}>{s}</option>
-              ))}
-            </select>
-            <select className="form-input" value={filterPrestart} onChange={(e) => setFilterPrestart(e.target.value)}>
-              <option value="">Pre-start: all</option>
-              <option value="yes">Pre-start required</option>
-              <option value="no">Not required</option>
-            </select>
-            <select className="form-input" value={filterArchived} onChange={(e) => setFilterArchived(e.target.value)}>
-              <option value="active">Active only</option>
-              <option value="archived">Archived only</option>
-              <option value="all">All</option>
-            </select>
             {isAdmin && (
               <button type="button" className="btn btn--primary" onClick={() => setModal({ type: 'add-equipment' })}>
                 Add equipment
               </button>
             )}
           </div>
+          <FilterDisclosure
+            activeCount={[
+              Boolean(filterType),
+              Boolean(filterStatus),
+              Boolean(filterOwnership),
+              Boolean(filterPrestart),
+              filterArchived !== 'active',
+            ].filter(Boolean).length}
+            onReset={() => {
+              setFilterType('')
+              setFilterStatus('')
+              setFilterOwnership('')
+              setFilterPrestart('')
+              setFilterRoadLegal('')
+              setFilterArchived('active')
+            }}
+          >
+            <div className="equipment-toolbar equipment-toolbar--filters">
+              <select className="form-input" value={filterType} onChange={(e) => setFilterType(e.target.value)} aria-label="Filter by type">
+                <option value="">All types</option>
+                {ASSET_TYPES.map((t) => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
+              </select>
+              <select className="form-input" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} aria-label="Filter by status">
+                <option value="">All statuses</option>
+                {OPERATIONAL_STATUSES.map((s) => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+              <select className="form-input" value={filterOwnership} onChange={(e) => setFilterOwnership(e.target.value)} aria-label="Filter by ownership">
+                <option value="">All ownership</option>
+                {OWNERSHIP_STATUSES.map((s) => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+              <select className="form-input" value={filterPrestart} onChange={(e) => setFilterPrestart(e.target.value)} aria-label="Filter by pre-start">
+                <option value="">Pre-start: all</option>
+                <option value="yes">Pre-start required</option>
+                <option value="no">Not required</option>
+              </select>
+              <select className="form-input" value={filterArchived} onChange={(e) => setFilterArchived(e.target.value)} aria-label="Filter archived">
+                <option value="active">Active only</option>
+                <option value="archived">Archived only</option>
+                <option value="all">All</option>
+              </select>
+            </div>
+          </FilterDisclosure>
 
           <div className="responsive-data-list">
             <div className="responsive-data-list__desktop">
@@ -661,7 +694,17 @@ export function EquipmentView({
               </div>
             </div>
             <div className="responsive-data-list__mobile">
-              {filteredEquipment.length === 0 && <p>No equipment found.</p>}
+              {filteredEquipment.length === 0 ? (
+                <EmptyState
+                  title="No equipment found"
+                  description="Try adjusting search or filters, or add a new asset."
+                  primaryAction={
+                    isAdmin
+                      ? { label: 'Add equipment', onClick: () => setModal({ type: 'add-equipment' }) }
+                      : undefined
+                  }
+                />
+              ) : null}
               {filteredEquipment.map((item) => (
                 <EquipmentSummaryCard
                   key={equipmentKey(item)}

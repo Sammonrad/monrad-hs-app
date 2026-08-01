@@ -1,6 +1,9 @@
 import { useMemo, useState } from 'react'
 import { Archive, CheckCircle2, Clock3, FileCheck2, FileText, Plus, Search, Send } from 'lucide-react'
 import { BackButton } from '../components/BackButton.jsx'
+import { EmptyState } from '../components/common/EmptyState.jsx'
+import { LoadingState } from '../components/common/LoadingState.jsx'
+import { StatusBadge } from '../components/common/StatusBadge.jsx'
 import { FormPageHeader } from '../components/forms/FormPageHeader.jsx'
 import { PrintableSSSP } from '../components/PrintableSSSP.jsx'
 import { ArchiveRecordModal } from '../components/ArchiveRecordModal.jsx'
@@ -188,7 +191,7 @@ export function SsspDashboardView({
         </p>
       )}
 
-      {isLoading && <p className="progress">Loading SSSPs…</p>}
+      {isLoading && <LoadingState label="Loading SSSPs…" />}
 
       <div className="sssp-dashboard">
         <section className="sssp-dashboard__summary" aria-label="SSSP status summary">
@@ -247,7 +250,7 @@ export function SsspDashboardView({
         </div>
 
         {activeTab === 'new' ? null : filteredRecords.length === 0 ? (
-          <p className="sssp-dashboard__empty">No SSSPs match this filter.</p>
+          <EmptyState title="No SSSPs match this filter" description="Try another status tab or create a new SSSP." />
         ) : (
           <ul className="sssp-dashboard__list">
             {filteredRecords.map((record) => (
@@ -257,11 +260,11 @@ export function SsspDashboardView({
                     <h3 className="sssp-card__number">{record.ssspNumber || 'No number'}</h3>
                     <p className="sssp-card__project">{record.project || 'Untitled project'}</p>
                   </div>
-                  <span
+                  <StatusBadge
+                    status={record.status}
+                    label={getSsspStatusLabel(record.status)}
                     className={`sssp-status-badge sssp-status-badge--${getSsspStatusModifier(record.status)}`}
-                  >
-                    {getSsspStatusLabel(record.status)}
-                  </span>
+                  />
                 </div>
 
                 <dl className="sssp-card__meta">

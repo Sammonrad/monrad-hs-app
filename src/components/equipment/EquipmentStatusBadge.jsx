@@ -1,11 +1,19 @@
-const STATUS_MODIFIERS = {
-  Available: 'available',
-  'In Use': 'in-use',
-  Maintenance: 'maintenance',
-  'Out of Service': 'out-of-service',
+import { StatusBadge } from '../common/StatusBadge.jsx'
+
+const STATUS_VARIANTS = {
+  Available: 'active',
+  'In Use': 'in-progress',
+  Maintenance: 'pending',
+  'Out of Service': 'overdue',
 }
 
 export function EquipmentStatusBadge({ status }) {
-  const modifier = STATUS_MODIFIERS[status] ?? 'default'
-  return <span className={`equipment-status-badge equipment-status-badge--${modifier}`}>{status || '—'}</span>
+  return (
+    <StatusBadge
+      status={status}
+      label={status || '—'}
+      variant={STATUS_VARIANTS[status] ?? 'default'}
+      className="equipment-status-badge"
+    />
+  )
 }

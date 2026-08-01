@@ -1,10 +1,18 @@
-const SEVERITY_MODIFIERS = {
-  Minor: 'minor',
-  Major: 'major',
+import { StatusBadge } from '../common/StatusBadge.jsx'
+
+const SEVERITY_VARIANTS = {
+  Minor: 'draft',
+  Major: 'pending',
   Critical: 'critical',
 }
 
 export function DefectSeverityBadge({ severity }) {
-  const modifier = SEVERITY_MODIFIERS[severity] ?? 'default'
-  return <span className={`defect-severity-badge defect-severity-badge--${modifier}`}>{severity || '—'}</span>
+  return (
+    <StatusBadge
+      status={severity}
+      label={severity || '—'}
+      variant={SEVERITY_VARIANTS[severity] ?? 'default'}
+      className="defect-severity-badge"
+    />
+  )
 }

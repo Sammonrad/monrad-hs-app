@@ -10,7 +10,7 @@ export function PrintableVisitorRollCall({ visitors, siteFilter }) {
   return (
     <article className="print-record print-visitor-roll-call">
       <header className="print-record__header">
-        <p className="print-record__company">Monrad Earthworx</p>
+        <p className="print-record__company print-header__company">Monrad Earthworx</p>
         <h1 className="print-record__title">Visitor Roll Call</h1>
         <p className="print-record__meta">Emergency roll call — visitors currently on site</p>
         <p className="print-record__meta">Printed {printedAt}</p>

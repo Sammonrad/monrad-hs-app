@@ -1,4 +1,4 @@
-import { MonradLogo } from '../MonradLogo.jsx'
+import { PrintHeader } from '../common/PrintHeader.jsx'
 import {
   MEETING_TYPE_LABELS,
   MEETING_STATUS_LABELS,
@@ -27,12 +27,11 @@ export function PrintableGeneralMeeting({ meeting }) {
 
   return (
     <article className="print-general-meeting">
-      <header className="print-general-meeting__header">
-        <MonradLogo variant="print" />
-        <h1 className="print-general-meeting__title">H&amp;S General Meeting</h1>
-        <p className="print-general-meeting__subtitle">{getMeetingDisplayTitle(meeting)}</p>
-        <p className="print-general-meeting__meta">Generated: {generated}</p>
-      </header>
+      <PrintHeader
+        title="H&S General Meeting"
+        subtitle={getMeetingDisplayTitle(meeting)}
+        meta={`Generated: ${generated}`}
+      />
 
       <Section title="Meeting details">
         <dl className="print-general-meeting__dl">

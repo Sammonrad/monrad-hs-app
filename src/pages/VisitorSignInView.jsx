@@ -6,6 +6,8 @@ import {
   VISITOR_SIGN_IN_DRAFT_KEY,
 } from '../constants/index.js'
 import { BackButton } from '../components/BackButton.jsx'
+import { ConfirmModal } from '../components/common/ConfirmModal.jsx'
+import { EmptyState } from '../components/common/EmptyState.jsx'
 import { CloudSyncBadge } from '../components/CloudSyncBadge.jsx'
 import { PrintableVisitorRecord } from '../components/PrintableVisitorRecord.jsx'
 import { PrintableVisitorRollCall } from '../components/PrintableVisitorRollCall.jsx'
@@ -110,6 +112,7 @@ export function VisitorSignInView({
   const [completedCloudError, setCompletedCloudError] = useState('')
   const [cloudLoadWarning, setCloudLoadWarning] = useState(null)
   const [signingOutId, setSigningOutId] = useState(null)
+  const [signOutTarget, setSignOutTarget] = useState(null)
   const [historySearch, setHistorySearch] = useState('')
   const [historyDate, setHistoryDate] = useState('')
   const [historySite, setHistorySite] = useState('')
@@ -359,12 +362,11 @@ export function VisitorSignInView({
     }
   }
 
-  async function handleSignOut(visitor) {
-    const confirmed = window.confirm(
-      `Sign out ${visitor.visitorName || 'this visitor'}?\n\nThis records their departure time as now.`,
-    )
-    if (!confirmed) return
+  function requestSignOut(visitor) {
+    setSignOutTarget(visitor)
+  }
 
+  async function handleSignOut(visitor) {
     setSigningOutId(visitor.id)
     const departureTime = new Date().toISOString()
     const signedOutBy = user?.id ?? null
@@ -687,7 +689,10 @@ export function VisitorSignInView({
           </div>
 
           {onSiteVisitors.length === 0 ? (
-            <p className="saved-records__empty">No visitors currently on site.</p>
+            <EmptyState
+              title="No visitors on site"
+              description="Signed-in visitors will appear here until they are signed out."
+            />
           ) : (
             <ul className="visitor-sign-in__card-list" role="list">
               {onSiteVisitors.map((visitor) => (
@@ -711,7 +716,7 @@ export function VisitorSignInView({
                   <button
                     type="button"
                     className="submit-btn visitor-sign-in__sign-out-btn"
-                    onClick={() => handleSignOut(visitor)}
+                    onClick={() => requestSignOut(visitor)}
                     disabled={signingOutId === visitor.id}
                   >
                     {signingOutId === visitor.id ? 'Signing out…' : 'Sign Out'}
@@ -865,7 +870,10 @@ export function VisitorSignInView({
               </div>
             </article>
           ) : filteredHistory.length === 0 ? (
-            <p className="saved-records__empty">No visitor records match your filters.</p>
+            <EmptyState
+              title="No visitor records"
+              description="No visitor records match your filters."
+            />
           ) : (
             <ul className="visitor-sign-in__history-list" role="list">
               {filteredHistory.map((record) => (
@@ -903,6 +911,28 @@ export function VisitorSignInView({
           )}
         </section>
       )}
-    </>
+    
+      <ConfirmModal
+        open={Boolean(signOutTarget)}
+        title="Sign out visitor?"
+        message={
+          signOutTarget
+            ? `Sign out ${signOutTarget.visitorName || 'this visitor'}? This records their departure time as now.`
+            : ''
+        }
+        confirmLabel="Sign out"
+        processingLabel="Signing out…"
+        processing={Boolean(signingOutId)}
+        variant="primary"
+        onCancel={() => {
+          if (!signingOutId) setSignOutTarget(null)
+        }}
+        onConfirm={async () => {
+          if (!signOutTarget) return
+          await handleSignOut(signOutTarget)
+          setSignOutTarget(null)
+        }}
+      />
+</>
   )
 }

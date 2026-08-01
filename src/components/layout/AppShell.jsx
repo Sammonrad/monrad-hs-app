@@ -25,7 +25,8 @@ export function AppShell({
   const isAdmin = isAdminProfile(profile)
   const pageMeta = useMemo(() => getPageMeta(currentView), [currentView])
 
-  const containerVariant = FORM_VIEW_IDS.has(currentView) ? 'form' : 'default'
+  const isFormView = FORM_VIEW_IDS.has(currentView)
+  const containerVariant = isFormView ? 'form' : 'default'
 
   function handleNavigate(viewId) {
     onNavigate(viewId)
@@ -33,7 +34,7 @@ export function AppShell({
   }
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell${isFormView ? ' app-shell--form' : ''}`}>
       <div className="app-shell__layout">
         <DesktopSidebar
           currentView={currentView}
@@ -68,7 +69,10 @@ export function AppShell({
             {children}
           </PageContainer>
 
-          <footer className="app-footer app-footer--mobile no-print" aria-label="Account">
+          <footer
+            className={`app-footer app-footer--mobile no-print${isFormView ? ' app-footer--form-hidden' : ''}`}
+            aria-label="Account"
+          >
             <div className="app-footer__account">
               <div className="app-footer__details">
                 {userEmail && (

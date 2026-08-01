@@ -1,0 +1,51 @@
+warning: in the working copy of 'index.html', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/App.css', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/components/ActionCard.jsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/components/ArchiveRecordModal.jsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/components/BackButton.jsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/components/PermanentDeleteModal.jsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/components/PrintableAction.jsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/components/PrintableRecord.jsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/components/PrintableSSSP.jsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/components/PrintableVisitorRecord.jsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/components/PrintableVisitorRollCall.jsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/components/equipment/DefectSeverityBadge.jsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/components/equipment/EquipmentStatusBadge.jsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/components/forms/FormPageHeader.jsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/components/generalMeeting/PrintableGeneralMeeting.jsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/components/layout/AppShell.jsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/pages/ActionRegisterView.jsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/pages/ArchivedRecordsView.jsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/pages/Dashboard.jsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/pages/EquipmentView.jsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/pages/GeneralMeetingView.jsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/pages/RecordsDashboardView.jsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/pages/SettingsView.jsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/pages/SsspDashboardView.jsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/pages/VisitorSignInView.jsx', LF will be replaced by CRLF the next time Git touches it
+ index.html                                         |   2 [32m+[m[31m-[m
+ src/App.css                                        | 619 [32m+++++++++++++++++++++[m
+ src/components/ActionCard.jsx                      |  13 [32m+[m[31m-[m
+ src/components/ArchiveRecordModal.jsx              |  22 [32m+[m[31m-[m
+ src/components/BackButton.jsx                      |   9 [32m+[m[31m-[m
+ src/components/PermanentDeleteModal.jsx            |  22 [32m+[m[31m-[m
+ src/components/PrintableAction.jsx                 |  12 [32m+[m[31m-[m
+ src/components/PrintableRecord.jsx                 |  13 [32m+[m[31m-[m
+ src/components/PrintableSSSP.jsx                   |   5 [32m+[m[31m-[m
+ src/components/PrintableVisitorRecord.jsx          |   4 [32m+[m[31m-[m
+ src/components/PrintableVisitorRollCall.jsx        |   2 [32m+[m[31m-[m
+ src/components/equipment/DefectSeverityBadge.jsx   |  18 [32m+[m[31m-[m
+ src/components/equipment/EquipmentStatusBadge.jsx  |  22 [32m+[m[31m-[m
+ src/components/forms/FormPageHeader.jsx            |  10 [32m+[m[31m-[m
+ .../generalMeeting/PrintableGeneralMeeting.jsx     |  13 [32m+[m[31m-[m
+ src/components/layout/AppShell.jsx                 |  10 [32m+[m[31m-[m
+ src/pages/ActionRegisterView.jsx                   |  71 [32m++[m[31m-[m
+ src/pages/ArchivedRecordsView.jsx                  |  91 [32m+[m[31m--[m
+ src/pages/Dashboard.jsx                            |  80 [32m+[m[31m--[m
+ src/pages/EquipmentView.jsx                        | 101 [32m+++[m[31m-[m
+ src/pages/GeneralMeetingView.jsx                   |  36 [32m+[m[31m-[m
+ src/pages/RecordsDashboardView.jsx                 | 209 [32m+++[m[31m----[m
+ src/pages/SettingsView.jsx                         |  91 [32m++[m[31m-[m
+ src/pages/SsspDashboardView.jsx                    |  15 [32m+[m[31m-[m
+ src/pages/VisitorSignInView.jsx                    |  48 [32m+[m[31m-[m
+ 25 files changed, 1208 insertions(+), 330 deletions(-)

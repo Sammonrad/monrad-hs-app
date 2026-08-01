@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Plus, Search } from 'lucide-react'
 import { BackButton } from '../components/BackButton.jsx'
+import { EmptyState } from '../components/common/EmptyState.jsx'
+import { FilterDisclosure } from '../components/common/FilterDisclosure.jsx'
+import { StatusBadge } from '../components/common/StatusBadge.jsx'
 import { FormPageHeader } from '../components/forms/FormPageHeader.jsx'
 import { FormSection } from '../components/forms/FormSection.jsx'
 import { FormField } from '../components/forms/FormField.jsx'
@@ -525,14 +528,20 @@ export function GeneralMeetingView({
               placeholder="Search date, location, chairperson, attendees…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
+              aria-label="Search meetings"
             />
           </div>
-          <select className="form-input" value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
-            <option value="">All types</option>
-            {MEETING_TYPES.map((type) => (
-              <option key={type} value={type}>{MEETING_TYPE_LABELS[type]}</option>
-            ))}
-          </select>
+          <FilterDisclosure
+            activeCount={typeFilter ? 1 : 0}
+            onReset={() => setTypeFilter('')}
+          >
+            <select className="form-input" value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} aria-label="Filter by meeting type">
+              <option value="">All types</option>
+              {MEETING_TYPES.map((type) => (
+                <option key={type} value={type}>{MEETING_TYPE_LABELS[type]}</option>
+              ))}
+            </select>
+          </FilterDisclosure>
         </div>
 
         <section className="gm-history" aria-label="Meeting history">
@@ -578,7 +587,13 @@ export function GeneralMeetingView({
             </div>
 
             <div className="responsive-data-list__mobile">
-              {filteredMeetings.length === 0 && <p>No meeting records found.</p>}
+              {filteredMeetings.length === 0 ? (
+                <EmptyState
+                  title="No meeting records found"
+                  description="Create a new meeting or adjust filters to see history."
+                  primaryAction={{ label: 'New meeting', onClick: startNew }}
+                />
+              ) : null}
               {filteredMeetings.map((record) => (
                 <article key={record.id} className="gm-history-card">
                   <header className="gm-history-card__header">
@@ -586,9 +601,10 @@ export function GeneralMeetingView({
                       <h3>{getMeetingDisplayTitle(record)}</h3>
                       <p>{record.chairperson || 'No chairperson'}</p>
                     </div>
-                    <span className={`gm-status-badge gm-status-badge--${record.status}`}>
-                      {MEETING_STATUS_LABELS[record.status]}
-                    </span>
+                    <StatusBadge
+                      status={record.status}
+                      label={MEETING_STATUS_LABELS[record.status] || record.status}
+                    />
                   </header>
                   <p>Next meeting: {record.nextMeetingDate || '—'}</p>
                   <CloudSyncBadge syncStatus={record.syncStatus} size="small" />

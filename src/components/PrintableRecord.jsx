@@ -2,20 +2,17 @@ import { formatSubmittedAt } from '../utils/formatting.js'
 import { getRecordDetailRows } from '../utils/recordDetails.js'
 import { isSeriousDefect } from '../utils/defects.js'
 import { DefectWarning } from './DefectWarning.jsx'
-import { MonradLogo } from './MonradLogo.jsx'
+import { PrintHeader } from './common/PrintHeader.jsx'
 
 export function PrintableRecord({ record }) {
   const detailRows = getRecordDetailRows(record)
 
   return (
     <article className="print-record">
-      <header className="print-record__header">
-        <MonradLogo variant="print" />
-        <h1 className="print-record__title">{record.formTypeLabel}</h1>
-        <p className="print-record__meta">
-          Record saved: {formatSubmittedAt(record.submittedAt)}
-        </p>
-      </header>
+      <PrintHeader
+        title={record.formTypeLabel}
+        meta={`Record saved: ${formatSubmittedAt(record.submittedAt)}`}
+      />
 
       <section className="print-record__section">
         <h2 className="print-record__section-title">Record details</h2>

@@ -33,9 +33,10 @@ export function PrintableSSSP({ record, includeAcknowledgements = false }) {
 
   return (
     <article className="print-sssp">
-      <header className="print-sssp__cover">
+      <header className="print-sssp__cover print-header">
         <MonradLogo variant="print" />
-        <h1 className="print-sssp__title">Site-Specific Safety Plan</h1>
+        <p className="print-header__company">Monrad Earthworx</p>
+        <h1 className="print-sssp__title print-header__title">Site-Specific Safety Plan</h1>
         <p className="print-sssp__number">{record.ssspNumber}</p>
         <dl className="print-sssp__cover-meta">
           <PrintField label="Project" value={record.project} />

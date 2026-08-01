@@ -4,19 +4,17 @@ import {
   SOURCE_TYPE_LABELS,
 } from '../constants/index.js'
 import { isOverdue } from '../utils/storage/actionsStorage.js'
+import { PrintHeader } from './common/PrintHeader.jsx'
 
 export function PrintableAction({ action }) {
   const overdue = isOverdue(action)
 
   return (
     <article className="print-record print-action">
-      <header className="print-record__header">
-        <p className="print-record__company">Monrad Earthworx</p>
-        <h1 className="print-record__title">Action Register Item</h1>
-        <p className="print-record__meta">
-          {SOURCE_TYPE_LABELS[action.sourceType] ?? action.sourceType}
-        </p>
-      </header>
+      <PrintHeader
+        title="Action Register Item"
+        meta={SOURCE_TYPE_LABELS[action.sourceType] ?? action.sourceType}
+      />
 
       <section className="print-record__section">
         <h2 className="print-record__section-title">Action details</h2>

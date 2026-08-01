@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { BackButton } from '../components/BackButton.jsx'
+import { EmptyState } from '../components/common/EmptyState.jsx'
+import { FilterDisclosure } from '../components/common/FilterDisclosure.jsx'
+import { LoadingState } from '../components/common/LoadingState.jsx'
+import { StatusBadge } from '../components/common/StatusBadge.jsx'
 import { getEquipmentReadableName } from '../constants/equipmentConfig.js'
 import { getSsspStatusLabel } from '../constants/ssspStatuses.js'
 import { formatSubmittedAt } from '../utils/formatting.js'
@@ -818,9 +822,9 @@ export function ArchivedRecordsView({
     <>
       <BackButton onClick={onBack} />
 
-      <header className="header no-print">
-        <p className="company">Monrad Earthworx</p>
-        <h1 className="title">Archived Records</h1>
+      <header className="header no-print form-page-header form-page-header--mobile-compact">
+        <p className="company form-page-header__company">Monrad Earthworx</p>
+        <h1 className="title form-page-header__title">Archived Records</h1>
         <p className="progress" aria-live="polite">
           {loading
             ? 'Loading archived records…'
@@ -867,38 +871,59 @@ export function ArchivedRecordsView({
           )}
         </div>
 
-        <div className="records-search__filters">
-          <label className="field records-search__filter">
-            <span className="field__label">Record type</span>
-            <select
-              className="field__input"
-              value={typeFilter}
-              onChange={(e) => setTypeFilter(e.target.value)}
-            >
-              {RECORD_TYPE_FILTERS.map((type) => (
-                <option key={type.id} value={type.id}>
-                  {type.label}
-                </option>
-              ))}
-            </select>
-          </label>
+        <label className="field records-search__query">
+          <span className="field__label">Search</span>
+          <input
+            type="search"
+            className="field__input"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Name, site, asset, project…"
+          />
+        </label>
 
-          <label className="field records-search__filter records-search__query">
-            <span className="field__label">Search</span>
-            <input
-              type="search"
-              className="field__input"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Name, site, asset, project…"
-            />
-          </label>
-        </div>
+        <FilterDisclosure
+          activeCount={typeFilter !== 'all' ? 1 : 0}
+          onReset={() => setTypeFilter('all')}
+        >
+          <div className="records-search__filters">
+            <label className="field records-search__filter">
+              <span className="field__label">Record type</span>
+              <select
+                className="field__input"
+                value={typeFilter}
+                onChange={(e) => setTypeFilter(e.target.value)}
+              >
+                {RECORD_TYPE_FILTERS.map((type) => (
+                  <option key={type.id} value={type.id}>
+                    {type.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+        </FilterDisclosure>
       </section>
 
       <section className="archived-records__list no-print" aria-live="polite">
-        {!loading && filteredItems.length === 0 ? (
-          <p className="records-search__empty">No archived records found</p>
+        {loading ? (
+          <LoadingState label="Loading archived records…" />
+        ) : filteredItems.length === 0 ? (
+          <EmptyState
+            title="No archived records found"
+            description="Archived items will appear here. Try clearing filters if you expected results."
+            secondaryAction={
+              typeFilter !== 'all' || searchQuery
+                ? {
+                    label: 'Clear filters',
+                    onClick: () => {
+                      setTypeFilter('all')
+                      setSearchQuery('')
+                    },
+                  }
+                : undefined
+            }
+          />
         ) : (
           filteredItems.map((item) => {
             const expanded = expandedKey === item.key
@@ -913,7 +938,7 @@ export function ArchivedRecordsView({
                       {item.meta && item.meta !== '—' ? ` · ${item.meta}` : ''}
                     </p>
                   </div>
-                  <span className="gm-status-badge gm-status-badge--draft">{item.statusLabel}</span>
+                  <StatusBadge status={item.statusLabel} label={item.statusLabel} />
                 </header>
 
                 {expanded && (

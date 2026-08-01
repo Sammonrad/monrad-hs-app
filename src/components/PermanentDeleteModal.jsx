@@ -1,3 +1,5 @@
+import { useEffect } from 'react'
+
 /**
  * In-app confirmation for permanent delete (no window.confirm).
  * Confirm stays disabled until the user types DELETE exactly.
@@ -12,6 +14,15 @@ export function PermanentDeleteModal({
   confirmText = '',
   onConfirmTextChange,
 }) {
+  useEffect(() => {
+    if (!open) return undefined
+    const previous = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = previous
+    }
+  }, [open])
+
   if (!open) return null
 
   const canConfirm = confirmText === 'DELETE' && !deleting
@@ -24,6 +35,15 @@ export function PermanentDeleteModal({
       aria-labelledby="permanent-delete-title"
     >
       <div className="equipment-modal archive-record-modal permanent-delete-modal">
+        <button
+          type="button"
+          className="equipment-modal__close"
+          onClick={onCancel}
+          disabled={deleting}
+          aria-label="Close"
+        >
+          ×
+        </button>
         <h2 id="permanent-delete-title" className="archive-record-modal__title">
           Permanently delete?
         </h2>
@@ -55,7 +75,7 @@ export function PermanentDeleteModal({
             {error}
           </p>
         ) : null}
-        <div className="archive-record-modal__actions">
+        <div className="archive-record-modal__actions modal-footer-actions">
           <button
             type="button"
             className="btn btn--secondary"

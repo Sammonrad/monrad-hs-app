@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { TODAY, DEFAULT_ACTION_PRIORITY, ACTION_REGISTER_FILTERS } from '../constants/index.js'
 import { BackButton } from '../components/BackButton.jsx'
+import { EmptyState } from '../components/common/EmptyState.jsx'
+import { FilterDisclosure } from '../components/common/FilterDisclosure.jsx'
+import { LoadingState } from '../components/common/LoadingState.jsx'
 import { ActionCard } from '../components/ActionCard.jsx'
 import { PrintableAction } from '../components/PrintableAction.jsx'
 import { DateField, TextField, SelectField } from '../components/FormFields.jsx'
@@ -296,9 +299,9 @@ export function ActionRegisterView({
 
       <BackButton onClick={onBack} />
 
-      <header className="header no-print">
-        <p className="company">Monrad Earthworx</p>
-        <h1 className="title">Action Register</h1>
+      <header className="header no-print form-page-header form-page-header--mobile-compact">
+        <p className="company form-page-header__company">Monrad Earthworx</p>
+        <h1 className="title form-page-header__title">Action Register</h1>
         <p className="progress" aria-live="polite">
           {activeActions.length} open · {completedActions.length} completed
           {overdueCount > 0 ? ` · ${overdueCount} overdue` : ''}
@@ -333,20 +336,26 @@ export function ActionRegisterView({
           </button>
         </div>
 
-        <div className="action-filters" role="tablist" aria-label="Filter actions">
-          {ACTION_REGISTER_FILTERS.map((filter) => (
-            <button
-              key={filter.id}
-              type="button"
-              className={
-                statusFilter === filter.id ? 'filter-btn filter-btn--active' : 'filter-btn'
-              }
-              onClick={() => setStatusFilter(filter.id)}
-            >
-              {filter.label}
-            </button>
-          ))}
-        </div>
+        <FilterDisclosure
+          activeCount={statusFilter !== 'open' && statusFilter !== 'all' ? 1 : 0}
+          onReset={() => setStatusFilter('open')}
+          label="Status filters"
+        >
+          <div className="action-filters" role="tablist" aria-label="Filter actions">
+            {ACTION_REGISTER_FILTERS.map((filter) => (
+              <button
+                key={filter.id}
+                type="button"
+                className={
+                  statusFilter === filter.id ? 'filter-btn filter-btn--active' : 'filter-btn'
+                }
+                onClick={() => setStatusFilter(filter.id)}
+              >
+                {filter.label}
+              </button>
+            ))}
+          </div>
+        </FilterDisclosure>
 
         {showAddForm && (
           <form className="action-form" onSubmit={handleAddManualAction} noValidate>
@@ -426,12 +435,28 @@ export function ActionRegisterView({
           </form>
         )}
 
-        {statusFilter !== 'completed' && filteredActive.length === 0 ? (
-          <p className="actions-register__empty">
-            {activeActions.length === 0
-              ? 'No open actions. Actions are created automatically from pre-start defects, incident corrective actions, and toolbox controls — or add one manually.'
-              : 'No actions match this filter.'}
-          </p>
+        {cloudLoading && statusFilter !== 'completed' && filteredActive.length === 0 ? (
+          <LoadingState label="Loading actions…" />
+        ) : statusFilter !== 'completed' && filteredActive.length === 0 ? (
+          <EmptyState
+            title={activeActions.length === 0 ? 'No open actions' : 'No matching actions'}
+            description={
+              activeActions.length === 0
+                ? 'Actions are created automatically from pre-start defects, incident corrective actions, and toolbox controls — or add one manually.'
+                : 'No actions match this filter.'
+            }
+            primaryAction={
+              !showAddForm
+                ? {
+                    label: 'Add action',
+                    onClick: () => {
+                      setShowAddForm(true)
+                      setFieldErrors({})
+                    },
+                  }
+                : undefined
+            }
+          />
         ) : (
           statusFilter !== 'completed' && (
             <ul className="actions-register__list">

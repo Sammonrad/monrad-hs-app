@@ -9,6 +9,7 @@ import { isCriticalAction } from '../utils/safetyAlerts.js'
 import { ARCHIVE_RECORD_TYPES } from '../utils/storage/archiveFilter.js'
 import { SummaryRow } from './FormFields.jsx'
 import { CloudSyncBadge } from './CloudSyncBadge.jsx'
+import { StatusBadge } from './common/StatusBadge.jsx'
 import { AdminArchiveAction } from './AdminArchiveAction.jsx'
 import { exportActionJson, exportActionText } from '../utils/export.js'
 
@@ -49,14 +50,16 @@ export function ActionCard({
           {ACTION_PRIORITY_LABELS[action.priority] ?? action.priority}
         </span>
         {action.status !== 'completed' && overdue && (
-          <span className="action-card__warning">Overdue</span>
+          <StatusBadge status="Overdue" variant="overdue" />
         )}
         {action.status !== 'completed' && !overdue && serious && (
-          <span className="action-card__warning">Serious</span>
+          <StatusBadge status="Serious" variant="critical" />
         )}
-        <span className={`action-status action-status--${action.status}`}>
-          {ACTION_STATUS_LABELS[action.status] ?? action.status}
-        </span>
+        <StatusBadge
+          status={action.status}
+          label={ACTION_STATUS_LABELS[action.status] ?? action.status}
+          className={`action-status action-status--${action.status}`}
+        />
       </div>
 
       <dl className="action-card__details">

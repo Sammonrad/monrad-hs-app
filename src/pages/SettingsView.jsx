@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { MACHINE_TYPES } from '../constants/index.js'
 import { BackButton } from '../components/BackButton.jsx'
 import { SettingsListItem } from '../components/SettingsListItem.jsx'
+import { ConfirmModal } from '../components/common/ConfirmModal.jsx'
+import { EmptyState } from '../components/common/EmptyState.jsx'
 import { createRecordId } from '../utils/ids.js'
 import { persistSettings } from '../utils/storage/settingsStorage.js'
 
@@ -10,6 +12,8 @@ export function SettingsView({ onBack, settings, setSettings }) {
   const [machineName, setMachineName] = useState('')
   const [machineType, setMachineType] = useState('Excavator')
   const [siteName, setSiteName] = useState('')
+  const [deleteTarget, setDeleteTarget] = useState(null)
+  const [deleting, setDeleting] = useState(false)
 
   function updateSettings(next) {
     if (!persistSettings(next)) return false
@@ -63,34 +67,43 @@ export function SettingsView({ onBack, settings, setSettings }) {
     setSiteName('')
   }
 
-  function deleteOperator(id) {
-    updateSettings({
-      ...settings,
-      operators: settings.operators.filter((item) => item.id !== id),
-    })
+  function requestDelete(kind, item) {
+    setDeleteTarget({ kind, id: item.id, name: item.name })
   }
 
-  function deleteMachine(id) {
-    updateSettings({
-      ...settings,
-      machines: settings.machines.filter((item) => item.id !== id),
-    })
-  }
-
-  function deleteSite(id) {
-    updateSettings({
-      ...settings,
-      sites: settings.sites.filter((item) => item.id !== id),
-    })
+  function handleConfirmDelete() {
+    if (!deleteTarget) return
+    setDeleting(true)
+    try {
+      if (deleteTarget.kind === 'operator') {
+        updateSettings({
+          ...settings,
+          operators: settings.operators.filter((item) => item.id !== deleteTarget.id),
+        })
+      } else if (deleteTarget.kind === 'machine') {
+        updateSettings({
+          ...settings,
+          machines: settings.machines.filter((item) => item.id !== deleteTarget.id),
+        })
+      } else if (deleteTarget.kind === 'site') {
+        updateSettings({
+          ...settings,
+          sites: settings.sites.filter((item) => item.id !== deleteTarget.id),
+        })
+      }
+      setDeleteTarget(null)
+    } finally {
+      setDeleting(false)
+    }
   }
 
   return (
     <>
       <BackButton onClick={onBack} />
 
-      <header className="header">
-        <p className="company">Monrad Earthworx</p>
-        <h1 className="title">Settings / Setup</h1>
+      <header className="header form-page-header form-page-header--mobile-compact">
+        <p className="company form-page-header__company">Monrad Earthworx</p>
+        <h1 className="title form-page-header__title">Settings / Setup</h1>
         <p className="progress">Operators, machines, and sites for quick form entry</p>
       </header>
 
@@ -114,14 +127,17 @@ export function SettingsView({ onBack, settings, setSettings }) {
           </button>
         </form>
         {settings.operators.length === 0 ? (
-          <p className="settings-section__empty">No operators saved yet.</p>
+          <EmptyState
+            title="No operators yet"
+            description="Add staff names for quick selection on forms."
+          />
         ) : (
           <ul className="settings-list">
             {settings.operators.map((item) => (
               <SettingsListItem
                 key={item.id}
                 title={item.name}
-                onDelete={() => deleteOperator(item.id)}
+                onDelete={() => requestDelete('operator', item)}
               />
             ))}
           </ul>
@@ -162,7 +178,10 @@ export function SettingsView({ onBack, settings, setSettings }) {
           </button>
         </form>
         {settings.machines.length === 0 ? (
-          <p className="settings-section__empty">No machines saved yet.</p>
+          <EmptyState
+            title="No machines yet"
+            description="Add machines for quick selection on pre-starts and timesheets."
+          />
         ) : (
           <ul className="settings-list">
             {settings.machines.map((item) => (
@@ -170,7 +189,7 @@ export function SettingsView({ onBack, settings, setSettings }) {
                 key={item.id}
                 title={item.name}
                 subtitle={item.type}
-                onDelete={() => deleteMachine(item.id)}
+                onDelete={() => requestDelete('machine', item)}
               />
             ))}
           </ul>
@@ -197,14 +216,17 @@ export function SettingsView({ onBack, settings, setSettings }) {
           </button>
         </form>
         {settings.sites.length === 0 ? (
-          <p className="settings-section__empty">No sites saved yet.</p>
+          <EmptyState
+            title="No sites yet"
+            description="Add common locations for faster form entry."
+          />
         ) : (
           <ul className="settings-list">
             {settings.sites.map((item) => (
               <SettingsListItem
                 key={item.id}
                 title={item.name}
-                onDelete={() => deleteSite(item.id)}
+                onDelete={() => requestDelete('site', item)}
               />
             ))}
           </ul>
@@ -214,6 +236,23 @@ export function SettingsView({ onBack, settings, setSettings }) {
       <p className="form-hint">
         Saved lists appear as suggestions on forms. You can still type any value manually.
       </p>
+
+      <ConfirmModal
+        open={Boolean(deleteTarget)}
+        title="Delete settings item?"
+        message={
+          deleteTarget
+            ? `“${deleteTarget.name}” will be removed from Settings. Forms can still accept typed values.`
+            : ''
+        }
+        confirmLabel="Delete"
+        processingLabel="Deleting…"
+        processing={deleting}
+        onCancel={() => {
+          if (!deleting) setDeleteTarget(null)
+        }}
+        onConfirm={handleConfirmDelete}
+      />
     </>
   )
 }
