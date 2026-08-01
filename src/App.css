@@ -2671,9 +2671,11 @@ body {
   color: var(--text-primary);
 }
 
-.field__input {
+.field__input,
+.form-input {
   width: 100%;
   max-width: 100%;
+  min-height: var(--tap-min);
   padding: var(--spacing-md) 0.875rem;
   font-size: 1rem;
   font-family: inherit;
@@ -2685,19 +2687,30 @@ body {
   transition: border-color 0.15s ease;
 }
 
-.field__input::placeholder {
+.field__input::placeholder,
+.form-input::placeholder {
   color: var(--text-muted);
   opacity: 0.75;
 }
 
-.field__input:focus {
+.field__input:focus,
+.form-input:focus {
   outline: none;
   border-color: var(--monrad-red);
 }
 
-.field__input:focus-visible {
+.field__input:focus-visible,
+.form-input:focus-visible {
   outline: 2px solid var(--monrad-red);
   outline-offset: 2px;
+}
+
+.field__input:disabled,
+.form-input:disabled {
+  color: var(--text-muted);
+  background: var(--color-grey-50);
+  cursor: not-allowed;
+  opacity: 0.75;
 }
 
 .field__textarea {
@@ -3286,6 +3299,7 @@ body {
 }
 
 .form-field--error .field__input,
+.form-field--error .form-input,
 .form-field--error .form-field__input {
   border-color: var(--monrad-red);
 }
@@ -4512,15 +4526,20 @@ body {
   }
 
   .field__input,
+  .form-input,
   .field__textarea,
-  select.field__input {
+  select.field__input,
+  select.form-input,
+  textarea.form-input,
+  input.form-input[type='date'] {
     width: 100%;
     min-height: 44px;
     padding: 0.75rem 0.875rem;
     font-size: 16px;
   }
 
-  .field__textarea {
+  .field__textarea,
+  textarea.form-input {
     min-height: 5rem;
   }
 
@@ -4853,8 +4872,12 @@ body {
   }
 
   .field__input,
+  .form-input,
   .field__textarea,
-  select.field__input {
+  select.field__input,
+  select.form-input,
+  textarea.form-input,
+  input.form-input[type='date'] {
     padding: 0.625rem 0.75rem;
   }
 
@@ -6436,6 +6459,11 @@ body {
   align-items: center;
 }
 
+.equipment-toolbar .form-input {
+  flex: 1 1 10rem;
+  min-width: 0;
+}
+
 .equipment-toolbar__search {
   flex: 1 1 12rem;
   min-width: 0;
@@ -6529,6 +6557,14 @@ body {
 
 .equipment-summary-card__details dt {
   color: var(--color-grey-600);
+}
+
+.equipment-summary-card__details dd,
+.equipment-summary-card__title,
+.equipment-summary-card__meta {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .equipment-summary-card__actions {
@@ -7146,6 +7182,11 @@ body {
   gap: var(--spacing-sm);
   margin-bottom: var(--spacing-md);
   align-items: center;
+}
+
+.gm-dashboard__filters .form-input {
+  flex: 1 1 10rem;
+  min-width: 0;
 }
 
 .gm-dashboard__tabs {

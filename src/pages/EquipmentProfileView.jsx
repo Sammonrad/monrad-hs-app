@@ -615,32 +615,67 @@ export function EquipmentProfileView({
           {preStartHistory.length === 0 ? (
             <p>No pre-start records for this asset.</p>
           ) : (
-            <table className="equipment-table">
-              <thead>
-                <tr>
-                  <th>Date</th>
-                  <th>Operator</th>
-                  <th>Result</th>
-                  <th>Defects</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
+            <div className="responsive-data-list">
+              <div className="responsive-data-list__desktop">
+                <div className="data-table-scroll">
+                  <table className="equipment-table">
+                    <thead>
+                      <tr>
+                        <th>Date</th>
+                        <th>Operator</th>
+                        <th>Result</th>
+                        <th>Defects</th>
+                        <th></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {preStartHistory.map((record) => (
+                        <tr key={record.id}>
+                          <td>{record.fields?.date}</td>
+                          <td>{record.fields?.operatorName}</td>
+                          <td>{record.allComplete ? 'Complete' : 'Partial'}</td>
+                          <td>{record.defectsFound === 'found' ? 'Defects found' : 'None'}</td>
+                          <td>
+                            <button type="button" className="btn btn--secondary btn--small" onClick={() => onNavigate('pre-start', { highlightRecordId: record.id })}>
+                              Open
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              <div className="responsive-data-list__mobile">
                 {preStartHistory.map((record) => (
-                  <tr key={record.id}>
-                    <td>{record.fields?.date}</td>
-                    <td>{record.fields?.operatorName}</td>
-                    <td>{record.allComplete ? 'Complete' : 'Partial'}</td>
-                    <td>{record.defectsFound === 'found' ? 'Defects found' : 'None'}</td>
-                    <td>
-                      <button type="button" className="btn btn--secondary btn--small" onClick={() => onNavigate('pre-start', { highlightRecordId: record.id })}>
+                  <article key={record.id} className="equipment-summary-card">
+                    <header className="equipment-summary-card__header">
+                      <div>
+                        <h3 className="equipment-summary-card__title">{record.fields?.date || '—'}</h3>
+                        <p className="equipment-summary-card__meta">
+                          {record.fields?.operatorName || '—'}
+                        </p>
+                      </div>
+                    </header>
+                    <dl className="equipment-summary-card__details">
+                      <dt>Result</dt>
+                      <dd>{record.allComplete ? 'Complete' : 'Partial'}</dd>
+                      <dt>Defects</dt>
+                      <dd>{record.defectsFound === 'found' ? 'Defects found' : 'None'}</dd>
+                    </dl>
+                    <div className="equipment-summary-card__actions">
+                      <button
+                        type="button"
+                        className="btn btn--secondary"
+                        onClick={() => onNavigate('pre-start', { highlightRecordId: record.id })}
+                      >
                         Open
                       </button>
-                    </td>
-                  </tr>
+                    </div>
+                  </article>
                 ))}
-              </tbody>
-            </table>
+              </div>
+            </div>
           )}
         </section>
 
