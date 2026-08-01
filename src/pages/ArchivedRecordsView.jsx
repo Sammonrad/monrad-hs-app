@@ -666,32 +666,23 @@ export function ArchivedRecordsView({
     setActionError('')
     setActionMessage('')
 
-    const { record: restored, error, localOnly } = await restoreArchivedRecord(
+    const { record: restored, error } = await restoreArchivedRecord(
       item.recordType,
       item.record,
       user,
+      profile,
       { preparedByName: profile?.full_name?.trim() || user.email || 'Admin' },
     )
 
     setRestoringKey(null)
 
-    if (error && !localOnly && !restored) {
-      setActionError(error.message)
+    if (error || !restored) {
+      setActionError(error?.message || 'Restore failed.')
       return
     }
 
-    if (error && localOnly) {
-      setActionError(
-        `${error.message} Local copy marked active; cloud restore may need the archive column.`,
-      )
-    } else if (error) {
-      setActionError(error.message)
-      return
-    } else {
-      setActionMessage(`Restored: ${item.title}`)
-    }
-
-    syncAppStateAfterRestore(item.recordType, restored ?? { ...item.record, archived: false })
+    setActionMessage(`Restored: ${item.title}`)
+    syncAppStateAfterRestore(item.recordType, restored)
     setItems((prev) => prev.filter((row) => row.key !== item.key))
     if (expandedKey === item.key) setExpandedKey(null)
   }
@@ -757,6 +748,7 @@ export function ArchivedRecordsView({
       deleteTarget.recordType,
       deleteTarget.record,
       user,
+      profile,
     )
 
     if (!ok) {

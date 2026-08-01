@@ -314,17 +314,16 @@ function firstInsertedRow(data) {
 /** Verifies a live Supabase session before any equipment cloud write. */
 export async function requireEquipmentCloudUser() {
   if (!isSupabaseConfigured || !supabase) {
-    console.log('Equipment cloud save auth.getUser(): Supabase is not configured.')
+    if (import.meta.env.DEV) {
+      console.error('Equipment cloud save: Supabase is not configured.')
+    }
     return { user: null, error: authRequiredError('Supabase is not configured.') }
   }
 
   const authResult = await supabase.auth.getUser()
-  console.log('Equipment cloud save auth.getUser():', {
-    user: authResult?.data?.user
-      ? { id: authResult.data.user.id, email: authResult.data.user.email }
-      : null,
-    error: authResult?.error ?? null,
-  })
+  if (import.meta.env.DEV && authResult?.error) {
+    console.error('Equipment cloud save auth.getUser() failed:', authResult.error)
+  }
 
   if (authResult?.error) {
     return { user: null, error: authResult.error }
@@ -351,10 +350,11 @@ export async function saveEquipmentRecord(_user, record) {
   }
   const { data, error } = await supabase.from('machine_equipment').insert(row).select()
 
-  console.log('Equipment cloud save result:', { data, error })
-
+  if (error) {
+    console.error('Equipment cloud insert failed:', error)
+    return { record: null, error }
+  }
   const inserted = firstInsertedRow(data)
-  if (error) return { record: null, error }
   if (!inserted?.id) {
     return {
       record: null,
@@ -384,10 +384,11 @@ export async function updateEquipmentRecord(_user, record) {
     .eq('id', record.cloudId)
     .select()
 
-  console.log('Equipment cloud save result:', { data, error })
-
+  if (error) {
+    console.error('Equipment cloud update failed:', error)
+    return { record: null, error }
+  }
   const updated = firstInsertedRow(data)
-  if (error) return { record: null, error }
   if (!updated?.id) {
     return {
       record: null,

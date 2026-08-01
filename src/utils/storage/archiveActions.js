@@ -284,13 +284,20 @@ export async function archiveRecord(type, record, user, profile, options = {}) {
 }
 
 /**
+ * Soft-restore an archived record. Cloud rows must succeed in Supabase before local is patched.
+ * Local-only records (no cloudId) restore on-device and return localOnly: true.
+ *
  * @param {string} type ARCHIVE_RECORD_TYPES value
  * @param {object} record
  * @param {object} user
+ * @param {object} profile
  * @param {{ preparedByName?: string }} [options]
  * @returns {Promise<{ record: object|null, error: Error|null, localOnly?: boolean }>}
  */
-export async function restoreArchivedRecord(type, record, user, options = {}) {
+export async function restoreArchivedRecord(type, record, user, profile, options = {}) {
+  if (!isAdminProfile(profile)) {
+    return { record: null, error: new Error('Admin access is required.') }
+  }
   if (!record) {
     return { record: null, error: new Error('No record to restore.') }
   }
@@ -301,16 +308,19 @@ export async function restoreArchivedRecord(type, record, user, options = {}) {
   try {
     if (type === ARCHIVE_RECORD_TYPES.EQUIPMENT || type === 'equipment') {
       const next = { ...record, archived: false }
-      const { record: saved, error } = await updateEquipmentRecord(user, next)
-      patchLocalEquipment(recordId, cloudId, { archived: false })
-      if (error) {
-        return {
-          record: { ...next, archived: false },
-          error: new Error(formatCloudSaveError(error)),
-          localOnly: true,
+      if (cloudId) {
+        const { record: saved, error } = await updateEquipmentRecord(user, next)
+        if (error || !saved) {
+          return {
+            record: null,
+            error: new Error(formatCloudSaveError(error) || 'Cloud restore failed.'),
+          }
         }
+        patchLocalEquipment(recordId, cloudId, { archived: false })
+        return { record: saved, error: null }
       }
-      return { record: saved ?? next, error: null }
+      patchLocalEquipment(recordId, null, { archived: false })
+      return { record: next, error: null, localOnly: true }
     }
 
     if (type === ARCHIVE_RECORD_TYPES.SSSP || type === 'sssp') {
@@ -330,8 +340,11 @@ export async function restoreArchivedRecord(type, record, user, options = {}) {
         userName: options.preparedByName || user?.email || 'Admin',
       })
       const { record: saved, error } = await updateSsspRecord(user, next)
-      if (error) {
-        return { record: null, error: new Error(formatCloudSaveError(error)) }
+      if (error || !saved) {
+        return {
+          record: null,
+          error: new Error(formatCloudSaveError(error) || 'Cloud restore failed.'),
+        }
       }
       return { record: saved, error: null }
     }
@@ -340,54 +353,51 @@ export async function restoreArchivedRecord(type, record, user, options = {}) {
       const next = normalizeAction({ ...record, archived: false })
       if (cloudId) {
         const { record: saved, error } = await updateActionRecord(user, next)
-        patchLocalActions(recordId, cloudId, { archived: false })
-        if (error) {
+        if (error || !saved) {
           return {
-            record: next,
-            error: new Error(formatCloudSaveError(error)),
-            localOnly: true,
+            record: null,
+            error: new Error(formatCloudSaveError(error) || 'Cloud restore failed.'),
           }
         }
+        patchLocalActions(recordId, cloudId, { archived: false })
         return { record: saved ?? next, error: null }
       }
       patchLocalActions(recordId, null, { archived: false })
-      return { record: next, error: null }
+      return { record: next, error: null, localOnly: true }
     }
 
     if (type === ARCHIVE_RECORD_TYPES.VISITOR || type === 'visitor') {
       const next = normalizeVisitorRecord({ ...record, archived: false })
       if (cloudId) {
         const { error } = await restoreBooleanCloudColumn('visitor_sign_in_records', cloudId)
-        patchLocalVisitors(recordId, cloudId, { archived: false })
         if (error) {
           return {
-            record: next,
-            error: new Error(formatCloudSaveError(error)),
-            localOnly: true,
+            record: null,
+            error: new Error(formatCloudSaveError(error) || 'Cloud restore failed.'),
           }
         }
+        patchLocalVisitors(recordId, cloudId, { archived: false })
         return { record: next, error: null }
       }
       patchLocalVisitors(recordId, null, { archived: false })
-      return { record: next, error: null }
+      return { record: next, error: null, localOnly: true }
     }
 
     if (type === ARCHIVE_RECORD_TYPES.GENERAL_MEETING || type === 'general-meeting') {
       const next = normalizeMeeting({ ...record, archived: false })
       if (cloudId) {
         const { record: saved, error } = await updateGeneralMeetingRecord(user, next)
-        patchLocalMeetings(recordId, cloudId, { archived: false })
-        if (error) {
+        if (error || !saved) {
           return {
-            record: next,
-            error: new Error(formatCloudSaveError(error)),
-            localOnly: true,
+            record: null,
+            error: new Error(formatCloudSaveError(error) || 'Cloud restore failed.'),
           }
         }
+        patchLocalMeetings(recordId, cloudId, { archived: false })
         return { record: saved ?? next, error: null }
       }
       patchLocalMeetings(recordId, null, { archived: false })
-      return { record: next, error: null }
+      return { record: next, error: null, localOnly: true }
     }
 
     const table = FORM_ARCHIVE_TABLES[type]
@@ -395,18 +405,17 @@ export async function restoreArchivedRecord(type, record, user, options = {}) {
       const next = { ...record, archived: false }
       if (cloudId) {
         const { error } = await restoreBooleanCloudColumn(table, cloudId)
-        patchLocalSavedRecord(recordId, cloudId, { archived: false })
         if (error) {
           return {
-            record: next,
-            error: new Error(formatCloudSaveError(error)),
-            localOnly: true,
+            record: null,
+            error: new Error(formatCloudSaveError(error) || 'Cloud restore failed.'),
           }
         }
+        patchLocalSavedRecord(recordId, cloudId, { archived: false })
         return { record: next, error: null }
       }
       patchLocalSavedRecord(recordId, null, { archived: false })
-      return { record: next, error: null }
+      return { record: next, error: null, localOnly: true }
     }
 
     return { record: null, error: new Error(`Unsupported record type: ${type}`) }
@@ -496,9 +505,13 @@ async function deleteCloudRow(table, cloudId) {
  * @param {string} type ARCHIVE_RECORD_TYPES value
  * @param {object} record
  * @param {object} user
+ * @param {object} profile
  * @returns {Promise<{ ok: boolean, error: Error|null, localOnly?: boolean }>}
  */
-export async function permanentlyDeleteArchivedRecord(type, record, user) {
+export async function permanentlyDeleteArchivedRecord(type, record, user, profile) {
+  if (!isAdminProfile(profile)) {
+    return { ok: false, error: new Error('Admin access is required.') }
+  }
   if (!user?.id) {
     return { ok: false, error: new Error('You must be signed in to delete records.') }
   }
