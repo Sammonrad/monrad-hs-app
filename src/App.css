@@ -958,6 +958,8 @@ body {
   border-top: 3px solid var(--monrad-red-border);
   border-radius: var(--card-radius);
   box-shadow: var(--card-shadow);
+  max-width: 100%;
+  min-width: 0;
 }
 
 .visitor-sign-in__card-header {
@@ -967,6 +969,12 @@ body {
   justify-content: space-between;
   gap: 0.5rem;
   margin-bottom: var(--spacing-sm);
+  min-width: 0;
+}
+
+.visitor-sign-in__card-header > * {
+  min-width: 0;
+  max-width: 100%;
 }
 
 .visitor-sign-in__card-name {
@@ -974,6 +982,8 @@ body {
   font-size: 1.05rem;
   font-weight: 600;
   color: var(--text-primary);
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .visitor-sign-in__sign-out-btn {
@@ -1030,6 +1040,21 @@ body {
   margin: 0.25rem 0 0;
   font-size: 0.85rem;
   color: var(--text-muted);
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.visitor-sign-in__history-row > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.visitor-sign-in__filters > *,
+.visitor-sign-in__filters .field {
+  min-width: 0;
+  max-width: 100%;
 }
 
 .type-badge--on-site {
@@ -1584,8 +1609,13 @@ body {
 
 @media (min-width: 640px) {
   .weekly-filters__grid {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+}
+
+.weekly-filters__grid > * {
+  min-width: 0;
+  max-width: 100%;
 }
 
 .weekly-summary {
@@ -1698,6 +1728,8 @@ body {
   background: var(--bg-card);
   border: 1px solid var(--border-subtle);
   border-radius: 8px;
+  max-width: 100%;
+  min-width: 0;
 }
 
 .weekly-record__header {
@@ -1706,6 +1738,12 @@ body {
   justify-content: space-between;
   gap: 0.5rem;
   margin-bottom: 0.75rem;
+  min-width: 0;
+}
+
+.weekly-record__header > * {
+  min-width: 0;
+  max-width: 100%;
 }
 
 .weekly-record__date {
@@ -1713,19 +1751,27 @@ body {
   font-size: 0.9rem;
   font-weight: 700;
   color: var(--text-primary);
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .weekly-record__details {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.5rem 0.75rem;
   margin: 0;
+  min-width: 0;
 }
 
 @media (min-width: 640px) {
   .weekly-record__details {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
+}
+
+.weekly-record__row {
+  min-width: 0;
+  max-width: 100%;
 }
 
 .weekly-record__row dt {
@@ -1740,6 +1786,9 @@ body {
   font-size: 0.85rem;
   line-height: 1.35;
   color: var(--text-primary);
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
   word-break: break-word;
 }
 
@@ -2154,6 +2203,13 @@ body {
   border: 1px solid var(--border-color);
   border-radius: var(--card-radius-sm);
   box-shadow: none;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.records-summary-card__content {
+  min-width: 0;
+  max-width: 100%;
 }
 
 .records-summary-card__title {
@@ -2161,6 +2217,10 @@ body {
   font-size: 1rem;
   font-weight: 700;
   color: var(--text-primary);
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .records-summary-card__count {
@@ -2174,6 +2234,10 @@ body {
   margin: 0.25rem 0 0;
   font-size: 0.8rem;
   color: var(--text-muted);
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .records-summary-card__recent--empty {
@@ -2240,13 +2304,15 @@ body {
 
 .records-search__filters {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.75rem;
   margin-bottom: 0.875rem;
 }
 
 .records-search__filter {
   margin: 0;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .records-search__toggles {
@@ -2345,13 +2411,15 @@ body {
 
 .search-result__meta {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.5rem;
   margin: 0 0 0.75rem;
 }
 
 .search-result__row {
   margin: 0;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .search-result__row dt {
@@ -2367,6 +2435,9 @@ body {
   margin: 0;
   font-size: 0.85rem;
   color: var(--text-primary);
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
   word-break: break-word;
 }
 
@@ -2448,6 +2519,8 @@ body {
   border: 1px solid var(--border-color);
   border-radius: var(--card-radius-sm);
   box-shadow: none;
+  max-width: 100%;
+  min-width: 0;
 }
 
 .action-card--overdue,
@@ -2675,6 +2748,7 @@ body {
 .form-input {
   width: 100%;
   max-width: 100%;
+  min-width: 0;
   min-height: var(--tap-min);
   padding: var(--spacing-md) 0.875rem;
   font-size: 1rem;
@@ -2685,6 +2759,14 @@ body {
   border: 1px solid var(--color-grey-200);
   border-radius: var(--card-radius-sm);
   transition: border-color 0.15s ease;
+}
+
+/* Native date controls have a large intrinsic min-width; keep them in-cell */
+input[type='date'].field__input,
+input[type='date'].form-input {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
 }
 
 .field__input::placeholder,
@@ -3881,6 +3963,8 @@ body {
   border-top: 2px solid var(--monrad-red);
   border-radius: var(--card-radius-sm);
   box-shadow: none;
+  max-width: 100%;
+  min-width: 0;
 }
 
 .saved-record__title {
@@ -3889,6 +3973,10 @@ body {
   font-weight: 700;
   color: var(--text-primary);
   line-height: 1.3;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .saved-record__details {
@@ -3896,6 +3984,8 @@ body {
   display: flex;
   flex-direction: column;
   gap: var(--spacing-xs);
+  min-width: 0;
+  max-width: 100%;
 }
 
 .saved-record__meta {
@@ -3904,6 +3994,10 @@ body {
   border-top: 1px solid var(--color-grey-150);
   font-size: 0.7rem;
   color: var(--color-grey-500);
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .saved-record__badges {
@@ -3975,6 +4069,8 @@ body {
   display: flex;
   flex-direction: column;
   gap: 0.15rem;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .saved-record__row dt {
@@ -3983,6 +4079,8 @@ body {
   letter-spacing: 0.03em;
   text-transform: uppercase;
   color: var(--color-grey-600);
+  min-width: 0;
+  max-width: 100%;
 }
 
 .saved-record__row dd {
@@ -3990,6 +4088,9 @@ body {
   font-size: 0.875rem;
   line-height: 1.4;
   color: var(--color-black);
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
   word-break: break-word;
 }
 
@@ -6527,6 +6628,8 @@ body {
   border-radius: var(--card-radius);
   padding: var(--spacing-md);
   margin-bottom: var(--spacing-sm);
+  max-width: 100%;
+  min-width: 0;
 }
 
 .equipment-summary-card__header {
@@ -6534,6 +6637,17 @@ body {
   justify-content: space-between;
   gap: var(--spacing-sm);
   margin-bottom: var(--spacing-sm);
+  min-width: 0;
+}
+
+.equipment-summary-card__header > :first-child {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.equipment-summary-card__header > :not(:first-child) {
+  flex-shrink: 0;
 }
 
 .equipment-summary-card__title {
@@ -6549,20 +6663,24 @@ body {
 
 .equipment-summary-card__details {
   display: grid;
-  grid-template-columns: auto 1fr;
+  grid-template-columns: auto minmax(0, 1fr);
   gap: 0.25rem 0.75rem;
   font-size: 0.85rem;
   margin: 0 0 var(--spacing-sm);
+  min-width: 0;
+  max-width: 100%;
 }
 
 .equipment-summary-card__details dt {
   color: var(--color-grey-600);
+  min-width: 0;
 }
 
 .equipment-summary-card__details dd,
 .equipment-summary-card__title,
 .equipment-summary-card__meta {
   min-width: 0;
+  max-width: 100%;
   overflow-wrap: anywhere;
   word-break: break-word;
 }
@@ -7233,6 +7351,8 @@ body {
   border-radius: var(--card-radius);
   padding: var(--spacing-md);
   margin-bottom: var(--spacing-sm);
+  max-width: 100%;
+  min-width: 0;
 }
 
 .gm-history-card__header {
@@ -7240,11 +7360,33 @@ body {
   justify-content: space-between;
   gap: var(--spacing-sm);
   margin-bottom: 0.35rem;
+  min-width: 0;
+}
+
+.gm-history-card__header > :first-child {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.gm-history-card__header > :not(:first-child) {
+  flex-shrink: 0;
 }
 
 .gm-history-card h3 {
   margin: 0;
   font-size: 0.95rem;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.gm-history-card p {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .gm-history-card .btn {
@@ -7295,13 +7437,23 @@ body {
 
 .gm-detail-summary__dl {
   display: grid;
-  grid-template-columns: auto 1fr;
+  grid-template-columns: auto minmax(0, 1fr);
   gap: 0.35rem 0.75rem;
   font-size: 0.875rem;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .gm-detail-summary__dl dt {
   color: var(--color-grey-600);
+  min-width: 0;
+}
+
+.gm-detail-summary__dl dd {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .gm-detail-sections {
@@ -7493,4 +7645,49 @@ body {
 .gm-detail-actions .archive-record-action,
 .visitor-sign-in__history-actions .archive-record-action {
   min-height: var(--tap-min);
+}
+
+/* Shared mobile card date/text containment (320–430px and up) */
+.equipment-summary-card,
+.gm-history-card,
+.archived-records__card,
+.records-summary-card,
+.visitor-sign-in__card,
+.visitor-sign-in__history-btn,
+.weekly-record,
+.saved-record,
+.action-card,
+.search-result {
+  box-sizing: border-box;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.field:has(> input[type='date']),
+.records-search__filter:has(> input[type='date']),
+.weekly-filters__grid .field:has(> input[type='date']),
+.visitor-sign-in__filters .field:has(> input[type='date']) {
+  min-width: 0;
+  max-width: 100%;
+}
+
+@media (max-width: 640px) {
+  .field__input[type='date'],
+  .form-input[type='date'],
+  input[type='date'].field__input,
+  input[type='date'].form-input {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+
+  .records-search__filters,
+  .search-result__meta,
+  .weekly-record__details,
+  .equipment-summary-card__details,
+  .gm-detail-summary__dl {
+    min-width: 0;
+    max-width: 100%;
+  }
 }
