@@ -3,6 +3,7 @@ import { normalizeRecord } from '../records.js'
 import { parseRecordHours } from '../weeklyTimesheet.js'
 import {
   SYNC_STATUS,
+  formatCloudSaveError,
   withSyncStatus,
 } from './cloudSyncStatus.js'
 import { ARCHIVE_RECORD_TYPES, filterArchived } from './archiveFilter.js'
@@ -14,6 +15,7 @@ export {
   getSyncStatusLabel,
   getSyncStatusModifier,
   resolveRecordSyncStatus,
+  formatCloudSaveError,
 } from './cloudSyncStatus.js'
 
 export function mapTimesheetToRow(record, userId) {
@@ -235,4 +237,94 @@ export async function saveTimesheetRecord(user, record) {
   }
 
   return { record: rowToTimesheetRecord(data), error: null }
+}
+
+/**
+ * Update an existing cloud timesheet. Does not change user_id or created_at
+ * (ownership and original create time stay with the row).
+ */
+export async function updateTimesheetRecord(user, record) {
+  if (!isSupabaseConfigured || !supabase) {
+    return { record: null, error: new Error('Supabase is not configured.') }
+  }
+
+  const userId = user?.id
+  if (!userId) {
+    return { record: null, error: new Error('You must be signed in to save to the cloud.') }
+  }
+
+  if (!record?.cloudId) {
+    return { record: null, error: new Error('Missing cloud record id for update.') }
+  }
+
+  if (record.cloudUserId && record.cloudUserId !== userId) {
+    return { record: null, error: new Error('You can only edit your own timesheets.') }
+  }
+
+  const row = mapTimesheetToRow(record, record.cloudUserId || userId)
+
+  const { data, error } = await supabase
+    .from('timesheet_records')
+    .update({
+      record_data: row.record_data,
+      record_date: row.record_date,
+      employee_name: row.employee_name,
+      job_name: row.job_name,
+      site_location: row.site_location,
+      machine_used: row.machine_used,
+      total_hours: row.total_hours,
+      chargeable_hours: row.chargeable_hours,
+      non_chargeable_hours: row.non_chargeable_hours,
+      updated_at: new Date().toISOString(),
+      ...(typeof record.archived === 'boolean' ? { archived: record.archived } : {}),
+    })
+    .eq('id', record.cloudId)
+    .select()
+    .single()
+
+  if (error) {
+    return {
+      record: null,
+      error: new Error(formatCloudSaveError(error) || error.message || 'Cloud update failed.'),
+    }
+  }
+
+  return { record: rowToTimesheetRecord(data), error: null }
+}
+
+/**
+ * Permanently delete a timesheet from the cloud (hard delete, not archive).
+ * Local copies must be removed by the caller so they are not merged back.
+ */
+export async function deleteTimesheetRecord(user, record) {
+  if (!isSupabaseConfigured || !supabase) {
+    return { ok: false, error: new Error('Supabase is not configured.') }
+  }
+
+  const userId = user?.id
+  if (!userId) {
+    return { ok: false, error: new Error('You must be signed in to delete timesheets.') }
+  }
+
+  if (!record?.cloudId) {
+    return { ok: true, error: null, localOnly: true }
+  }
+
+  if (record.cloudUserId && record.cloudUserId !== userId) {
+    return { ok: false, error: new Error('You can only delete your own timesheets.') }
+  }
+
+  const { error } = await supabase
+    .from('timesheet_records')
+    .delete()
+    .eq('id', record.cloudId)
+
+  if (error) {
+    return {
+      ok: false,
+      error: new Error(formatCloudSaveError(error) || error.message || 'Cloud delete failed.'),
+    }
+  }
+
+  return { ok: true, error: null, localOnly: false }
 }

@@ -8,6 +8,7 @@ import { AdminArchiveAction } from '../components/AdminArchiveAction.jsx'
 import { SavedRecordSignature } from '../components/SavedRecordSignature.jsx'
 import { TimesheetCloudSyncBadge } from '../components/TimesheetCloudSyncBadge.jsx'
 import { WeeklyPrintSummary } from '../components/WeeklyPrintSummary.jsx'
+import { ConfirmModal } from '../components/common/ConfirmModal.jsx'
 import { buildWeeklyPrintSheetForRecord } from '../utils/weeklyTimesheet.js'
 import { FormSection } from '../components/forms/FormSection.jsx'
 import { FormField } from '../components/forms/FormField.jsx'
@@ -31,6 +32,7 @@ import { createEmptyDraft, getRecordTitle } from '../utils/records.js'
 import { persistSavedRecords } from '../utils/storage/recordsStorage.js'
 import { getSettingsOptions } from '../utils/storage/settingsStorage.js'
 import {
+  deleteTimesheetRecord,
   fetchTimesheetRecords,
   getMergedTimesheetRecords,
   getUnavailableSyncStatus,
@@ -38,6 +40,7 @@ import {
   resolveRecordSyncStatus,
   saveTimesheetRecord,
   SYNC_STATUS,
+  updateTimesheetRecord,
 } from '../utils/storage/timesheetCloudStorage.js'
 import { isAdminProfile } from '../utils/storage/userProfileStorage.js'
 import { ARCHIVE_RECORD_TYPES } from '../utils/storage/archiveFilter.js'
@@ -52,6 +55,20 @@ import {
   hasValidationErrors,
   getValidationSummary,
 } from '../utils/formValidation.js'
+
+function isOwnTimesheetRecord(record, user) {
+  if (!user?.id || !record) return false
+  if (record.cloudUserId) return record.cloudUserId === user.id
+  // Local-only / not yet attributed in cloud — device copy belongs to current user
+  return true
+}
+
+function matchesTimesheetIdentity(item, record) {
+  if (!item || !record) return false
+  if (record.cloudId && item.cloudId === record.cloudId) return true
+  if (record.id && item.id === record.id) return true
+  return false
+}
 
 export function TimesheetView({
   onBack,
@@ -69,15 +86,23 @@ export function TimesheetView({
   const [draft, setDraft] = useState(() => createEmptyDraft('timesheet'))
   useDefaultFormDate(setDraft)
   const [completedRecord, setCompletedRecord] = useState(null)
+  const [editingRecord, setEditingRecord] = useState(null)
+  const [viewingRecordId, setViewingRecordId] = useState(null)
   const [fieldErrors, setFieldErrors] = useState({})
   const [completedSyncStatus, setCompletedSyncStatus] = useState(null)
   const [completedCloudError, setCompletedCloudError] = useState('')
+  const [formStatusMessage, setFormStatusMessage] = useState('')
+  const [formStatusError, setFormStatusError] = useState('')
   const [cloudLoadWarning, setCloudLoadWarning] = useState(null)
   const [cloudSaving, setCloudSaving] = useState(false)
   const [chargeableEdited, setChargeableEdited] = useState(false)
   const [archiveMessage, setArchiveMessage] = useState('')
+  const [deleteTarget, setDeleteTarget] = useState(null)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
   const [printPayload, setPrintPayload] = useState(null)
   const recordRef = useRef(null)
+  const formRef = useRef(null)
 
   const { fields, signatureConfirmation } = draft
   const comboOptions = getSettingsOptions(settings)
@@ -130,6 +155,28 @@ export function TimesheetView({
       return next
     })
     setCompletedRecord((prev) => (prev?.id === recordId ? { ...prev, ...patch } : prev))
+    setEditingRecord((prev) => (prev?.id === recordId ? { ...prev, ...patch } : prev))
+  }
+
+  function upsertLocalTimesheet(record) {
+    setSavedRecords((prev) => {
+      const without = prev.filter((item) => !matchesTimesheetIdentity(item, record))
+      const next = [record, ...without]
+      persistSavedRecords(next)
+      return next
+    })
+  }
+
+  function removeLocalAndCloudTimesheet(record) {
+    setSavedRecords((prev) => {
+      const next = prev.filter((item) => !matchesTimesheetIdentity(item, record))
+      persistSavedRecords(next)
+      return next
+    })
+    setCloudTimesheets((prev) => prev.filter((item) => !matchesTimesheetIdentity(item, record)))
+    setCompletedRecord((prev) => (matchesTimesheetIdentity(prev, record) ? null : prev))
+    setEditingRecord((prev) => (matchesTimesheetIdentity(prev, record) ? null : prev))
+    setViewingRecordId((prev) => (prev === record.id ? null : prev))
   }
 
   useEffect(() => {
@@ -210,8 +257,38 @@ export function TimesheetView({
     return errors
   }
 
+  function buildTimesheetFieldsFromDraft() {
+    const chargeableHours =
+      chargeableEdited && fields.chargeableHours.trim()
+        ? fields.chargeableHours.trim()
+        : autoChargeableHours
+
+    return {
+      date: fields.date,
+      employeeName: fields.employeeName,
+      jobProjectName: fields.jobProjectName,
+      siteLocation: fields.siteLocation,
+      customerName: fields.customerName,
+      machineUsed: fields.machineUsed,
+      startTime: fields.startTime,
+      finishTime: fields.finishTime,
+      breakMinutes: fields.breakMinutes,
+      totalHoursWorked: labourCalc.value,
+      chargeableHours,
+      nonChargeableHours: fields.nonChargeableHours,
+      nonChargeableReason: fields.nonChargeableReason,
+      workCompleted: fields.workCompleted,
+      materialsUsed: fields.materialsUsed,
+      docketNumber: fields.docketNumber,
+      delaysOrIssues: fields.delaysOrIssues,
+      safetyIssues: fields.safetyIssues,
+      notes: fields.notes,
+    }
+  }
+
   async function handleSubmit(event) {
     event.preventDefault()
+    if (cloudSaving || deleting) return
 
     const errors = validateForm()
     if (hasValidationErrors(errors)) {
@@ -221,37 +298,138 @@ export function TimesheetView({
     }
 
     setFieldErrors({})
-    const submittedAt = new Date().toISOString()
-    const chargeableHours =
-      chargeableEdited && fields.chargeableHours.trim()
-        ? fields.chargeableHours.trim()
-        : autoChargeableHours
+    setFormStatusMessage('')
+    setFormStatusError('')
+    setCompletedCloudError('')
 
+    const nextFields = buildTimesheetFieldsFromDraft()
+    const isEditing = Boolean(editingRecord)
+
+    if (isEditing) {
+      if (!isOwnTimesheetRecord(editingRecord, user)) {
+        setFormStatusError('You can only edit your own timesheets.')
+        return
+      }
+
+      const updatedRecord = {
+        ...editingRecord,
+        formType: 'timesheet',
+        formTypeLabel: formConfig.title,
+        fields: nextFields,
+        completedItems: editingRecord.completedItems ?? [],
+        completedCount: editingRecord.completedCount ?? 0,
+        totalCount: editingRecord.totalCount ?? 0,
+        allComplete: true,
+        signatureConfirmation: signatureConfirmation.trim(),
+        photos: editingRecord.photos ?? [],
+        // Preserve original submittedAt / owner metadata
+        submittedAt: editingRecord.submittedAt,
+        cloudId: editingRecord.cloudId ?? null,
+        cloudUserId: editingRecord.cloudUserId ?? null,
+      }
+
+      upsertLocalTimesheet(updatedRecord)
+      setCompletedRecord(updatedRecord)
+      setCompletedSyncStatus(null)
+
+      if (!updatedRecord.cloudId) {
+        if (isCloudSaveUnavailable(user)) {
+          const syncStatus = getUnavailableSyncStatus(user)
+          patchSavedTimesheetRecord(updatedRecord.id, { syncStatus })
+          setCompletedSyncStatus(syncStatus)
+          setFormStatusMessage('Timesheet updated on this device.')
+          setEditingRecord(null)
+          return
+        }
+
+        setCloudSaving(true)
+        const { record: cloudRecord, error } = await saveTimesheetRecord(user, updatedRecord)
+        setCloudSaving(false)
+
+        if (error) {
+          patchSavedTimesheetRecord(updatedRecord.id, { syncStatus: SYNC_STATUS.CLOUD_FAILED })
+          setCompletedSyncStatus(SYNC_STATUS.CLOUD_FAILED)
+          setFormStatusError(error.message || 'Could not save updated timesheet to the cloud.')
+          return
+        }
+
+        const cloudPatch = {
+          syncStatus: SYNC_STATUS.CLOUD,
+          cloudId: cloudRecord?.cloudId ?? null,
+          cloudUserId: cloudRecord?.cloudUserId ?? user.id,
+        }
+        patchSavedTimesheetRecord(updatedRecord.id, cloudPatch)
+        setCompletedSyncStatus(SYNC_STATUS.CLOUD)
+        setFormStatusMessage('Timesheet updated.')
+        setEditingRecord(null)
+        if (cloudRecord) {
+          setCloudTimesheets((prev) => {
+            const withoutDup = prev.filter(
+              (item) =>
+                !matchesTimesheetIdentity(item, cloudRecord) &&
+                !matchesTimesheetIdentity(item, updatedRecord),
+            )
+            return [cloudRecord, ...withoutDup]
+          })
+        }
+        return
+      }
+
+      if (isCloudSaveUnavailable(user)) {
+        const syncStatus = getUnavailableSyncStatus(user)
+        patchSavedTimesheetRecord(updatedRecord.id, { syncStatus })
+        setCompletedSyncStatus(syncStatus)
+        setFormStatusMessage('Timesheet updated on this device. Cloud sync unavailable.')
+        setEditingRecord(null)
+        return
+      }
+
+      setCloudSaving(true)
+      const { record: cloudRecord, error } = await updateTimesheetRecord(user, updatedRecord)
+      setCloudSaving(false)
+
+      if (error) {
+        patchSavedTimesheetRecord(updatedRecord.id, { syncStatus: SYNC_STATUS.CLOUD_FAILED })
+        setCompletedSyncStatus(SYNC_STATUS.CLOUD_FAILED)
+        setFormStatusError(error.message || 'Could not update timesheet in the cloud.')
+        return
+      }
+
+      const merged = {
+        ...updatedRecord,
+        ...(cloudRecord ?? {}),
+        id: updatedRecord.id,
+        cloudId: cloudRecord?.cloudId ?? updatedRecord.cloudId,
+        cloudUserId: cloudRecord?.cloudUserId ?? updatedRecord.cloudUserId,
+        submittedAt: updatedRecord.submittedAt,
+        syncStatus: SYNC_STATUS.CLOUD,
+        storageSource: 'both',
+      }
+      upsertLocalTimesheet(merged)
+      setCompletedRecord(merged)
+      setCompletedSyncStatus(SYNC_STATUS.CLOUD)
+      setFormStatusMessage('Timesheet updated.')
+      setFormStatusError('')
+      setEditingRecord(null)
+      if (cloudRecord) {
+        setCloudTimesheets((prev) => {
+          const withoutDup = prev.filter(
+            (item) =>
+              !matchesTimesheetIdentity(item, cloudRecord) &&
+              !matchesTimesheetIdentity(item, updatedRecord),
+          )
+          return [merged, ...withoutDup]
+        })
+      }
+      return
+    }
+
+    const submittedAt = new Date().toISOString()
     const record = {
       id: createRecordId(),
       formType: 'timesheet',
       formTypeLabel: formConfig.title,
-      fields: {
-        date: fields.date,
-        employeeName: fields.employeeName,
-        jobProjectName: fields.jobProjectName,
-        siteLocation: fields.siteLocation,
-        customerName: fields.customerName,
-        machineUsed: fields.machineUsed,
-        startTime: fields.startTime,
-        finishTime: fields.finishTime,
-        breakMinutes: fields.breakMinutes,
-        totalHoursWorked: labourCalc.value,
-        chargeableHours,
-        nonChargeableHours: fields.nonChargeableHours,
-        nonChargeableReason: fields.nonChargeableReason,
-        workCompleted: fields.workCompleted,
-        materialsUsed: fields.materialsUsed,
-        docketNumber: fields.docketNumber,
-        delaysOrIssues: fields.delaysOrIssues,
-        safetyIssues: fields.safetyIssues,
-        notes: fields.notes,
-      },
+      fields: nextFields,
       completedItems: [],
       completedCount: 0,
       totalCount: 0,
@@ -267,6 +445,8 @@ export function TimesheetView({
     setCompletedRecord(record)
     setCompletedSyncStatus(null)
     setCompletedCloudError('')
+    setFormStatusMessage('')
+    setFormStatusError('')
 
     if (isCloudSaveUnavailable(user)) {
       const syncStatus = getUnavailableSyncStatus(user)
@@ -289,6 +469,7 @@ export function TimesheetView({
     const cloudPatch = {
       syncStatus: SYNC_STATUS.CLOUD,
       cloudId: cloudRecord?.cloudId ?? null,
+      cloudUserId: cloudRecord?.cloudUserId ?? user?.id ?? null,
     }
     patchSavedTimesheetRecord(record.id, cloudPatch)
     setCompletedSyncStatus(SYNC_STATUS.CLOUD)
@@ -304,11 +485,120 @@ export function TimesheetView({
     }
   }
 
-  function handleReset() {
-    setDraft(createEmptyDraft('timesheet'))
+  function handleStartEdit(record) {
+    if (!isOwnTimesheetRecord(record, user) || cloudSaving || deleting) return
+
+    setEditingRecord(record)
+    setViewingRecordId(null)
     setCompletedRecord(null)
     setFieldErrors({})
+    setFormStatusMessage('')
+    setFormStatusError('')
     setCompletedSyncStatus(null)
+    setCompletedCloudError('')
+    setChargeableEdited(Boolean(record.fields?.chargeableHours?.trim()))
+    setDraft({
+      fields: {
+        ...FORM_TYPES.timesheet.emptyFields,
+        ...record.fields,
+      },
+      signatureConfirmation: record.signatureConfirmation ?? '',
+      checked: new Set(),
+      photos: record.photos ?? [],
+    })
+
+    window.requestAnimationFrame(() => {
+      formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    })
+  }
+
+  function handleCancelEdit() {
+    if (cloudSaving) return
+    setEditingRecord(null)
+    setDraft(createEmptyDraft('timesheet'))
+    setFieldErrors({})
+    setChargeableEdited(false)
+    setFormStatusMessage('')
+    setFormStatusError('')
+  }
+
+  function handleToggleView(record) {
+    setViewingRecordId((prev) => (prev === record.id ? null : record.id))
+  }
+
+  function openDeleteModal(record) {
+    if (!isOwnTimesheetRecord(record, user) || deleting || cloudSaving) return
+    setDeleteError('')
+    setDeleteTarget(record)
+  }
+
+  function closeDeleteModal() {
+    if (deleting) return
+    setDeleteTarget(null)
+    setDeleteError('')
+  }
+
+  async function handleConfirmDelete() {
+    if (!deleteTarget || deleting) return
+    if (!isOwnTimesheetRecord(deleteTarget, user)) {
+      setDeleteError('You can only delete your own timesheets.')
+      return
+    }
+
+    setDeleting(true)
+    setDeleteError('')
+
+    try {
+      if (deleteTarget.cloudId) {
+        if (isCloudSaveUnavailable(user)) {
+          setDeleteError('Cloud delete unavailable. Sign in and check your connection, then try again.')
+          setDeleting(false)
+          return
+        }
+
+        const { ok, error } = await deleteTimesheetRecord(user, deleteTarget)
+        if (!ok) {
+          setDeleteError(
+            error?.message
+              || 'Could not permanently delete this timesheet from the cloud. The record was not removed.',
+          )
+          setDeleting(false)
+          return
+        }
+      }
+
+      removeLocalAndCloudTimesheet(deleteTarget)
+      setArchiveMessage('')
+      setFormStatusMessage('Timesheet permanently deleted.')
+      setFormStatusError('')
+      setDeleteTarget(null)
+      setDeleteError('')
+
+      if (editingRecord && matchesTimesheetIdentity(editingRecord, deleteTarget)) {
+        setEditingRecord(null)
+        setDraft(createEmptyDraft('timesheet'))
+        setChargeableEdited(false)
+      }
+    } catch (error) {
+      setDeleteError(
+        error?.message
+          || 'Could not permanently delete this timesheet. Please try again.',
+      )
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  function handleReset() {
+    if (cloudSaving) return
+    setDraft(createEmptyDraft('timesheet'))
+    setCompletedRecord(null)
+    setEditingRecord(null)
+    setFieldErrors({})
+    setCompletedSyncStatus(null)
+    setCompletedCloudError('')
+    setFormStatusMessage('')
+    setFormStatusError('')
     setChargeableEdited(false)
   }
 
@@ -366,10 +656,25 @@ export function TimesheetView({
 
       <FormPageHeader
         title={formConfig.title}
-        subtitle="Daily work and hours record"
+        subtitle={editingRecord ? 'Edit your timesheet record' : 'Daily work and hours record'}
       />
 
-      <form className="job-form no-print" onSubmit={handleSubmit} noValidate>
+      <form ref={formRef} className="job-form no-print" onSubmit={handleSubmit} noValidate>
+        {editingRecord && (
+          <p className="form-hint" role="status">
+            Editing a saved timesheet. Changes update the same record (owner and original save date are kept).
+          </p>
+        )}
+        {formStatusMessage && (
+          <p className="form-hint" role="status">
+            {formStatusMessage}
+          </p>
+        )}
+        {formStatusError && (
+          <p className="validation-message validation-message--error" role="alert">
+            {formStatusError}
+          </p>
+        )}
         <FormSection title="Date & Employee" id="timesheet-employee">
           <FormGrid>
             <FormField label="Date" fieldId="date" required error={fieldErrors.date}>
@@ -504,10 +809,26 @@ export function TimesheetView({
           {hasValidationErrors(fieldErrors) && (
             <ValidationMessage variant="summary" messages={getValidationSummary(fieldErrors)} />
           )}
-          <p className="form-hint">Complete job and time details, then submit your daily work record.</p>
-          <button type="submit" className="submit-btn" disabled={cloudSaving}>
-            {cloudSaving ? 'Saving…' : 'Submit Record'}
-          </button>
+          <p className="form-hint">
+            {editingRecord
+              ? 'Update the details below, then save your changes.'
+              : 'Complete job and time details, then submit your daily work record.'}
+          </p>
+          <div className="timesheet-form-actions">
+            <button type="submit" className="submit-btn" disabled={cloudSaving || deleting}>
+              {cloudSaving ? 'Saving…' : editingRecord ? 'Save Changes' : 'Submit Record'}
+            </button>
+            {editingRecord && (
+              <button
+                type="button"
+                className="btn btn--secondary"
+                onClick={handleCancelEdit}
+                disabled={cloudSaving || deleting}
+              >
+                Cancel edit
+              </button>
+            )}
+          </div>
         </FormActions>
       </form>
 
@@ -616,6 +937,9 @@ export function TimesheetView({
                 record.cloudUserId &&
                 record.cloudUserId !== user?.id &&
                 resolveRecordSyncStatus(record) === SYNC_STATUS.CLOUD
+              const isOwn = isOwnTimesheetRecord(record, user)
+              const isViewing = viewingRecordId === record.id
+              const isEditingThis = editingRecord && matchesTimesheetIdentity(editingRecord, record)
 
               return (
               <li key={record.id} data-record-id={record.id} className="saved-record">
@@ -627,6 +951,9 @@ export function TimesheetView({
                       <span className="type-badge type-badge--small type-badge--cloud-user">
                         {record.fields?.employeeName?.trim() || 'Other user'}
                       </span>
+                    )}
+                    {isEditingThis && (
+                      <span className="type-badge type-badge--small">Editing</span>
                     )}
                   </div>
                   <p className="saved-record__title">{getRecordTitle(record)}</p>
@@ -649,6 +976,42 @@ export function TimesheetView({
                 <p className="saved-record__meta">
                   Saved {formatSubmittedAt(record.submittedAt)}
                 </p>
+
+                {isOwn && (
+                  <div className="saved-record__manage no-print">
+                    <button
+                      type="button"
+                      className="btn btn--secondary saved-record__manage-btn"
+                      onClick={() => handleToggleView(record)}
+                      disabled={deleting || cloudSaving}
+                    >
+                      {isViewing ? 'Hide' : 'View'}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn--secondary saved-record__manage-btn"
+                      onClick={() => handleStartEdit(record)}
+                      disabled={deleting || cloudSaving || isEditingThis}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn--secondary btn--danger-text saved-record__manage-btn"
+                      onClick={() => openDeleteModal(record)}
+                      disabled={deleting || cloudSaving}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                )}
+
+                {isViewing && (
+                  <div className="saved-record__view no-print">
+                    <RecordDetails record={record} />
+                  </div>
+                )}
+
                 <RecordActions record={record} onPrint={handlePrintTimesheet} variant="saved" />
                 <div className="record__actions record__actions--saved no-print">
                   <AdminArchiveAction
@@ -664,6 +1027,20 @@ export function TimesheetView({
           </ul>
         )}
       </section>
+
+      <ConfirmModal
+        open={Boolean(deleteTarget)}
+        title="Delete timesheet?"
+        message="Permanently delete this timesheet? This cannot be undone and the record will also be removed from the admin view."
+        confirmLabel="Permanently Delete"
+        cancelLabel="Cancel"
+        processingLabel="Deleting…"
+        processing={deleting}
+        variant="danger"
+        error={deleteError}
+        onCancel={closeDeleteModal}
+        onConfirm={handleConfirmDelete}
+      />
     </>
   )
 }
