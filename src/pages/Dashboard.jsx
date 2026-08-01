@@ -4,6 +4,7 @@ import {
   ClipboardCheck,
   ClipboardSignature,
   Clock,
+  Construction,
   ShieldCheck,
   UsersRound,
   HelpCircle,
@@ -31,6 +32,7 @@ import { getMergedDefectRecords } from '../utils/storage/equipmentDefectStorage.
 const CARD_ICONS = {
   'job-start': ClipboardCheck,
   'pre-start': Wrench,
+  'machines-equipment': Construction,
   toolbox: BriefcaseBusiness,
   incident: TriangleAlert,
   'critical-risks': OctagonAlert,
@@ -57,6 +59,9 @@ function getDashboardCardClass(card) {
       break
     case 'visitor-sign-in':
       classes.push('dashboard-card--visitor-sign-in')
+      break
+    case 'machines-equipment':
+      classes.push('dashboard-card--machines-equipment')
       break
     case 'sssp':
       classes.push('dashboard-card--sssp')
@@ -206,6 +211,46 @@ export function Dashboard({
         <p className="dashboard-greeting__date">{formatDashboardDate()}</p>
       </section>
 
+      <section className="dashboard-overview" aria-label="Today's site safety overview">
+        <h2 className="dashboard-overview__title">Today&apos;s site safety overview</h2>
+        <div className="dashboard-overview__stats">
+          <OverviewStat label="Open actions" value={overview.openActions} />
+          <OverviewStat
+            label="Overdue"
+            value={overview.overdueActions}
+            variant={overview.overdueActions > 0 ? 'alert' : undefined}
+          />
+          <OverviewStat
+            label="Critical"
+            value={overview.criticalActions}
+            variant={overview.criticalActions > 0 ? 'alert' : undefined}
+          />
+          <OverviewStat label="Incident follow-up" value={overview.incidentFollowUp} />
+          <OverviewStat label="Timesheets today" value={overview.timesheetsToday} />
+          <OverviewStat label="Job starts today" value={overview.jobStartsToday} />
+          <OverviewStat label="Pre-starts today" value={overview.preStartsToday} />
+        </div>
+
+        {warnings.length > 0 && (
+          <ul className="dashboard-overview__warnings" aria-label="Warnings">
+            {warnings.map((warning) => (
+              <li
+                key={warning.id}
+                className={`dashboard-overview__warning dashboard-overview__warning--${warning.severity}${warning.onClick ? ' dashboard-overview__warning--clickable' : ''}`}
+              >
+                {warning.onClick ? (
+                  <button type="button" className="dashboard-overview__warning-btn" onClick={warning.onClick}>
+                    {warning.text}
+                  </button>
+                ) : (
+                  warning.text
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
       <nav className="dashboard__nav" aria-label="Form types">
         {DASHBOARD_GROUPS.map((group) => {
           const visibleCards = group.cardIds.map((cardId) => cardsById[cardId]).filter(Boolean)
@@ -296,46 +341,6 @@ export function Dashboard({
           )
         })}
       </nav>
-
-      <section className="dashboard-overview" aria-label="Today's site safety overview">
-        <h2 className="dashboard-overview__title">Today&apos;s site safety overview</h2>
-        <div className="dashboard-overview__stats">
-          <OverviewStat label="Open actions" value={overview.openActions} />
-          <OverviewStat
-            label="Overdue"
-            value={overview.overdueActions}
-            variant={overview.overdueActions > 0 ? 'alert' : undefined}
-          />
-          <OverviewStat
-            label="Critical"
-            value={overview.criticalActions}
-            variant={overview.criticalActions > 0 ? 'alert' : undefined}
-          />
-          <OverviewStat label="Incident follow-up" value={overview.incidentFollowUp} />
-          <OverviewStat label="Timesheets today" value={overview.timesheetsToday} />
-          <OverviewStat label="Job starts today" value={overview.jobStartsToday} />
-          <OverviewStat label="Pre-starts today" value={overview.preStartsToday} />
-        </div>
-
-        {warnings.length > 0 && (
-          <ul className="dashboard-overview__warnings" aria-label="Warnings">
-            {warnings.map((warning) => (
-              <li
-                key={warning.id}
-                className={`dashboard-overview__warning dashboard-overview__warning--${warning.severity}${warning.onClick ? ' dashboard-overview__warning--clickable' : ''}`}
-              >
-                {warning.onClick ? (
-                  <button type="button" className="dashboard-overview__warning-btn" onClick={warning.onClick}>
-                    {warning.text}
-                  </button>
-                ) : (
-                  warning.text
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
 
       {recordCount > 0 && (
         <p className="dashboard__records-hint">

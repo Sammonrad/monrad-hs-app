@@ -638,6 +638,23 @@ function App() {
     }
   }, [currentView, profile])
 
+  // Reset page scroll only when the main view changes (navigation / back / menu).
+  // Same-view updates (forms, filters, modals, saves) do not change currentView.
+  // Skip when a URL hash is present so deliberate in-page anchors still work.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    if (window.location.hash) return
+
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
+    document.documentElement.scrollTop = 0
+    document.body.scrollTop = 0
+
+    document.querySelectorAll('.app-shell__main, .app-shell__content').forEach((el) => {
+      el.scrollTop = 0
+      el.scrollLeft = 0
+    })
+  }, [currentView])
+
   return (
     <div className="app">
       {!authReady && (

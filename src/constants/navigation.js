@@ -242,6 +242,11 @@ export const DASHBOARD_GROUPS = [
     ],
   },
   {
+    id: 'plant-equipment',
+    title: 'Plant & Equipment',
+    cardIds: ['machines-equipment'],
+  },
+  {
     id: 'planning-docs',
     title: 'Planning & Documentation',
     cardIds: ['sssp', 'general-meeting'],
@@ -294,6 +299,14 @@ export const DASHBOARD_CARDS = [
     id: 'visitor-sign-in',
     title: 'Visitor Sign-In',
     group: 'site-safety',
+    placement: 'mainDashboard',
+    available: true,
+    fullWidth: true,
+  },
+  {
+    id: 'machines-equipment',
+    title: 'Machines & Equipment',
+    group: 'plant-equipment',
     placement: 'mainDashboard',
     available: true,
     fullWidth: true,
