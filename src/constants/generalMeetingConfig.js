@@ -1,3 +1,5 @@
+import { formatNzDate } from '../utils/formatting.js'
+
 export const MEETING_TYPES = ['weekly', 'monthly', 'special']
 
 export const MEETING_TYPE_LABELS = {
@@ -27,7 +29,7 @@ export const MEETING_FILTER_TABS = [
 ]
 
 export function getMeetingDisplayTitle(meeting) {
-  const date = meeting.meetingDate || 'No date'
+  const date = meeting.meetingDate ? formatNzDate(meeting.meetingDate) : 'No date'
   const type = MEETING_TYPE_LABELS[meeting.meetingType] || meeting.meetingType || 'Meeting'
   const location = meeting.location?.trim()
   return location ? `${type} — ${date} — ${location}` : `${type} — ${date}`

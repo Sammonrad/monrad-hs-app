@@ -4,14 +4,12 @@ import {
   formatTimesheetDateDay,
 } from '../utils/weeklyTimesheet.js'
 import { formatTime12Hour } from '../utils/time12Hour.js'
+import { formatSubmittedAt } from '../utils/formatting.js'
 import { MonradLogo } from './MonradLogo.jsx'
 
 function formatPrintedAt(value) {
   if (value) return value
-  return new Date().toLocaleString('en-NZ', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  })
+  return formatSubmittedAt(new Date())
 }
 
 function WeeklyPrintSheet({ sheet, generatedAt }) {

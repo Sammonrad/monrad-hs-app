@@ -89,7 +89,7 @@ export function PrintableVisitorRecord({ record }) {
 
       <footer className="print-record__footer">
         Monrad Earthworx — Visitor Sign-In — printed{' '}
-        {new Date().toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}
+        {formatSubmittedAt(new Date())}
       </footer>
     </article>
   )

@@ -2,10 +2,7 @@ import { formatSubmittedAt } from '../utils/formatting.js'
 import { formatVisitorDuration } from '../utils/visitorSignIn.js'
 
 export function PrintableVisitorRollCall({ visitors, siteFilter }) {
-  const printedAt = new Date().toLocaleString(undefined, {
-    dateStyle: 'full',
-    timeStyle: 'short',
-  })
+  const printedAt = formatSubmittedAt(new Date())
 
   return (
     <article className="print-record print-visitor-roll-call">

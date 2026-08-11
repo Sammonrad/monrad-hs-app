@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { BackButton } from '../components/BackButton.jsx'
 import { WeeklyPrintSummary } from '../components/WeeklyPrintSummary.jsx'
 import { ComboField } from '../components/FormFields.jsx'
-import { formatDecimalHoursDisplay } from '../utils/formatting.js'
+import { formatDecimalHoursDisplay, formatNzDate, formatSubmittedAt } from '../utils/formatting.js'
 import { formatTime12Hour } from '../utils/time12Hour.js'
 import {
   EMPTY_WEEKLY_FILTERS,
@@ -61,10 +61,7 @@ export function WeeklyTimesheetSummaryView({
   function handlePrint() {
     setPrintPayload({
       sheets: buildWeeklyPrintSheets(filteredRecords),
-      generatedAt: new Date().toLocaleString('en-NZ', {
-        dateStyle: 'medium',
-        timeStyle: 'short',
-      }),
+      generatedAt: formatSubmittedAt(new Date()),
     })
   }
 
@@ -251,7 +248,7 @@ export function WeeklyTimesheetSummaryView({
                   <li key={record.id} className="weekly-record">
                     <div className="weekly-record__header">
                       <span className="type-badge type-badge--small">Timesheet</span>
-                      <p className="weekly-record__date">{fields.date || '—'}</p>
+                      <p className="weekly-record__date">{formatNzDate(fields.date)}</p>
                     </div>
                     <dl className="weekly-record__details">
                       <div className="weekly-record__row">

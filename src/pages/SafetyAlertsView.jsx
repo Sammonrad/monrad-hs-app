@@ -14,12 +14,13 @@ import {
   listUnresolvedIncidentActions,
   listUnresolvedMachineDefects,
 } from '../utils/safetyAlerts.js'
+import { formatNzDate } from '../utils/formatting.js'
 
 function actionLabel(action) {
   const parts = [
     action.description?.trim() || 'Untitled action',
     action.site?.trim() || null,
-    action.dueDate ? `Due ${action.dueDate}` : null,
+    action.dueDate ? `Due ${formatNzDate(action.dueDate)}` : null,
   ].filter(Boolean)
   return parts.join(' · ')
 }
@@ -114,7 +115,7 @@ export function SafetyAlertsView({ onBack, onNavigate, savedRecords, actions }) 
         items: machineDefects.map((record) => ({
           id: record.id,
           primary: defectLabel(record),
-          secondary: [record.date, record.siteLocation || record.operatorName]
+          secondary: [record.date ? formatNzDate(record.date) : null, record.siteLocation || record.operatorName]
             .filter(Boolean)
             .join(' · '),
           onClick: () =>

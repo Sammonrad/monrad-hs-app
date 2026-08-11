@@ -1,4 +1,5 @@
 import { TODAY } from '../constants/index.js'
+import { formatNzDate } from './formatting.js'
 import { getSafetyAlerts } from './safetyAlerts.js'
 import { getMergedJobStartRecords } from './storage/jobStartCloudStorage.js'
 import { getMergedPreStartRecords } from './storage/preStartCloudStorage.js'
@@ -26,12 +27,7 @@ export function getFirstName(profile, email) {
 }
 
 export function formatDashboardDate(date = new Date()) {
-  return date.toLocaleDateString('en-NZ', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  })
+  return formatNzDate(date)
 }
 
 function countRecordsForDate(records, date) {

@@ -58,6 +58,7 @@ import {
   PrintableMaintenanceHistory,
   PrintableComplianceSummary,
 } from '../components/equipment/PrintableEquipment.jsx'
+import { formatNzDate } from '../utils/formatting.js'
 
 export function EquipmentProfileView({
   onBack,
@@ -545,7 +546,7 @@ export function EquipmentProfileView({
             <div><dt>Current hours</dt><dd>{asset.currentHours || '—'}</dd></div>
             <div><dt>Current odometer</dt><dd>{asset.currentOdometer ? `${asset.currentOdometer} km` : '—'}</dd></div>
             <div><dt>Next service</dt><dd><MaintenanceDueBadge equipment={asset} /></dd></div>
-            <div><dt>Next service date</dt><dd>{asset.nextServiceDate || '—'}</dd></div>
+            <div><dt>Next service date</dt><dd>{formatNzDate(asset.nextServiceDate)}</dd></div>
             <div><dt>Next service hours</dt><dd>{asset.nextServiceHours || '—'}</dd></div>
           </dl>
         </section>
@@ -577,7 +578,7 @@ export function EquipmentProfileView({
             <ul className="equipment-profile-list">
               {assetServices.map((service) => (
                 <li key={service.cloudId ?? service.id}>
-                  <strong>{service.serviceDate}</strong> — {service.serviceType}: {service.workCompleted || 'No details'}
+                  <strong>{formatNzDate(service.serviceDate)}</strong> — {service.serviceType}: {service.workCompleted || 'No details'}
                   {' '}
                   <CloudSyncBadge syncStatus={service.syncStatus} size="small" />
                 </li>
@@ -589,7 +590,7 @@ export function EquipmentProfileView({
         <section className="equipment-profile-section">
           <h2>Upcoming maintenance</h2>
           <MaintenanceDueBadge equipment={asset} />
-          <p>Next service: {asset.nextServiceDate || '—'} · {asset.nextServiceHours || '—'} hrs · {asset.nextServiceOdometer || '—'} km</p>
+          <p>Next service: {formatNzDate(asset.nextServiceDate)} · {asset.nextServiceHours || '—'} hrs · {asset.nextServiceOdometer || '—'} km</p>
         </section>
 
         <section className="equipment-profile-section">
@@ -631,7 +632,7 @@ export function EquipmentProfileView({
                     <tbody>
                       {preStartHistory.map((record) => (
                         <tr key={record.id}>
-                          <td>{record.fields?.date}</td>
+                          <td>{formatNzDate(record.fields?.date)}</td>
                           <td>{record.fields?.operatorName}</td>
                           <td>{record.allComplete ? 'Complete' : 'Partial'}</td>
                           <td>{record.defectsFound === 'found' ? 'Defects found' : 'None'}</td>
@@ -651,7 +652,7 @@ export function EquipmentProfileView({
                   <article key={record.id} className="equipment-summary-card">
                     <header className="equipment-summary-card__header">
                       <div>
-                        <h3 className="equipment-summary-card__title">{record.fields?.date || '—'}</h3>
+                        <h3 className="equipment-summary-card__title">{formatNzDate(record.fields?.date)}</h3>
                         <p className="equipment-summary-card__meta">
                           {record.fields?.operatorName || '—'}
                         </p>

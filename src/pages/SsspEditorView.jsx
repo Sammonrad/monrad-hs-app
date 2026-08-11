@@ -19,6 +19,7 @@ import {
   syncIndexedFieldsFromRecordData,
   appendChangeLog,
 } from '../utils/storage/ssspStorage.js'
+import { formatSubmittedAt } from '../utils/formatting.js'
 import {
   fetchSsspById,
   saveSsspRecord,
@@ -113,7 +114,7 @@ export function SsspEditorView({
       if (mode === 'create') {
         const draft = loadEditorDraft()
         if (draft?.record) {
-          setDraftNotice(`Restored local draft from ${draft.savedAt ? new Date(draft.savedAt).toLocaleString() : 'earlier'}.`)
+          setDraftNotice(`Restored local draft from ${draft.savedAt ? formatSubmittedAt(draft.savedAt) : 'earlier'}.`)
           setRecord(normalizeSsspRecord(draft.record))
           if (draft.sectionId) setActiveSection(draft.sectionId)
         } else {

@@ -26,7 +26,7 @@ import {
 import { useHighlightRecord } from '../hooks/useHighlightRecord.js'
 import { useDefaultFormDate } from '../hooks/useDefaultFormDate.js'
 import { createRecordId } from '../utils/ids.js'
-import { formatSubmittedAt, formatReportType } from '../utils/formatting.js'
+import { formatSubmittedAt, formatReportType, formatNzDate } from '../utils/formatting.js'
 import { createEmptyDraft, getRecordTitle } from '../utils/records.js'
 import { persistSavedRecords } from '../utils/storage/recordsStorage.js'
 import { getSettingsOptions } from '../utils/storage/settingsStorage.js'
@@ -563,7 +563,7 @@ export function IncidentView({
                   <SummaryRow label="Type" value={formatReportType(record.fields.reportType)} />
                   <SummaryRow label="Site" value={record.fields.siteLocation ?? record.fields.location} />
                   <SummaryRow label="Reported by" value={record.fields.reportedBy} />
-                  <SummaryRow label="Date" value={record.fields.date} />
+                  <SummaryRow label="Date" value={formatNzDate(record.fields.date)} />
                   <SummaryRow
                     label="Checklist"
                     value={`${record.completedCount} of ${record.totalCount} completed`}

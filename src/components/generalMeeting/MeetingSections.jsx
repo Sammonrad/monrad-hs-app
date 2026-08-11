@@ -1,5 +1,6 @@
 import { ACTION_PRIORITIES, ACTION_PRIORITY_LABELS, ACTION_STATUS_LABELS } from '../../constants/index.js'
 import { createEmptyMeetingAction, createEmptyPreviousAction } from '../../utils/storage/generalMeetingStorage.js'
+import { formatNzDate } from '../../utils/formatting.js'
 
 function ActionRowList({ items, onChange, readOnly = false, type = 'new' }) {
   const list = Array.isArray(items) ? items : []
@@ -27,7 +28,7 @@ function ActionRowList({ items, onChange, readOnly = false, type = 'new' }) {
               <p><strong>{item.description || '—'}</strong>{item.progress ? ` — ${item.progress}` : ''}</p>
             ) : (
               <p>
-                {item.description || '—'} · {item.personResponsible || 'Unassigned'} · {item.dueDate || 'No due date'}
+                {item.description || '—'} · {item.personResponsible || 'Unassigned'} · {item.dueDate ? formatNzDate(item.dueDate) : 'No due date'}
               </p>
             )}
           </div>
@@ -153,7 +154,7 @@ export function MeetingDetailSections({ meeting, readOnly = true }) {
       </section>
       <section className="gm-detail-section">
         <h3>Next meeting and sign-off</h3>
-        <p><strong>Next meeting:</strong> {meeting.nextMeetingDate || '—'}</p>
+        <p><strong>Next meeting:</strong> {formatNzDate(meeting.nextMeetingDate)}</p>
         <p><strong>Attendee acknowledgement:</strong> {meeting.attendeeSignOff || '—'}</p>
       </section>
     </div>

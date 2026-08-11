@@ -6,7 +6,7 @@ import { LoadingState } from '../components/common/LoadingState.jsx'
 import { StatusBadge } from '../components/common/StatusBadge.jsx'
 import { getEquipmentReadableName } from '../constants/equipmentConfig.js'
 import { getSsspStatusLabel } from '../constants/ssspStatuses.js'
-import { formatSubmittedAt } from '../utils/formatting.js'
+import { formatSubmittedAt, formatNzDate, formatFieldDisplayValue } from '../utils/formatting.js'
 import { formatTime12Hour } from '../utils/time12Hour.js'
 import { getFormTypeLabel, getRecordTitle } from '../utils/records.js'
 import { PermanentDeleteModal } from '../components/PermanentDeleteModal.jsx'
@@ -58,15 +58,8 @@ const RECORD_TYPE_FILTERS = [
 
 function formatDateLabel(value) {
   if (!value) return '—'
-  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    const date = new Date(`${value}T00:00:00`)
-    if (!Number.isNaN(date.getTime())) {
-      return date.toLocaleDateString('en-NZ', {
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric',
-      })
-    }
+  if (/^\d{4}-\d{2}-\d{2}$/.test(String(value).trim())) {
+    return formatNzDate(value)
   }
   try {
     return formatSubmittedAt(value)
@@ -278,7 +271,7 @@ function DetailRows({ item }) {
         {rows.map(([key, value]) => (
           <div key={key} className="archived-records__detail-row">
             <dt>{key}</dt>
-            <dd>{String(value)}</dd>
+            <dd>{formatFieldDisplayValue(key, value)}</dd>
           </div>
         ))}
         {record.cloudId && (
@@ -304,7 +297,7 @@ function DetailRows({ item }) {
         </div>
         <div className="archived-records__detail-row">
           <dt>Due</dt>
-          <dd>{record.dueDate || '—'}</dd>
+          <dd>{formatNzDate(record.dueDate)}</dd>
         </div>
         <div className="archived-records__detail-row">
           <dt>Status</dt>
@@ -360,7 +353,7 @@ function DetailRows({ item }) {
       <dl className="equipment-summary-card__details archived-records__detail-dl">
         <div className="archived-records__detail-row">
           <dt>Date</dt>
-          <dd>{record.meetingDate || '—'}</dd>
+          <dd>{formatNzDate(record.meetingDate)}</dd>
         </div>
         <div className="archived-records__detail-row">
           <dt>Time</dt>

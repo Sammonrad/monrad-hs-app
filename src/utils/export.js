@@ -6,6 +6,7 @@ import {
   formatDefectsFound,
   formatDefectSeverity,
   formatMachineOperable,
+  formatNzDate,
 } from './formatting.js'
 import { isSeriousDefect } from './defects.js'
 import {
@@ -101,8 +102,8 @@ export function buildActionTextSummary(action) {
     `Source: ${SOURCE_TYPE_LABELS[action.sourceType] ?? action.sourceType}`,
     `Status: ${ACTION_STATUS_LABELS[action.status] ?? action.status}${overdue ? ' — Overdue' : ''}`,
     `Priority: ${ACTION_PRIORITY_LABELS[action.priority] ?? action.priority}`,
-    `Date: ${action.date || '—'}`,
-    `Due date: ${action.dueDate || '—'}`,
+    `Date: ${formatNzDate(action.date)}`,
+    `Due date: ${formatNzDate(action.dueDate)}`,
     `Site: ${action.site || '—'}`,
     `Description: ${action.description || '—'}`,
     `Person responsible: ${action.personResponsible || '—'}`,

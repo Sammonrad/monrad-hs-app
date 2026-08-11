@@ -3,6 +3,7 @@ import { BackButton } from '../components/BackButton.jsx'
 import { AdminReportPrint } from '../components/AdminReportPrint.jsx'
 import { ComboField } from '../components/FormFields.jsx'
 import { formatHoursTotal } from '../utils/weeklyTimesheet.js'
+import { formatNzDate, formatSubmittedAt } from '../utils/formatting.js'
 import { fetchAllCloudRecords } from '../utils/recordsDashboardCloud.js'
 import { isAdminProfile } from '../utils/storage/userProfileStorage.js'
 import {
@@ -108,10 +109,7 @@ export function AdminReportsView({ onBack, user, profile }) {
       summary,
       groups,
       filterDescription,
-      generatedAt: new Date().toLocaleString('en-NZ', {
-        dateStyle: 'medium',
-        timeStyle: 'short',
-      }),
+      generatedAt: formatSubmittedAt(new Date()),
     })
   }
 
@@ -403,7 +401,7 @@ export function AdminReportsView({ onBack, user, profile }) {
                     <dl className="admin-report-row__meta">
                       <div className="admin-report-row__field">
                         <dt>Date</dt>
-                        <dd>{row.date || '—'}</dd>
+                        <dd>{formatNzDate(row.date)}</dd>
                       </div>
                       <div className="admin-report-row__field">
                         <dt>Staff</dt>

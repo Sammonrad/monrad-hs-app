@@ -18,7 +18,7 @@ import {
   appendChangeLog,
   syncIndexedFieldsFromRecordData,
 } from '../utils/storage/ssspStorage.js'
-import { formatSubmittedAt } from '../utils/formatting.js'
+import { formatSubmittedAt, formatNzDate } from '../utils/formatting.js'
 import { SSSP_STATUS } from '../constants/ssspStatuses.js'
 import { updateSsspRecord } from '../utils/storage/ssspCloudStorage.js'
 import { ARCHIVE_RECORD_TYPES } from '../utils/storage/archiveFilter.js'
@@ -273,7 +273,7 @@ export function SsspDashboardView({
                   <div><dt>Revision</dt><dd>{record.revision ?? 1}</dd></div>
                   <div><dt>Prepared by</dt><dd>{record.preparedBy || '—'}</dd></div>
                   <div><dt>Updated</dt><dd>{record.updatedAt ? formatSubmittedAt(record.updatedAt) : '—'}</dd></div>
-                  <div><dt>Effective</dt><dd>{record.effectiveDate || '—'}</dd></div>
+                  <div><dt>Effective</dt><dd>{formatNzDate(record.effectiveDate)}</dd></div>
                 </dl>
 
                 <div className="sssp-card__actions">

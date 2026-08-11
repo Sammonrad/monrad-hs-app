@@ -1,4 +1,5 @@
 import { parseDecimalHours, getLabourMinutes, minutesToDecimalHours } from './time.js'
+import { formatNzDate } from './formatting.js'
 
 export const EMPTY_WEEKLY_FILTERS = {
   employee: '',
@@ -103,9 +104,8 @@ export function formatWeekRangeParts(weekStart) {
     return { startLabel: '—', endLabel: '—', weekLabel: 'Unknown week' }
   }
 
-  const opts = { day: 'numeric', month: 'short', year: 'numeric' }
-  const startLabel = start.toLocaleDateString('en-NZ', opts)
-  const endLabel = end.toLocaleDateString('en-NZ', opts)
+  const startLabel = formatNzDate(start)
+  const endLabel = formatNzDate(end)
   return {
     startLabel,
     endLabel,
@@ -113,7 +113,7 @@ export function formatWeekRangeParts(weekStart) {
   }
 }
 
-/** Compact date + weekday for weekly print rows, e.g. "Mon 28 Jul". */
+/** Compact weekday + NZ date for weekly print rows, e.g. "Mon 28-07-2025". */
 export function formatTimesheetDateDay(dateStr) {
   if (!dateStr?.trim()) return '—'
   const parts = dateStr.trim().split('-').map(Number)
@@ -122,11 +122,8 @@ export function formatTimesheetDateDay(dateStr) {
   const date = new Date(parts[0], parts[1] - 1, parts[2])
   if (Number.isNaN(date.getTime())) return dateStr
 
-  return date.toLocaleDateString('en-NZ', {
-    weekday: 'short',
-    day: 'numeric',
-    month: 'short',
-  })
+  const weekday = date.toLocaleDateString('en-NZ', { weekday: 'short' })
+  return `${weekday} ${formatNzDate(date)}`
 }
 
 /**

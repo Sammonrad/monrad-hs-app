@@ -12,6 +12,7 @@ import { CloudSyncBadge } from './CloudSyncBadge.jsx'
 import { StatusBadge } from './common/StatusBadge.jsx'
 import { AdminArchiveAction } from './AdminArchiveAction.jsx'
 import { exportActionJson, exportActionText } from '../utils/export.js'
+import { formatNzDate } from '../utils/formatting.js'
 
 export function ActionCard({
   action,
@@ -63,11 +64,11 @@ export function ActionCard({
       </div>
 
       <dl className="action-card__details">
-        <SummaryRow label="Date" value={action.date} />
+        <SummaryRow label="Date" value={formatNzDate(action.date)} />
         <SummaryRow label="Site / location" value={action.site} />
         <SummaryRow label="Description" value={action.description} />
         <SummaryRow label="Person responsible" value={action.personResponsible} />
-        <SummaryRow label="Due date" value={action.dueDate} />
+        <SummaryRow label="Due date" value={formatNzDate(action.dueDate)} />
         <SummaryRow
           label="Priority"
           value={ACTION_PRIORITY_LABELS[action.priority] ?? action.priority}

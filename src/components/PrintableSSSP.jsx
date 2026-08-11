@@ -1,5 +1,5 @@
 import { MonradLogo } from './MonradLogo.jsx'
-import { formatSubmittedAt } from '../utils/formatting.js'
+import { formatSubmittedAt, formatNzDate } from '../utils/formatting.js'
 import { SSSP_SECTIONS } from '../constants/ssspSections.js'
 import { getSsspStatusLabel } from '../constants/ssspStatuses.js'
 import { getActiveHazards } from '../utils/storage/ssspStorage.js'
@@ -15,12 +15,13 @@ function PrintSection({ title, children }) {
   )
 }
 
-function PrintField({ label, value }) {
+function PrintField({ label, value, type }) {
   if (!value) return null
+  const display = type === 'date' ? formatNzDate(value) : value
   return (
     <div className="print-sssp__field">
       <dt>{label}</dt>
-      <dd>{value}</dd>
+      <dd>{display}</dd>
     </div>
   )
 }
@@ -47,8 +48,8 @@ export function PrintableSSSP({ record, includeAcknowledgements = false }) {
           <PrintField label="Revision" value={String(record.revision ?? 1)} />
           <PrintField label="Status" value={getSsspStatusLabel(record.status)} />
           <PrintField label="Prepared by" value={record.preparedBy} />
-          <PrintField label="Effective date" value={record.effectiveDate} />
-          <PrintField label="Printed" value={formatSubmittedAt(new Date().toISOString())} />
+          <PrintField label="Effective date" value={record.effectiveDate} type="date" />
+          <PrintField label="Printed" value={formatSubmittedAt(new Date())} />
         </dl>
       </header>
 
@@ -118,7 +119,7 @@ export function PrintableSSSP({ record, includeAcknowledgements = false }) {
                     <h3 className="print-sssp__repeat-title">Entry {index + 1}</h3>
                     <dl className="print-sssp__fields">
                       {section.itemFields.map((field) => (
-                        <PrintField key={field.key} label={field.label} value={item[field.key]} />
+                        <PrintField key={field.key} label={field.label} value={item[field.key]} type={field.type} />
                       ))}
                     </dl>
                   </div>
@@ -132,7 +133,7 @@ export function PrintableSSSP({ record, includeAcknowledgements = false }) {
           <PrintSection key={section.id} title={section.title}>
             <dl className="print-sssp__fields">
               {section.fields.map((field) => (
-                <PrintField key={field.key} label={field.label} value={data?.[field.key]} />
+                <PrintField key={field.key} label={field.label} value={data?.[field.key]} type={field.type} />
               ))}
             </dl>
           </PrintSection>

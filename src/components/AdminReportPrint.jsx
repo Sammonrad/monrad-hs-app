@@ -1,5 +1,6 @@
 import { MonradLogo } from './MonradLogo.jsx'
 import { formatHoursTotal } from '../utils/weeklyTimesheet.js'
+import { formatNzDate } from '../utils/formatting.js'
 
 export function AdminReportPrint({ summary, groups, filterDescription, generatedAt }) {
   return (
@@ -87,7 +88,7 @@ export function AdminReportPrint({ summary, groups, filterDescription, generated
             <tbody>
               {group.rows.map((row) => (
                 <tr key={row.id}>
-                  <td>{row.date || '—'}</td>
+                  <td>{formatNzDate(row.date)}</td>
                   <td>{row.staff || '—'}</td>
                   <td>{row.site || '—'}</td>
                   <td>{row.description || '—'}</td>

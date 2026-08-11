@@ -59,6 +59,7 @@ import { computeEquipmentStats } from '../utils/equipmentStats.js'
 import { CloudSyncBadge } from '../components/CloudSyncBadge.jsx'
 import { EmptyState } from '../components/common/EmptyState.jsx'
 import { FilterDisclosure } from '../components/common/FilterDisclosure.jsx'
+import { formatNzDate, formatSubmittedAt } from '../utils/formatting.js'
 
 
 const TABS = [
@@ -769,7 +770,7 @@ export function EquipmentView({
                     {filteredDefects.map((defect) => (
                       <tr key={defect.id} className={defect.severity === 'Critical' && defect.status !== 'Resolved' ? 'equipment-table__row--critical' : ''}>
                         <td>{defect.equipmentName || getEquipmentName(defect.equipmentId)}</td>
-                        <td>{new Date(defect.reportedAt).toLocaleString('en-NZ')}</td>
+                        <td>{formatSubmittedAt(defect.reportedAt)}</td>
                         <td><DefectSeverityBadge severity={defect.severity} /></td>
                         <td>{defect.description}</td>
                         <td>{defect.status}</td>
@@ -842,7 +843,7 @@ export function EquipmentView({
                     {activeEquipment.map((item) => (
                       <tr key={equipmentKey(item)}>
                         <td>{getEquipmentReadableName(item)}</td>
-                        <td>{item.nextServiceDate || '—'}</td>
+                        <td>{formatNzDate(item.nextServiceDate)}</td>
                         <td>—</td>
                         <td>—</td>
                         <td>—</td>
@@ -869,7 +870,7 @@ export function EquipmentView({
                   </header>
                   <dl className="equipment-summary-card__details">
                     <dt>Next service</dt>
-                    <dd>{item.nextServiceDate || '—'}</dd>
+                    <dd>{formatNzDate(item.nextServiceDate)}</dd>
                     <dt>Next hours / odo</dt>
                     <dd>
                       {item.nextServiceHours || item.nextServiceOdometer
@@ -924,7 +925,7 @@ export function EquipmentView({
                     {serviceRecords.map((record) => (
                       <tr key={record.cloudId ?? record.id}>
                         <td>{getEquipmentName(record.equipmentId)}</td>
-                        <td>{record.serviceDate}</td>
+                        <td>{formatNzDate(record.serviceDate)}</td>
                         <td>{record.serviceType}</td>
                         <td>
                           {record.operatingHours || '—'} / {record.odometer || '—'}
@@ -934,7 +935,7 @@ export function EquipmentView({
                         <td>
                           {record.nextServiceDate || record.nextServiceHours || record.nextServiceOdometer
                             ? [
-                                record.nextServiceDate,
+                                record.nextServiceDate ? formatNzDate(record.nextServiceDate) : null,
                                 record.nextServiceHours ? `${record.nextServiceHours} hrs` : null,
                                 record.nextServiceOdometer ? `${record.nextServiceOdometer} km` : null,
                               ].filter(Boolean).join(' · ')
@@ -955,7 +956,7 @@ export function EquipmentView({
                     <div>
                       <h3 className="equipment-summary-card__title">{getEquipmentName(record.equipmentId)}</h3>
                       <p className="equipment-summary-card__meta">
-                        {record.serviceDate || '—'} · {record.serviceType || '—'}
+                        {formatNzDate(record.serviceDate)} · {record.serviceType || '—'}
                       </p>
                     </div>
                   </header>
@@ -973,7 +974,7 @@ export function EquipmentView({
                     <dd>
                       {record.nextServiceDate || record.nextServiceHours || record.nextServiceOdometer
                         ? [
-                            record.nextServiceDate,
+                            record.nextServiceDate ? formatNzDate(record.nextServiceDate) : null,
                             record.nextServiceHours ? `${record.nextServiceHours} hrs` : null,
                             record.nextServiceOdometer ? `${record.nextServiceOdometer} km` : null,
                           ].filter(Boolean).join(' · ')
@@ -1033,8 +1034,8 @@ export function EquipmentView({
                         <td>{doc.documentTitle}</td>
                         <td>{doc.referenceNumber || '—'}</td>
                         <td>{doc.issuingOrganisation || '—'}</td>
-                        <td>{doc.issueDate || '—'}</td>
-                        <td>{doc.expiryDate || '—'}</td>
+                        <td>{formatNzDate(doc.issueDate)}</td>
+                        <td>{formatNzDate(doc.expiryDate)}</td>
                         <td><ComplianceExpiryBadge document={doc} /></td>
                         <td><CloudSyncBadge syncStatus={doc.syncStatus} size="small" /></td>
                       </tr>
@@ -1063,9 +1064,9 @@ export function EquipmentView({
                     <dt>Issuing org</dt>
                     <dd>{doc.issuingOrganisation || '—'}</dd>
                     <dt>Issue date</dt>
-                    <dd>{doc.issueDate || '—'}</dd>
+                    <dd>{formatNzDate(doc.issueDate)}</dd>
                     <dt>Expiry</dt>
-                    <dd>{doc.expiryDate || '—'}</dd>
+                    <dd>{formatNzDate(doc.expiryDate)}</dd>
                   </dl>
                   <div className="equipment-summary-card__actions">
                     <button

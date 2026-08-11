@@ -1,6 +1,7 @@
 import { MonradLogo } from '../MonradLogo.jsx'
 import { EquipmentStatusBadge } from './EquipmentStatusBadge.jsx'
 import { getEquipmentMakeModel, getEquipmentReadableName } from '../../constants/equipmentConfig.js'
+import { formatNzDate, formatSubmittedAt } from '../../utils/formatting.js'
 
 export function PrintableEquipmentProfile({
   equipment,
@@ -9,7 +10,7 @@ export function PrintableEquipmentProfile({
   documents = [],
   preStarts = [],
 }) {
-  const generated = new Date().toLocaleString('en-NZ')
+  const generated = formatSubmittedAt(new Date())
   const openDefects = defects.filter((d) => d.status !== 'Resolved')
 
   return (
@@ -34,6 +35,7 @@ export function PrintableEquipmentProfile({
           <div><dt>Assigned operator</dt><dd>{equipment.assignedOperator || '—'}</dd></div>
           <div><dt>Location</dt><dd>{equipment.normalLocation || '—'}</dd></div>
           <div><dt>Hours / Odometer</dt><dd>{equipment.currentHours || '—'} / {equipment.currentOdometer || '—'}</dd></div>
+          <div><dt>Next service date</dt><dd>{formatNzDate(equipment.nextServiceDate)}</dd></div>
           <div><dt>Pre-start required</dt><dd>{equipment.prestartRequired ? 'Yes' : 'No'}</dd></div>
           <div><dt>Road legal</dt><dd>{equipment.roadLegal ? 'Yes' : 'No'}</dd></div>
         </dl>
@@ -63,7 +65,7 @@ export function PrintableEquipmentProfile({
           <ul>
             {services.map((s) => (
               <li key={s.id}>
-                {s.serviceDate}: {s.serviceType} — {s.workCompleted || 'No details'}
+                {formatNzDate(s.serviceDate)}: {s.serviceType} — {s.workCompleted || 'No details'}
               </li>
             ))}
           </ul>
@@ -76,7 +78,7 @@ export function PrintableEquipmentProfile({
           <ul>
             {documents.map((d) => (
               <li key={d.id}>
-                {d.documentTitle} ({d.documentType}) — expires {d.expiryDate || 'N/A'}
+                {d.documentTitle} ({d.documentType}) — expires {formatNzDate(d.expiryDate)}
               </li>
             ))}
           </ul>
@@ -89,7 +91,7 @@ export function PrintableEquipmentProfile({
           <ul>
             {preStarts.map((p) => (
               <li key={p.id}>
-                {p.fields?.date}: {p.fields?.operatorName} — {p.defectsFound === 'found' ? 'Defects found' : 'OK'}
+                {formatNzDate(p.fields?.date)}: {p.fields?.operatorName} — {p.defectsFound === 'found' ? 'Defects found' : 'OK'}
               </li>
             ))}
           </ul>
@@ -100,7 +102,7 @@ export function PrintableEquipmentProfile({
 }
 
 export function PrintableDefectReport({ defect, equipment }) {
-  const generated = new Date().toLocaleString('en-NZ')
+  const generated = formatSubmittedAt(new Date())
   return (
     <article className="print-equipment">
       <header className="print-equipment__header">
@@ -111,7 +113,7 @@ export function PrintableDefectReport({ defect, equipment }) {
       </header>
       <section className="print-equipment__section">
         <dl className="print-equipment__dl">
-          <div><dt>Reported</dt><dd>{new Date(defect.reportedAt).toLocaleString('en-NZ')}</dd></div>
+          <div><dt>Reported</dt><dd>{formatSubmittedAt(defect.reportedAt)}</dd></div>
           <div><dt>Severity</dt><dd>{defect.severity}</dd></div>
           <div><dt>Status</dt><dd>{defect.status}</dd></div>
           <div><dt>Description</dt><dd>{defect.description}</dd></div>
@@ -119,12 +121,12 @@ export function PrintableDefectReport({ defect, equipment }) {
           <div><dt>Machine isolated</dt><dd>{defect.machineIsolated ? 'Yes' : 'No'}</dd></div>
           <div><dt>Safe to operate</dt><dd>{defect.safeToOperate ? 'Yes' : 'No'}</dd></div>
           <div><dt>Assigned to</dt><dd>{defect.assignedPerson || '—'}</dd></div>
-          <div><dt>Target date</dt><dd>{defect.targetDate || '—'}</dd></div>
+          <div><dt>Target date</dt><dd>{formatNzDate(defect.targetDate)}</dd></div>
           <div><dt>Reported by</dt><dd>{defect.reportedByName || '—'}</dd></div>
           {defect.status === 'Resolved' && (
             <>
               <div><dt>Resolution</dt><dd>{defect.resolutionDetails}</dd></div>
-              <div><dt>Resolved</dt><dd>{defect.resolvedAt ? new Date(defect.resolvedAt).toLocaleString('en-NZ') : '—'}</dd></div>
+              <div><dt>Resolved</dt><dd>{defect.resolvedAt ? formatSubmittedAt(defect.resolvedAt) : '—'}</dd></div>
               <div><dt>Resolved by</dt><dd>{defect.resolvedByName || '—'}</dd></div>
             </>
           )}
@@ -135,7 +137,7 @@ export function PrintableDefectReport({ defect, equipment }) {
 }
 
 export function PrintableMaintenanceHistory({ equipment, services }) {
-  const generated = new Date().toLocaleString('en-NZ')
+  const generated = formatSubmittedAt(new Date())
   return (
     <article className="print-equipment">
       <header className="print-equipment__header">
@@ -160,7 +162,7 @@ export function PrintableMaintenanceHistory({ equipment, services }) {
             <tbody>
               {services.map((s) => (
                 <tr key={s.id}>
-                  <td>{s.serviceDate}</td>
+                  <td>{formatNzDate(s.serviceDate)}</td>
                   <td>{s.serviceType}</td>
                   <td>{s.serviceProvider || '—'}</td>
                   <td>{s.workCompleted || '—'}</td>
@@ -175,7 +177,7 @@ export function PrintableMaintenanceHistory({ equipment, services }) {
 }
 
 export function PrintableComplianceSummary({ equipment, documents }) {
-  const generated = new Date().toLocaleString('en-NZ')
+  const generated = formatSubmittedAt(new Date())
   return (
     <article className="print-equipment">
       <header className="print-equipment__header">
@@ -203,7 +205,7 @@ export function PrintableComplianceSummary({ equipment, documents }) {
                   <td>{d.documentType}</td>
                   <td>{d.documentTitle}</td>
                   <td>{d.referenceNumber || '—'}</td>
-                  <td>{d.expiryDate || '—'}</td>
+                  <td>{formatNzDate(d.expiryDate)}</td>
                 </tr>
               ))}
             </tbody>

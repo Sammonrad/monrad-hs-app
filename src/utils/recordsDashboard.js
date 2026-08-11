@@ -3,7 +3,7 @@ import {
   ACTION_PRIORITY_LABELS,
   SOURCE_TYPE_LABELS,
 } from '../constants/index.js'
-import { formatSubmittedAt, formatReportType, formatDefectSeverity } from './formatting.js'
+import { formatSubmittedAt, formatReportType, formatDefectSeverity, formatNzDate } from './formatting.js'
 import { getRecordTitle, getFormTypeLabel } from './records.js'
 import { isOverdue } from './storage/actionsStorage.js'
 import { getSafetyAlerts } from './safetyAlerts.js'
@@ -17,7 +17,11 @@ export function getMostRecentRecordDate(records) {
     return timeB - timeA
   })
   const recent = sorted[0]
-  return recent.fields?.date || (recent.submittedAt ? formatSubmittedAt(recent.submittedAt) : null)
+  return recent.fields?.date
+    ? formatNzDate(recent.fields.date)
+    : recent.submittedAt
+      ? formatSubmittedAt(recent.submittedAt)
+      : null
 }
 
 export function getMostRecentActionDate(actionList) {
@@ -26,7 +30,11 @@ export function getMostRecentActionDate(actionList) {
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
   )
   const recent = sorted[0]
-  return recent.date || (recent.createdAt ? formatSubmittedAt(recent.createdAt) : null)
+  return recent.date
+    ? formatNzDate(recent.date)
+    : recent.createdAt
+      ? formatSubmittedAt(recent.createdAt)
+      : null
 }
 
 export function getRecordsDashboardStats(savedRecords, actionList) {

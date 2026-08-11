@@ -27,7 +27,7 @@ import {
   MEETING_STATUS_LABELS,
   getMeetingDisplayTitle,
 } from '../constants/generalMeetingConfig.js'
-import { formatSubmittedAt } from '../utils/formatting.js'
+import { formatSubmittedAt, formatNzDate } from '../utils/formatting.js'
 import { getSettingsOptions } from '../utils/storage/settingsStorage.js'
 import {
   createEmptyMeeting,
@@ -470,7 +470,7 @@ export function GeneralMeetingView({
 
         <section className="gm-detail-summary">
           <dl className="gm-detail-summary__dl">
-            <div><dt>Date / time</dt><dd>{selectedMeeting.meetingDate} {formatTime12Hour(selectedMeeting.meetingTime) || '—'}</dd></div>
+            <div><dt>Date / time</dt><dd>{formatNzDate(selectedMeeting.meetingDate)} {formatTime12Hour(selectedMeeting.meetingTime) || '—'}</dd></div>
             <div><dt>Location</dt><dd>{selectedMeeting.location || '—'}</dd></div>
             <div><dt>Chairperson</dt><dd>{selectedMeeting.chairperson || '—'}</dd></div>
             <div><dt>Attendees</dt><dd>{selectedMeeting.attendees || '—'}</dd></div>
@@ -568,12 +568,12 @@ export function GeneralMeetingView({
                   )}
                   {filteredMeetings.map((record) => (
                     <tr key={record.id}>
-                      <td>{record.meetingDate || '—'}</td>
+                      <td>{formatNzDate(record.meetingDate)}</td>
                       <td>{MEETING_TYPE_LABELS[record.meetingType] || record.meetingType}</td>
                       <td>{record.location || '—'}</td>
                       <td>{record.chairperson || '—'}</td>
                       <td>{MEETING_STATUS_LABELS[record.status] || record.status}</td>
-                      <td>{record.nextMeetingDate || '—'}</td>
+                      <td>{formatNzDate(record.nextMeetingDate)}</td>
                       <td><CloudSyncBadge syncStatus={record.syncStatus} size="small" /></td>
                       <td>
                         <button type="button" className="btn btn--secondary btn--small" onClick={() => openDetail(record)}>
@@ -606,7 +606,7 @@ export function GeneralMeetingView({
                       label={MEETING_STATUS_LABELS[record.status] || record.status}
                     />
                   </header>
-                  <p>Next meeting: {record.nextMeetingDate || '—'}</p>
+                  <p>Next meeting: {formatNzDate(record.nextMeetingDate)}</p>
                   <CloudSyncBadge syncStatus={record.syncStatus} size="small" />
                   <button type="button" className="btn btn--secondary" onClick={() => openDetail(record)}>
                     Open

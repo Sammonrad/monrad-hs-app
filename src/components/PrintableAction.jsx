@@ -4,6 +4,7 @@ import {
   SOURCE_TYPE_LABELS,
 } from '../constants/index.js'
 import { isOverdue } from '../utils/storage/actionsStorage.js'
+import { formatNzDate, formatSubmittedAt } from '../utils/formatting.js'
 import { PrintHeader } from './common/PrintHeader.jsx'
 
 export function PrintableAction({ action }) {
@@ -32,11 +33,11 @@ export function PrintableAction({ action }) {
           </div>
           <div className="print-record__row">
             <dt>Date</dt>
-            <dd>{action.date || '—'}</dd>
+            <dd>{formatNzDate(action.date)}</dd>
           </div>
           <div className="print-record__row">
             <dt>Due date</dt>
-            <dd>{action.dueDate || '—'}</dd>
+            <dd>{formatNzDate(action.dueDate)}</dd>
           </div>
           <div className="print-record__row">
             <dt>Site / location</dt>
@@ -59,7 +60,7 @@ export function PrintableAction({ action }) {
 
       <footer className="print-record__footer">
         Monrad Earthworx — Action Register — printed{' '}
-        {new Date().toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}
+        {formatSubmittedAt(new Date())}
       </footer>
     </article>
   )

@@ -10,6 +10,7 @@ import {
   isAdminProfile,
   updateProfile,
 } from '../utils/storage/userProfileStorage.js'
+import { formatNzDate } from '../utils/formatting.js'
 
 const STATUS_FILTERS = [
   { id: 'all', label: 'All' },
@@ -19,14 +20,7 @@ const STATUS_FILTERS = [
 ]
 
 function formatCreatedDate(value) {
-  if (!value) return '—'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '—'
-  return date.toLocaleDateString('en-NZ', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  })
+  return formatNzDate(value)
 }
 
 function buildEditsFromProfiles(profiles) {

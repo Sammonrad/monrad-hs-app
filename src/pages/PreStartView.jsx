@@ -32,6 +32,7 @@ import {
   formatDefectsFound,
   formatDefectSeverity,
   formatMachineOperable,
+  formatNzDate,
 } from '../utils/formatting.js'
 import { isSeriousDefect } from '../utils/defects.js'
 import { createEmptyDraft, getRecordTitle } from '../utils/records.js'
@@ -810,7 +811,7 @@ export function PreStartView({
                   <SummaryRow label="Machine" value={record.fields.machineNameId ?? record.fields.machine} />
                   <SummaryRow label="Site" value={record.fields.siteLocation} />
                   <SummaryRow label="Hours" value={record.fields.machineHours ?? record.fields.hourMeter} />
-                  <SummaryRow label="Date" value={record.fields.date} />
+                  <SummaryRow label="Date" value={formatNzDate(record.fields.date)} />
                   <SummaryRow
                     label="Checklist"
                     value={`${record.completedCount} of ${record.totalCount} completed`}

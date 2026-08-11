@@ -3,6 +3,7 @@ import { MaintenanceDueBadge } from './MaintenanceDueBadge.jsx'
 import { CloudSyncBadge } from '../CloudSyncBadge.jsx'
 import { getEquipmentMakeModel, getEquipmentReadableName } from '../../constants/equipmentConfig.js'
 import { getOpenDefectCountForEquipment } from '../../utils/storage/equipmentDefectStorage.js'
+import { formatNzDate } from '../../utils/formatting.js'
 
 export function EquipmentSummaryCard({ equipment, defectRecords = [], onView, onAction }) {
   const openDefects = getOpenDefectCountForEquipment(defectRecords, equipment.cloudId ?? equipment.id)
@@ -43,7 +44,7 @@ export function EquipmentSummaryCard({ equipment, defectRecords = [], onView, on
         <dd>
           {equipment.nextServiceDate || equipment.nextServiceHours || equipment.nextServiceOdometer ? (
             <>
-              {equipment.nextServiceDate && <span>{equipment.nextServiceDate}</span>}
+              {equipment.nextServiceDate && <span>{formatNzDate(equipment.nextServiceDate)}</span>}
               {equipment.nextServiceHours && <span> · {equipment.nextServiceHours} hrs</span>}
               {equipment.nextServiceOdometer && <span> · {equipment.nextServiceOdometer} km</span>}
               <div className="equipment-summary-card__badge-row">

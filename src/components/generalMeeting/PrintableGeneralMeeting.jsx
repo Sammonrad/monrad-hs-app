@@ -6,6 +6,7 @@ import {
 } from '../../constants/generalMeetingConfig.js'
 import { ACTION_PRIORITY_LABELS, ACTION_STATUS_LABELS } from '../../constants/index.js'
 import { formatTime12Hour } from '../../utils/time12Hour.js'
+import { formatNzDate, formatSubmittedAt } from '../../utils/formatting.js'
 
 function Section({ title, children }) {
   if (!children) return null
@@ -23,7 +24,7 @@ function TextBlock({ value }) {
 }
 
 export function PrintableGeneralMeeting({ meeting }) {
-  const generated = new Date().toLocaleString('en-NZ')
+  const generated = formatSubmittedAt(new Date())
 
   return (
     <article className="print-general-meeting">
@@ -35,7 +36,7 @@ export function PrintableGeneralMeeting({ meeting }) {
 
       <Section title="Meeting details">
         <dl className="print-general-meeting__dl">
-          <div><dt>Date</dt><dd>{meeting.meetingDate || '—'}</dd></div>
+          <div><dt>Date</dt><dd>{formatNzDate(meeting.meetingDate)}</dd></div>
           <div><dt>Time</dt><dd>{formatTime12Hour(meeting.meetingTime) || '—'}</dd></div>
           <div><dt>Location</dt><dd>{meeting.location || '—'}</dd></div>
           <div><dt>Type</dt><dd>{MEETING_TYPE_LABELS[meeting.meetingType] || meeting.meetingType || '—'}</dd></div>
@@ -113,7 +114,7 @@ export function PrintableGeneralMeeting({ meeting }) {
                   <td>{action.description || '—'}</td>
                   <td>{action.personResponsible || '—'}</td>
                   <td>{ACTION_PRIORITY_LABELS[action.priority] || action.priority}</td>
-                  <td>{action.dueDate || '—'}</td>
+                  <td>{formatNzDate(action.dueDate)}</td>
                   <td>{ACTION_STATUS_LABELS[action.status] || action.status}</td>
                 </tr>
               ))}
@@ -124,7 +125,7 @@ export function PrintableGeneralMeeting({ meeting }) {
 
       <Section title="Next meeting and sign-off">
         <dl className="print-general-meeting__dl">
-          <div><dt>Next meeting date</dt><dd>{meeting.nextMeetingDate || '—'}</dd></div>
+          <div><dt>Next meeting date</dt><dd>{formatNzDate(meeting.nextMeetingDate)}</dd></div>
           <div><dt>Attendee acknowledgement / sign-off</dt><dd>{meeting.attendeeSignOff || '—'}</dd></div>
         </dl>
       </Section>

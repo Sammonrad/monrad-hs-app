@@ -2,6 +2,7 @@ import { FormField } from '../forms/FormField.jsx'
 import { SsspInput, SsspTextarea } from './SsspFields.jsx'
 import { createRecordId } from '../../utils/ids.js'
 import { getEquipmentReadableName, getEquipmentMakeModel } from '../../constants/equipmentConfig.js'
+import { formatNzDate } from '../../utils/formatting.js'
 
 function buildPlantRowFromEquipment(equipment) {
   return {
@@ -10,7 +11,7 @@ function buildPlantRowFromEquipment(equipment) {
     registration: equipment.registrationNumber || equipment.assetNumber || '',
     operator: equipment.assignedOperator || '',
     inspections: [
-      equipment.nextServiceDate ? `Next service: ${equipment.nextServiceDate}` : '',
+      equipment.nextServiceDate ? `Next service: ${formatNzDate(equipment.nextServiceDate)}` : '',
       equipment.prestartRequired ? 'Pre-start required' : '',
     ].filter(Boolean).join('; ') || '',
     hazards: '',

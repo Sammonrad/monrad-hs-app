@@ -11,6 +11,7 @@ import {
   fetchUserAcknowledgementForSssp,
   saveSsspAcknowledgement,
 } from '../utils/storage/ssspCloudStorage.js'
+import { formatSubmittedAt } from '../utils/formatting.js'
 
 export function SsspAcknowledgementView({
   onBack,
@@ -135,7 +136,7 @@ export function SsspAcknowledgementView({
             <p className="sssp-acknowledge__success">
               You acknowledged revision {existingAck.revision} on{' '}
               {existingAck.acknowledgedAt
-                ? new Date(existingAck.acknowledgedAt).toLocaleString()
+                ? formatSubmittedAt(existingAck.acknowledgedAt)
                 : 'record'}
               .
             </p>

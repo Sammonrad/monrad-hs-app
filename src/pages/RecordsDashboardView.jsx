@@ -4,7 +4,7 @@ import { CloudSyncBadge } from '../components/CloudSyncBadge.jsx'
 import { EmptyState } from '../components/common/EmptyState.jsx'
 import { FilterDisclosure } from '../components/common/FilterDisclosure.jsx'
 import { LoadingState } from '../components/common/LoadingState.jsx'
-import { formatSubmittedAt } from '../utils/formatting.js'
+import { formatSubmittedAt, formatNzDate } from '../utils/formatting.js'
 import { getTimesheetRecords } from '../utils/weeklyTimesheet.js'
 import { isAdminProfile } from '../utils/storage/userProfileStorage.js'
 import {
@@ -433,7 +433,7 @@ export function RecordsDashboardView({
                   <dl className="search-result__meta">
                     <div className="search-result__row">
                       <dt>Date</dt>
-                      <dd>{item.date || (item.submittedAt ? formatSubmittedAt(item.submittedAt) : '—')}</dd>
+                      <dd>{item.date ? formatNzDate(item.date) : (item.submittedAt ? formatSubmittedAt(item.submittedAt) : '—')}</dd>
                     </div>
                     {item.mainPerson && (
                       <div className="search-result__row">
@@ -497,7 +497,7 @@ export function RecordsDashboardView({
                           <span className="type-badge type-badge--small">{item.typeLabel}</span>
                         </td>
                         <td className="data-table__title">{item.title}</td>
-                        <td>{item.date || (item.submittedAt ? formatSubmittedAt(item.submittedAt) : '—')}</td>
+                        <td>{item.date ? formatNzDate(item.date) : (item.submittedAt ? formatSubmittedAt(item.submittedAt) : '—')}</td>
                         <td>{item.mainPerson || '—'}</td>
                         <td>{item.site || '—'}</td>
                         <td>{item.status || '—'}</td>

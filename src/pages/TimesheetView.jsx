@@ -27,7 +27,7 @@ import {
 import { useHighlightRecord } from '../hooks/useHighlightRecord.js'
 import { useDefaultFormDate } from '../hooks/useDefaultFormDate.js'
 import { createRecordId } from '../utils/ids.js'
-import { formatSubmittedAt, formatDecimalHoursDisplay } from '../utils/formatting.js'
+import { formatSubmittedAt, formatDecimalHoursDisplay, formatNzDate } from '../utils/formatting.js'
 import { createEmptyDraft, getRecordTitle } from '../utils/records.js'
 import { persistSavedRecords } from '../utils/storage/recordsStorage.js'
 import { getSettingsOptions } from '../utils/storage/settingsStorage.js'
@@ -629,10 +629,7 @@ export function TimesheetView({
   function handlePrintTimesheet(record) {
     setPrintPayload({
       sheets: buildWeeklyPrintSheetForRecord(record, timesheetRecords),
-      generatedAt: new Date().toLocaleString('en-NZ', {
-        dateStyle: 'medium',
-        timeStyle: 'short',
-      }),
+      generatedAt: formatSubmittedAt(new Date()),
     })
   }
 
@@ -981,7 +978,7 @@ export function TimesheetView({
                   <SummaryRow label="Employee" value={record.fields.employeeName} />
                   <SummaryRow label="Job" value={record.fields.jobProjectName} />
                   <SummaryRow label="Site" value={record.fields.siteLocation} />
-                  <SummaryRow label="Date" value={record.fields.date} />
+                  <SummaryRow label="Date" value={formatNzDate(record.fields.date)} />
                   <SummaryRow label="Labour hours" value={record.fields.totalHoursWorked} />
                   <SummaryRow
                     label="Chargeable"

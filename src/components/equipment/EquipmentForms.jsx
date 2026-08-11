@@ -8,6 +8,7 @@ import {
   isoToLocalTimePart,
   localDateAndTimeToIso,
 } from '../../utils/time12Hour.js'
+import { formatNzDate } from '../../utils/formatting.js'
 import { FormActions } from '../forms/FormActions.jsx'
 import {
   ASSET_TYPES,
@@ -436,7 +437,7 @@ export function ServiceUpdatePrompt({ service, onConfirm, onSkip }) {
       <ul>
         {service.operatingHours && <li>Set current hours to {service.operatingHours}</li>}
         {service.odometer && <li>Set current odometer to {service.odometer} km</li>}
-        {service.nextServiceDate && <li>Set next service date to {service.nextServiceDate}</li>}
+        {service.nextServiceDate && <li>Set next service date to {formatNzDate(service.nextServiceDate)}</li>}
         {service.nextServiceHours && <li>Set next service hours to {service.nextServiceHours}</li>}
         {service.nextServiceOdometer && <li>Set next service odometer to {service.nextServiceOdometer} km</li>}
       </ul>

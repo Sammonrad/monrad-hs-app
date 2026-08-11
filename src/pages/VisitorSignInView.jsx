@@ -168,14 +168,7 @@ export function VisitorSignInView({
 
   const historySites = useMemo(() => getUniqueVisitorSites(mergedRecords), [mergedRecords])
 
-  const arrivalDisplay = useMemo(
-    () =>
-      new Date().toLocaleString(undefined, {
-        dateStyle: 'full',
-        timeStyle: 'short',
-      }),
-    [],
-  )
+  const arrivalDisplay = useMemo(() => formatSubmittedAt(new Date()), [])
 
   useEffect(() => {
     saveDraftToSession(draft)
