@@ -13,8 +13,10 @@ import { ConfirmModal } from '../components/common/ConfirmModal.jsx'
 import { EmptyState } from '../components/common/EmptyState.jsx'
 import {
   buildWeeklyPrintSheetForRecord,
+  filterTimesheetsByEmployee,
   formatHoursTotal,
   getCurrentWeekStart,
+  getFilterOptions,
   getWeekStartMonday,
   groupTimesheetsByWeek,
 } from '../utils/weeklyTimesheet.js'
@@ -117,6 +119,7 @@ export function TimesheetView({
   const [deleteError, setDeleteError] = useState('')
   const [printPayload, setPrintPayload] = useState(null)
   const [scrollToRecordId, setScrollToRecordId] = useState(null)
+  const [employeeFilter, setEmployeeFilter] = useState('')
   const formRef = useRef(null)
 
   const { fields, signatureConfirmation } = draft
@@ -134,15 +137,29 @@ export function TimesheetView({
 
   const displayedChargeableHours = chargeableEdited ? fields.chargeableHours : autoChargeableHours
 
+  const isAdmin = isAdminProfile(profile)
+
   const timesheetRecords = useMemo(
     () => getMergedTimesheetRecords(savedRecords, cloudTimesheets),
     [savedRecords, cloudTimesheets],
   )
 
-  const weekGroups = useMemo(
-    () => groupTimesheetsByWeek(timesheetRecords),
+  const employeeOptions = useMemo(
+    () => getFilterOptions(timesheetRecords).employees,
     [timesheetRecords],
   )
+
+  const visibleTimesheetRecords = useMemo(() => {
+    if (!isAdmin || !employeeFilter) return timesheetRecords
+    return filterTimesheetsByEmployee(timesheetRecords, employeeFilter)
+  }, [timesheetRecords, employeeFilter, isAdmin])
+
+  const weekGroups = useMemo(
+    () => groupTimesheetsByWeek(visibleTimesheetRecords),
+    [visibleTimesheetRecords],
+  )
+
+  const hasEmployeeFilter = isAdmin && Boolean(employeeFilter)
 
   const [expandedWeeks, setExpandedWeeks] = useState(() => {
     const current = getCurrentWeekStart()
@@ -161,7 +178,6 @@ export function TimesheetView({
   const cloudRecordCount = timesheetRecords.filter(
     (record) => resolveRecordSyncStatus(record) === SYNC_STATUS.CLOUD,
   ).length
-  const isAdmin = isAdminProfile(profile)
 
   function handleRecordArchived(archived, { localOnly } = {}) {
     setSavedRecords((prev) => {
@@ -807,7 +823,11 @@ export function TimesheetView({
             Saved timesheet records
           </h2>
           <p className="saved-records__count">
-            {timesheetRecords.length} record{timesheetRecords.length === 1 ? '' : 's'}
+            {hasEmployeeFilter
+              ? `${visibleTimesheetRecords.length} of ${timesheetRecords.length} record${
+                  timesheetRecords.length === 1 ? '' : 's'
+                }`
+              : `${timesheetRecords.length} record${timesheetRecords.length === 1 ? '' : 's'}`}
             {user?.id && cloudRecordCount > 0
               ? isAdmin
                 ? ` (${cloudRecordCount} from cloud — all users)`
@@ -838,6 +858,11 @@ export function TimesheetView({
         <EmptyState
           title="No saved timesheets yet"
           description='Tap "New Timesheet" above to create your first daily work record.'
+        />
+      ) : visibleTimesheetRecords.length === 0 ? (
+        <EmptyState
+          title="No matching timesheets"
+          description={`No timesheets found for ${employeeFilter}. Try selecting a different employee or choose All.`}
         />
       ) : (
         <div className="timesheet-week-groups">
@@ -1143,6 +1168,24 @@ export function TimesheetView({
           <Plus size={16} aria-hidden="true" />
           New Timesheet
         </button>
+        {isAdmin && employeeOptions.length > 0 && (
+          <label className="field timesheet-list-toolbar__filter">
+            <span className="field__label">Employee</span>
+            <select
+              className="form-input"
+              value={employeeFilter}
+              onChange={(e) => setEmployeeFilter(e.target.value)}
+              aria-label="Filter by employee"
+            >
+              <option value="">All</option>
+              {employeeOptions.map((name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
       </div>
 
       {savedRecordsSection}

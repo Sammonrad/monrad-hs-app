@@ -4130,7 +4130,23 @@ input[type='date']::-webkit-datetime-edit {
 }
 
 .timesheet-list-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--spacing-sm);
   margin-bottom: var(--spacing-md);
+}
+
+.timesheet-list-toolbar__filter {
+  flex: 1 1 10rem;
+  min-width: 0;
+  max-width: 16rem;
+  margin: 0;
+}
+
+.timesheet-list-toolbar__filter .form-input {
+  width: 100%;
+  min-height: var(--tap-min);
 }
 
 .timesheet-list-toolbar .btn {

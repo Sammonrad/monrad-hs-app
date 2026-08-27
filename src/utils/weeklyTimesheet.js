@@ -274,6 +274,13 @@ export function filterTimesheets(records, filters) {
   return records.filter((record) => recordMatchesFilters(record, filters))
 }
 
+/** Exact-match employee filter for admin timesheet list (dropdown selection). */
+export function filterTimesheetsByEmployee(records, employeeName) {
+  if (!employeeName?.trim()) return records
+  const target = employeeName.trim()
+  return records.filter((record) => (record.fields?.employeeName ?? '').trim() === target)
+}
+
 export function groupByWeek(records) {
   const groups = new Map()
 
