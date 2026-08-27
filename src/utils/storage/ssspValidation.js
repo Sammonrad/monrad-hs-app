@@ -18,8 +18,15 @@ export function getSectionNotApplicableKey(section) {
 
 export function isSectionNotApplicable(recordData, section) {
   const key = getSectionNotApplicableKey(section)
-  if (!key) return false
-  return recordData?.[key] === true
+  if (!key || !recordData) return false
+  return recordData[key] === true
+}
+
+/** Single snapshot of the JSON + hazards used by completion and validation. */
+export function getSsspRecordContext(record) {
+  const recordData = record?.recordData ?? {}
+  const hazards = record?.hazards ?? recordData.hazards ?? []
+  return { recordData, hazards }
 }
 
 function sectionHasAnyContent(section, recordData) {
@@ -120,7 +127,8 @@ export function existingRequiredSectionValidationPasses(section, recordData, haz
  * (and N/A-eligible sections also have content if not marked N/A).
  */
 export function isSsspSectionComplete(section, recordData, hazards, gate = 'ready') {
-  if (isSectionNotApplicable(recordData, section)) return true
+  const notApplicable = isSectionNotApplicable(recordData, section)
+  if (notApplicable) return true
 
   if (section.allowsNotApplicable && !sectionHasAnyContent(section, recordData)) {
     return false
@@ -129,9 +137,13 @@ export function isSsspSectionComplete(section, recordData, hazards, gate = 'read
   return existingRequiredSectionValidationPasses(section, recordData, hazards, gate)
 }
 
+export function isSsspRecordSectionComplete(section, record, gate = 'ready') {
+  const { recordData, hazards } = getSsspRecordContext(record)
+  return isSsspSectionComplete(section, recordData, hazards, gate)
+}
+
 export function getIncompleteSsspSections(record, gate = 'ready') {
-  const recordData = record?.recordData ?? {}
-  const hazards = record?.hazards ?? recordData.hazards
+  const { recordData, hazards } = getSsspRecordContext(record)
   return SSSP_SECTIONS.filter(
     (section) => !isSsspSectionComplete(section, recordData, hazards, gate),
   )

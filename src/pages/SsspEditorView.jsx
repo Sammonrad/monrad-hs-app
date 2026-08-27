@@ -37,7 +37,7 @@ import {
   validateSsspRecord,
   getValidationGateForStatus,
   canTransitionStatus,
-  isSsspSectionComplete,
+  isSsspRecordSectionComplete,
   getIncompleteSsspSections,
 } from '../utils/storage/ssspValidation.js'
 import {
@@ -224,10 +224,8 @@ export function SsspEditorView({
   const activeSectionIndex = SSSP_SECTIONS.findIndex((section) => section.id === activeSection)
   const completedSectionCount = useMemo(
     () =>
-      SSSP_SECTIONS.filter((section) =>
-        isSsspSectionComplete(section, record.recordData, record.hazards, 'ready'),
-      ).length,
-    [record.hazards, record.recordData],
+      SSSP_SECTIONS.filter((section) => isSsspRecordSectionComplete(section, record, 'ready')).length,
+    [record],
   )
   const progressPercent = Math.round((completedSectionCount / SSSP_SECTIONS.length) * 100)
 
@@ -261,12 +259,14 @@ export function SsspEditorView({
   }
 
   function updateNotApplicable(key, checked) {
-    setRecord((prev) =>
-      syncIndexedFieldsFromRecordData({
-        ...prev,
-        recordData: { ...prev.recordData, [key]: Boolean(checked) },
-      }),
-    )
+    setRecord((prev) => ({
+      ...prev,
+      updatedAt: new Date().toISOString(),
+      recordData: {
+        ...prev.recordData,
+        [key]: checked === true,
+      },
+    }))
   }
 
   function goToSection(sectionId) {
@@ -623,8 +623,7 @@ export function SsspEditorView({
           sections={SSSP_SECTIONS}
           activeSectionId={activeSection}
           onSelect={setActiveSection}
-          recordData={record.recordData}
-          hazards={record.hazards}
+          record={record}
           />
         </aside>
 

@@ -8,6 +8,7 @@ import { RepeatableList } from './RepeatableList.jsx'
 import { SsspPlantEquipmentList } from './SsspPlantEquipmentList.jsx'
 import {
   getSectionNotApplicableKey,
+  getSsspRecordContext,
   isSectionNotApplicable,
   isSsspSectionComplete,
 } from '../../utils/storage/ssspValidation.js'
@@ -134,7 +135,9 @@ export function SsspSectionForm({
   )
 }
 
-export function SsspSectionNav({ sections, activeSectionId, onSelect, recordData, hazards }) {
+export function SsspSectionNav({ sections, activeSectionId, onSelect, record }) {
+  const { recordData, hazards } = getSsspRecordContext(record)
+
   function sectionComplete(section) {
     return isSsspSectionComplete(section, recordData, hazards, 'ready')
   }
