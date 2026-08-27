@@ -4,6 +4,7 @@ import { SSSP_SECTIONS } from '../constants/ssspSections.js'
 import { getSsspStatusLabel } from '../constants/ssspStatuses.js'
 import { getActiveHazards } from '../utils/storage/ssspStorage.js'
 import { getRiskBandLabel } from '../constants/ssspRiskMatrix.js'
+import { isSectionNotApplicable } from '../utils/storage/ssspValidation.js'
 import { RiskMatrix } from './sssp/RiskMatrix.jsx'
 
 function PrintSection({ title, children }) {
@@ -54,6 +55,14 @@ export function PrintableSSSP({ record, includeAcknowledgements = false }) {
       </header>
 
       {SSSP_SECTIONS.map((section) => {
+        if (isSectionNotApplicable(recordData, section)) {
+          return (
+            <PrintSection key={section.id} title={section.title}>
+              <p className="print-sssp__na">Not applicable for this job</p>
+            </PrintSection>
+          )
+        }
+
         if (section.isRiskRegister) {
           return (
             <PrintSection key={section.id} title={section.title}>

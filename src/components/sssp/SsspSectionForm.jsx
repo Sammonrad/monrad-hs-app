@@ -6,12 +6,33 @@ import { RiskRegister } from './RiskRegister.jsx'
 import { RiskMatrix } from './RiskMatrix.jsx'
 import { RepeatableList } from './RepeatableList.jsx'
 import { SsspPlantEquipmentList } from './SsspPlantEquipmentList.jsx'
+import {
+  getSectionNotApplicableKey,
+  isSectionNotApplicable,
+  isSsspSectionComplete,
+} from '../../utils/storage/ssspValidation.js'
+
+function NotApplicableToggle({ checked, onChange, disabled }) {
+  return (
+    <label className="sssp-na-toggle">
+      <input
+        type="checkbox"
+        className="item__checkbox"
+        checked={checked}
+        disabled={disabled}
+        onChange={(event) => onChange(event.target.checked)}
+      />
+      <span>Not applicable for this job</span>
+    </label>
+  )
+}
 
 export function SsspSectionForm({
   sectionId,
   recordData,
   hazards,
   onSectionChange,
+  onNotApplicableChange,
   onHazardsChange,
   readOnly = false,
   onNavigateCriticalRisks,
@@ -20,6 +41,23 @@ export function SsspSectionForm({
 }) {
   const section = SSSP_SECTIONS.find((s) => s.id === sectionId)
   if (!section) return null
+
+  const notApplicable = isSectionNotApplicable(recordData, section)
+  const fieldsDisabled = readOnly || notApplicable
+
+  function handleNotApplicableChange(checked) {
+    const key = getSectionNotApplicableKey(section)
+    if (!key || !onNotApplicableChange) return
+    onNotApplicableChange(key, checked)
+  }
+
+  const naToggle = section.allowsNotApplicable ? (
+    <NotApplicableToggle
+      checked={notApplicable}
+      onChange={handleNotApplicableChange}
+      disabled={readOnly}
+    />
+  ) : null
 
   if (section.isRiskRegister) {
     return (
@@ -44,60 +82,61 @@ export function SsspSectionForm({
     const ListComponent = section.id === 'plant' ? SsspPlantEquipmentList : RepeatableList
     return (
       <FormSection title={section.title} id={`sssp-section-${section.id}`}>
-        <ListComponent
-          items={data}
-          itemFields={section.itemFields}
-          onChange={(next) => onSectionChange(section.id, next)}
-          readOnly={readOnly}
-          addLabel={`Add ${section.shortTitle ?? section.title} row`}
-          equipment={equipment}
-          isAdmin={isAdmin}
-        />
+        {naToggle}
+        <div className={notApplicable ? 'sssp-section-form__body--na' : undefined}>
+          <ListComponent
+            items={data}
+            itemFields={section.itemFields}
+            onChange={(next) => onSectionChange(section.id, next)}
+            readOnly={fieldsDisabled}
+            addLabel={`Add ${section.shortTitle ?? section.title} row`}
+            equipment={equipment}
+            isAdmin={isAdmin}
+          />
+        </div>
       </FormSection>
     )
   }
 
   return (
     <FormSection title={section.title} id={`sssp-section-${section.id}`}>
-      {section.fields.map((field) => (
-        <FormField key={field.key} label={field.label} required={field.required}>
-          {field.type === 'textarea' ? (
-            readOnly ? (
+      {naToggle}
+      <div className={notApplicable ? 'sssp-section-form__body--na' : undefined}>
+        {section.fields.map((field) => (
+          <FormField key={field.key} label={field.label} required={field.required && !notApplicable}>
+            {field.type === 'textarea' ? (
+              fieldsDisabled ? (
+                <p className="sssp-readonly-value">{data?.[field.key] || '—'}</p>
+              ) : (
+                <SsspTextarea
+                  value={data?.[field.key] ?? ''}
+                  onChange={(v) =>
+                    onSectionChange(section.id, { ...data, [field.key]: v })
+                  }
+                  rows={4}
+                />
+              )
+            ) : fieldsDisabled ? (
               <p className="sssp-readonly-value">{data?.[field.key] || '—'}</p>
             ) : (
-              <SsspTextarea
+              <SsspInput
+                type={field.type === 'date' ? 'date' : 'text'}
                 value={data?.[field.key] ?? ''}
                 onChange={(v) =>
                   onSectionChange(section.id, { ...data, [field.key]: v })
                 }
-                rows={4}
               />
-            )
-          ) : readOnly ? (
-            <p className="sssp-readonly-value">{data?.[field.key] || '—'}</p>
-          ) : (
-            <SsspInput
-              type={field.type === 'date' ? 'date' : 'text'}
-              value={data?.[field.key] ?? ''}
-              onChange={(v) =>
-                onSectionChange(section.id, { ...data, [field.key]: v })
-              }
-            />
-          )}
-        </FormField>
-      ))}
+            )}
+          </FormField>
+        ))}
+      </div>
     </FormSection>
   )
 }
 
 export function SsspSectionNav({ sections, activeSectionId, onSelect, recordData, hazards }) {
   function sectionComplete(section) {
-    if (section.isRiskRegister) {
-      return (hazards ?? []).some((h) => !h.archived)
-    }
-    const data = recordData?.[section.id]
-    if (section.repeatable) return Array.isArray(data) && data.length > 0
-    return section.fields?.some((f) => f.required && data?.[f.key]?.trim?.())
+    return isSsspSectionComplete(section, recordData, hazards, 'ready')
   }
 
   return (

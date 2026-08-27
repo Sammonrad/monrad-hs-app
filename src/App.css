@@ -7344,6 +7344,42 @@ input[type='date']::-webkit-datetime-edit {
   font-weight: 800;
 }
 
+.sssp-na-toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin: 0 0 var(--spacing-md);
+  padding: 0.75rem 0.9rem;
+  border: 1px solid var(--color-grey-300);
+  border-radius: var(--card-radius);
+  background: var(--color-grey-50, #f8f8f8);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.sssp-na-toggle input {
+  margin-top: 0.15rem;
+}
+
+.sssp-section-form__body--na {
+  opacity: 0.55;
+}
+
+.sssp-incomplete-sections {
+  margin: 0.5rem 0 0;
+  padding-left: 1.1rem;
+}
+
+.sssp-incomplete-sections li {
+  margin: 0.2rem 0;
+}
+
+.print-sssp__na {
+  margin: 0;
+  font-style: italic;
+  color: var(--color-grey-700, #444);
+}
+
 .sssp-editor,
 .sssp-editor__content {
   min-width: 0;

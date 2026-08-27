@@ -37,6 +37,8 @@ import {
   validateSsspRecord,
   getValidationGateForStatus,
   canTransitionStatus,
+  isSsspSectionComplete,
+  getIncompleteSsspSections,
 } from '../utils/storage/ssspValidation.js'
 import {
   suggestNextSsspNumber,
@@ -204,18 +206,27 @@ export function SsspEditorView({
     }
   }, [record, activeSection, isNewSssp, user?.id, readOnly, draftSiteOrJobId])
 
+  useEffect(() => {
+    if (!printRecord) return undefined
+    const timer = window.setTimeout(() => window.print(), 350)
+    const handleAfterPrint = () => setPrintRecord(null)
+    window.addEventListener('afterprint', handleAfterPrint)
+    return () => {
+      window.clearTimeout(timer)
+      window.removeEventListener('afterprint', handleAfterPrint)
+    }
+  }, [printRecord])
+
   const validationForReady = useMemo(() => validateSsspRecord(record, 'ready'), [record])
   const validationForApproval = useMemo(() => validateSsspRecord(record, 'approval'), [record])
   const validationForSubmitted = useMemo(() => validateSsspRecord(record, 'submitted'), [record])
+  const incompleteForReady = useMemo(() => getIncompleteSsspSections(record, 'ready'), [record])
   const activeSectionIndex = SSSP_SECTIONS.findIndex((section) => section.id === activeSection)
   const completedSectionCount = useMemo(
     () =>
-      SSSP_SECTIONS.filter((section) => {
-        if (section.isRiskRegister) return (record.hazards ?? []).some((hazard) => !hazard.archived)
-        const data = record.recordData?.[section.id]
-        if (section.repeatable) return Array.isArray(data) && data.length > 0
-        return section.fields?.some((field) => field.required && data?.[field.key]?.trim?.())
-      }).length,
+      SSSP_SECTIONS.filter((section) =>
+        isSsspSectionComplete(section, record.recordData, record.hazards, 'ready'),
+      ).length,
     [record.hazards, record.recordData],
   )
   const progressPercent = Math.round((completedSectionCount / SSSP_SECTIONS.length) * 100)
@@ -247,6 +258,49 @@ export function SsspEditorView({
         recordData: { ...prev.recordData, [sectionId]: data },
       }),
     )
+  }
+
+  function updateNotApplicable(key, checked) {
+    setRecord((prev) =>
+      syncIndexedFieldsFromRecordData({
+        ...prev,
+        recordData: { ...prev.recordData, [key]: Boolean(checked) },
+      }),
+    )
+  }
+
+  function goToSection(sectionId) {
+    setActiveSection(sectionId)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  function showIncompleteSectionsMessage(sections, actionLabel) {
+    setErrors([
+      {
+        type: 'incomplete-sections',
+        actionLabel,
+        sections: sections.map((section) => ({ id: section.id, title: section.title })),
+      },
+    ])
+  }
+
+  function handleReadyForReview() {
+    if (incompleteForReady.length > 0) {
+      showIncompleteSectionsMessage(incompleteForReady, 'Ready for Review')
+      return
+    }
+    if (!validationForReady.valid) {
+      setErrors(validationForReady.errors)
+      return
+    }
+    handleStatusTransition(
+      SSSP_STATUS.READY_FOR_REVIEW,
+      getValidationGateForStatus(SSSP_STATUS.READY_FOR_REVIEW),
+    )
+  }
+
+  function handlePrintSavePdf() {
+    setPrintRecord(record)
   }
 
   function updateHazards(hazards) {
@@ -478,7 +532,7 @@ export function SsspEditorView({
         <div className="sssp-editor__overview-copy">
           <div>
             <span className="sssp-editor__eyebrow">Document progress</span>
-            <strong>{completedSectionCount} of {SSSP_SECTIONS.length} sections started</strong>
+            <strong>{completedSectionCount} of {SSSP_SECTIONS.length} sections complete</strong>
           </div>
           <span className={`sssp-status-badge sssp-status-badge--${record.status.replaceAll('_', '-')}`}>
             {getSsspStatusLabel(record.status)}
@@ -524,10 +578,35 @@ export function SsspEditorView({
 
       {errors.length > 0 && (
         <div className="validation-summary" role="alert">
-          <strong>Complete the following before continuing:</strong>
-          {errors.map((err) => (
-            <ValidationMessage key={err} message={err} />
-          ))}
+          {errors[0]?.type === 'incomplete-sections' ? (
+            <>
+              <strong>
+                {errors[0].sections.length} section{errors[0].sections.length === 1 ? '' : 's'} still
+                require attention
+                {errors[0].actionLabel ? ` before ${errors[0].actionLabel}` : ''}:
+              </strong>
+              <ul className="sssp-incomplete-sections">
+                {errors[0].sections.map((section) => (
+                  <li key={section.id}>
+                    <button
+                      type="button"
+                      className="btn btn--link"
+                      onClick={() => goToSection(section.id)}
+                    >
+                      {section.title}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </>
+          ) : (
+            <>
+              <strong>Complete the following before continuing:</strong>
+              {errors.map((err) => (
+                <ValidationMessage key={typeof err === 'string' ? err : err?.message} message={typeof err === 'string' ? err : err?.message} />
+              ))}
+            </>
+          )}
         </div>
       )}
 
@@ -559,6 +638,7 @@ export function SsspEditorView({
             recordData={record.recordData}
             hazards={record.hazards}
             onSectionChange={updateSection}
+            onNotApplicableChange={updateNotApplicable}
             onHazardsChange={updateHazards}
             readOnly={readOnly}
             equipment={equipment}
@@ -602,7 +682,7 @@ export function SsspEditorView({
       </div>
 
       <FormActions>
-        <button type="button" className="btn btn--secondary" onClick={() => setPrintRecord(record)}>
+        <button type="button" className="btn btn--secondary" onClick={handlePrintSavePdf}>
           Print / Save PDF
         </button>
 
@@ -615,8 +695,8 @@ export function SsspEditorView({
               <button
                 type="button"
                 className="btn btn--primary"
-                disabled={saving || !validationForReady.valid}
-                onClick={() => handleStatusTransition(SSSP_STATUS.READY_FOR_REVIEW, getValidationGateForStatus(SSSP_STATUS.READY_FOR_REVIEW))}
+                disabled={saving}
+                onClick={handleReadyForReview}
               >
                 Ready for Review
               </button>

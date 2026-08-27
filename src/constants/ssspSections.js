@@ -53,6 +53,8 @@ export const SSSP_SECTIONS = [
     id: 'siteArrangements',
     title: 'Site Arrangements',
     shortTitle: 'Site',
+    allowsNotApplicable: true,
+    notApplicableKey: 'siteArrangementsNotApplicable',
     fields: [
       { key: 'siteAccess', label: 'Site access / egress', type: 'textarea' },
       { key: 'parking', label: 'Parking and deliveries', type: 'textarea' },
@@ -85,6 +87,8 @@ export const SSSP_SECTIONS = [
     title: 'Plant & Equipment',
     shortTitle: 'Plant',
     repeatable: true,
+    allowsNotApplicable: true,
+    notApplicableKey: 'plantNotApplicable',
     itemFields: [
       { key: 'plantType', label: 'Plant / equipment type', type: 'text', required: true },
       { key: 'registration', label: 'Registration / ID', type: 'text' },
@@ -98,6 +102,8 @@ export const SSSP_SECTIONS = [
     title: 'Training & Competency',
     shortTitle: 'Training',
     repeatable: true,
+    allowsNotApplicable: true,
+    notApplicableKey: 'trainingNotApplicable',
     itemFields: [
       { key: 'trainingTopic', label: 'Training / competency topic', type: 'text', required: true },
       { key: 'requiredFor', label: 'Required for', type: 'text' },
@@ -118,6 +124,8 @@ export const SSSP_SECTIONS = [
     id: 'hazardousSubstances',
     title: 'Hazardous Substances',
     shortTitle: 'Haz Subs',
+    allowsNotApplicable: true,
+    notApplicableKey: 'hazardousSubstancesNotApplicable',
     fields: [
       { key: 'substancesUsed', label: 'Substances used on site', type: 'textarea' },
       { key: 'sdsLocation', label: 'SDS location / access', type: 'textarea' },
@@ -129,6 +137,8 @@ export const SSSP_SECTIONS = [
     id: 'permits',
     title: 'Permits & Authorisations',
     shortTitle: 'Permits',
+    allowsNotApplicable: true,
+    notApplicableKey: 'permitsNotApplicable',
     fields: [
       { key: 'permitsRequired', label: 'Permits required', type: 'textarea' },
       { key: 'permitProcess', label: 'Permit-to-work process', type: 'textarea' },
@@ -139,6 +149,8 @@ export const SSSP_SECTIONS = [
     id: 'traffic',
     title: 'Traffic Management',
     shortTitle: 'Traffic',
+    allowsNotApplicable: true,
+    notApplicableKey: 'trafficNotApplicable',
     fields: [
       { key: 'tmpReference', label: 'TMP reference / version', type: 'text' },
       { key: 'vehicleRoutes', label: 'Vehicle routes and parking', type: 'textarea' },
@@ -151,6 +163,8 @@ export const SSSP_SECTIONS = [
     title: 'Subcontractors',
     shortTitle: 'Subs',
     repeatable: true,
+    allowsNotApplicable: true,
+    notApplicableKey: 'subcontractorsNotApplicable',
     itemFields: [
       { key: 'companyName', label: 'Company name', type: 'text', required: true },
       { key: 'scope', label: 'Scope of work', type: 'textarea' },
@@ -162,6 +176,8 @@ export const SSSP_SECTIONS = [
     id: 'communication',
     title: 'Communication',
     shortTitle: 'Comms',
+    allowsNotApplicable: true,
+    notApplicableKey: 'communicationsNotApplicable',
     fields: [
       { key: 'toolboxFrequency', label: 'Toolbox / pre-start frequency', type: 'textarea' },
       { key: 'reportingLines', label: 'Reporting lines', type: 'textarea' },
@@ -183,6 +199,8 @@ export const SSSP_SECTIONS = [
     id: 'monitoring',
     title: 'Monitoring & Review',
     shortTitle: 'Monitoring',
+    allowsNotApplicable: true,
+    notApplicableKey: 'monitoringNotApplicable',
     fields: [
       { key: 'inspectionSchedule', label: 'Inspection schedule', type: 'textarea' },
       { key: 'auditProcess', label: 'Audit / review process', type: 'textarea' },
@@ -194,6 +212,8 @@ export const SSSP_SECTIONS = [
     id: 'supportingDocs',
     title: 'Supporting Documents',
     shortTitle: 'Docs',
+    allowsNotApplicable: true,
+    notApplicableKey: 'supportingDocsNotApplicable',
     fields: [
       { key: 'referencedDocs', label: 'Referenced documents / drawings', type: 'textarea' },
       { key: 'certificates', label: 'Certificates / SWMS / TMP attachments', type: 'textarea' },

@@ -11,6 +11,30 @@ function isEmpty(value) {
   return false
 }
 
+export function getSectionNotApplicableKey(section) {
+  if (!section?.allowsNotApplicable) return null
+  return section.notApplicableKey ?? `${section.id}NotApplicable`
+}
+
+export function isSectionNotApplicable(recordData, section) {
+  const key = getSectionNotApplicableKey(section)
+  if (!key) return false
+  return recordData?.[key] === true
+}
+
+function sectionHasAnyContent(section, recordData) {
+  const data = recordData?.[section.id]
+  if (section.repeatable) {
+    return Array.isArray(data) && data.length > 0
+  }
+  return Boolean(
+    section.fields?.some((field) => {
+      const value = data?.[field.key]
+      return typeof value === 'string' ? Boolean(value.trim()) : !isEmpty(value)
+    }),
+  )
+}
+
 function validateSectionFields(section, data) {
   const errors = []
 
@@ -83,6 +107,36 @@ function validateEmergency(recordData, gate) {
   return errors
 }
 
+/** Existing required-field / risk checks for a section (ignores N/A). */
+export function existingRequiredSectionValidationPasses(section, recordData, hazards, gate = 'ready') {
+  if (section.isRiskRegister) {
+    return validateHazards(hazards ?? recordData?.hazards, gate).length === 0
+  }
+  return validateSectionFields(section, recordData?.[section.id]).length === 0
+}
+
+/**
+ * Section complete when marked N/A, or when required validation passes
+ * (and N/A-eligible sections also have content if not marked N/A).
+ */
+export function isSsspSectionComplete(section, recordData, hazards, gate = 'ready') {
+  if (isSectionNotApplicable(recordData, section)) return true
+
+  if (section.allowsNotApplicable && !sectionHasAnyContent(section, recordData)) {
+    return false
+  }
+
+  return existingRequiredSectionValidationPasses(section, recordData, hazards, gate)
+}
+
+export function getIncompleteSsspSections(record, gate = 'ready') {
+  const recordData = record?.recordData ?? {}
+  const hazards = record?.hazards ?? recordData.hazards
+  return SSSP_SECTIONS.filter(
+    (section) => !isSsspSectionComplete(section, recordData, hazards, gate),
+  )
+}
+
 export function validateSsspRecord(record, gate = 'draft') {
   const errors = []
   const recordData = record?.recordData ?? {}
@@ -99,7 +153,15 @@ export function validateSsspRecord(record, gate = 'draft') {
 
   SSSP_SECTIONS.forEach((section) => {
     if (section.isRiskRegister) return
+    if (isSectionNotApplicable(recordData, section)) return
+
     if (gate === 'ready' || gate === 'approval' || gate === 'submitted') {
+      if (section.allowsNotApplicable && !sectionHasAnyContent(section, recordData)) {
+        errors.push(
+          `${section.title}: mark as “Not applicable for this job” or add section details.`,
+        )
+        return
+      }
       errors.push(...validateSectionFields(section, recordData[section.id]))
     }
   })
