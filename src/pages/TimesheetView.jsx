@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { Plus } from 'lucide-react'
 import { FORM_TYPES } from '../constants/index.js'
 import { BackButton } from '../components/BackButton.jsx'
 import { SignatureConfirmationField } from '../components/SignatureConfirmationField.jsx'
@@ -92,14 +93,12 @@ export function TimesheetView({
   setCloudTimesheets,
 }) {
   const formConfig = FORM_TYPES.timesheet
+  const [mode, setMode] = useState('list')
   const [draft, setDraft] = useState(() => createEmptyDraft('timesheet'))
   useDefaultFormDate(setDraft)
-  const [completedRecord, setCompletedRecord] = useState(null)
   const [editingRecord, setEditingRecord] = useState(null)
   const [viewingRecordId, setViewingRecordId] = useState(null)
   const [fieldErrors, setFieldErrors] = useState({})
-  const [completedSyncStatus, setCompletedSyncStatus] = useState(null)
-  const [completedCloudError, setCompletedCloudError] = useState('')
   const [formStatusMessage, setFormStatusMessage] = useState('')
   const [formStatusError, setFormStatusError] = useState('')
   const [cloudLoadWarning, setCloudLoadWarning] = useState(null)
@@ -110,7 +109,7 @@ export function TimesheetView({
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
   const [printPayload, setPrintPayload] = useState(null)
-  const recordRef = useRef(null)
+  const [scrollToRecordId, setScrollToRecordId] = useState(null)
   const formRef = useRef(null)
 
   const { fields, signatureConfirmation } = draft
@@ -149,7 +148,11 @@ export function TimesheetView({
     setCloudTimesheets((prev) =>
       prev.map((item) => (matchesArchiveTarget(item, archived) ? { ...item, archived: true } : item)),
     )
-    setCompletedRecord((prev) => (matchesArchiveTarget(prev, archived) ? null : prev))
+    if (editingRecord && matchesArchiveTarget(editingRecord, archived)) {
+      setEditingRecord(null)
+      setMode('list')
+      setDraft(createEmptyDraft('timesheet'))
+    }
     setArchiveMessage(
       localOnly
         ? 'Record archived on this device (Local). Find it under Archived Records.'
@@ -163,7 +166,6 @@ export function TimesheetView({
       persistSavedRecords(next)
       return next
     })
-    setCompletedRecord((prev) => (prev?.id === recordId ? { ...prev, ...patch } : prev))
     setEditingRecord((prev) => (prev?.id === recordId ? { ...prev, ...patch } : prev))
   }
 
@@ -183,9 +185,12 @@ export function TimesheetView({
       return next
     })
     setCloudTimesheets((prev) => prev.filter((item) => !matchesTimesheetIdentity(item, record)))
-    setCompletedRecord((prev) => (matchesTimesheetIdentity(prev, record) ? null : prev))
     setEditingRecord((prev) => (matchesTimesheetIdentity(prev, record) ? null : prev))
     setViewingRecordId((prev) => (prev === record.id ? null : prev))
+    if (matchesTimesheetIdentity(editingRecord, record)) {
+      setMode('list')
+      setDraft(createEmptyDraft('timesheet'))
+    }
   }
 
   useEffect(() => {
@@ -221,10 +226,60 @@ export function TimesheetView({
   useHighlightRecord(highlightRecordId, onClearHighlight, [timesheetRecords])
 
   useEffect(() => {
-    if (completedRecord && recordRef.current) {
-      recordRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    }
-  }, [completedRecord])
+    if (!scrollToRecordId || mode !== 'list') return undefined
+
+    const timer = window.setTimeout(() => {
+      const el = document.querySelector(`[data-record-id="${scrollToRecordId}"]`)
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        el.classList.add('saved-record--highlight')
+        window.setTimeout(() => {
+          el.classList.remove('saved-record--highlight')
+          setScrollToRecordId(null)
+        }, 2500)
+      } else {
+        setScrollToRecordId(null)
+      }
+    }, 350)
+
+    return () => window.clearTimeout(timer)
+  }, [scrollToRecordId, mode, timesheetRecords])
+
+  function returnToListAfterSave(recordId, { message = '', error = '' } = {}) {
+    setMode('list')
+    setEditingRecord(null)
+    setDraft(createEmptyDraft('timesheet'))
+    setFieldErrors({})
+    setChargeableEdited(false)
+    setFormStatusMessage(message)
+    setFormStatusError(error)
+    if (recordId) setScrollToRecordId(recordId)
+  }
+
+  function handleStartNew() {
+    if (cloudSaving || deleting) return
+    setEditingRecord(null)
+    setDraft(createEmptyDraft('timesheet'))
+    setFieldErrors({})
+    setFormStatusMessage('')
+    setFormStatusError('')
+    setChargeableEdited(false)
+    setMode('new')
+    window.requestAnimationFrame(() => {
+      formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    })
+  }
+
+  function handleCancelForm() {
+    if (cloudSaving) return
+    setMode('list')
+    setEditingRecord(null)
+    setDraft(createEmptyDraft('timesheet'))
+    setFieldErrors({})
+    setChargeableEdited(false)
+    setFormStatusMessage('')
+    setFormStatusError('')
+  }
 
   function updateDraft(updates) {
     setDraft((prev) => ({ ...prev, ...updates }))
@@ -309,7 +364,6 @@ export function TimesheetView({
     setFieldErrors({})
     setFormStatusMessage('')
     setFormStatusError('')
-    setCompletedCloudError('')
 
     const nextFields = buildTimesheetFieldsFromDraft()
     const isEditing = Boolean(editingRecord)
@@ -338,16 +392,12 @@ export function TimesheetView({
       }
 
       upsertLocalTimesheet(updatedRecord)
-      setCompletedRecord(updatedRecord)
-      setCompletedSyncStatus(null)
 
       if (!updatedRecord.cloudId) {
         if (isCloudSaveUnavailable(user)) {
           const syncStatus = getUnavailableSyncStatus(user)
           patchSavedTimesheetRecord(updatedRecord.id, { syncStatus })
-          setCompletedSyncStatus(syncStatus)
-          setFormStatusMessage('Timesheet updated on this device.')
-          setEditingRecord(null)
+          returnToListAfterSave(updatedRecord.id, { message: 'Timesheet updated on this device.' })
           return
         }
 
@@ -357,8 +407,9 @@ export function TimesheetView({
 
         if (error) {
           patchSavedTimesheetRecord(updatedRecord.id, { syncStatus: SYNC_STATUS.CLOUD_FAILED })
-          setCompletedSyncStatus(SYNC_STATUS.CLOUD_FAILED)
-          setFormStatusError(error.message || 'Could not save updated timesheet to the cloud.')
+          returnToListAfterSave(updatedRecord.id, {
+            error: error.message || 'Could not save updated timesheet to the cloud.',
+          })
           return
         }
 
@@ -368,9 +419,6 @@ export function TimesheetView({
           cloudUserId: cloudRecord?.cloudUserId ?? user.id,
         }
         patchSavedTimesheetRecord(updatedRecord.id, cloudPatch)
-        setCompletedSyncStatus(SYNC_STATUS.CLOUD)
-        setFormStatusMessage('Timesheet updated.')
-        setEditingRecord(null)
         if (cloudRecord) {
           setCloudTimesheets((prev) => {
             const withoutDup = prev.filter(
@@ -381,15 +429,16 @@ export function TimesheetView({
             return [cloudRecord, ...withoutDup]
           })
         }
+        returnToListAfterSave(updatedRecord.id, { message: 'Timesheet updated.' })
         return
       }
 
       if (isCloudSaveUnavailable(user)) {
         const syncStatus = getUnavailableSyncStatus(user)
         patchSavedTimesheetRecord(updatedRecord.id, { syncStatus })
-        setCompletedSyncStatus(syncStatus)
-        setFormStatusMessage('Timesheet updated on this device. Cloud sync unavailable.')
-        setEditingRecord(null)
+        returnToListAfterSave(updatedRecord.id, {
+          message: 'Timesheet updated on this device. Cloud sync unavailable.',
+        })
         return
       }
 
@@ -401,8 +450,9 @@ export function TimesheetView({
 
       if (error) {
         patchSavedTimesheetRecord(updatedRecord.id, { syncStatus: SYNC_STATUS.CLOUD_FAILED })
-        setCompletedSyncStatus(SYNC_STATUS.CLOUD_FAILED)
-        setFormStatusError(error.message || 'Could not update timesheet in the cloud.')
+        returnToListAfterSave(updatedRecord.id, {
+          error: error.message || 'Could not update timesheet in the cloud.',
+        })
         return
       }
 
@@ -417,11 +467,6 @@ export function TimesheetView({
         storageSource: 'both',
       }
       upsertLocalTimesheet(merged)
-      setCompletedRecord(merged)
-      setCompletedSyncStatus(SYNC_STATUS.CLOUD)
-      setFormStatusMessage('Timesheet updated.')
-      setFormStatusError('')
-      setEditingRecord(null)
       if (cloudRecord) {
         setCloudTimesheets((prev) => {
           const withoutDup = prev.filter(
@@ -432,6 +477,7 @@ export function TimesheetView({
           return [merged, ...withoutDup]
         })
       }
+      returnToListAfterSave(merged.id, { message: 'Timesheet updated.' })
       return
     }
 
@@ -453,16 +499,11 @@ export function TimesheetView({
     const nextRecords = [record, ...savedRecords]
     if (!persistSavedRecords(nextRecords)) return
     setSavedRecords(nextRecords)
-    setCompletedRecord(record)
-    setCompletedSyncStatus(null)
-    setCompletedCloudError('')
-    setFormStatusMessage('')
-    setFormStatusError('')
 
     if (isCloudSaveUnavailable(user)) {
       const syncStatus = getUnavailableSyncStatus(user)
       patchSavedTimesheetRecord(record.id, { syncStatus })
-      setCompletedSyncStatus(syncStatus)
+      returnToListAfterSave(record.id, { message: 'Timesheet saved on this device.' })
       return
     }
 
@@ -472,8 +513,9 @@ export function TimesheetView({
 
     if (error) {
       patchSavedTimesheetRecord(record.id, { syncStatus: SYNC_STATUS.CLOUD_FAILED })
-      setCompletedSyncStatus(SYNC_STATUS.CLOUD_FAILED)
-      setCompletedCloudError(error.message)
+      returnToListAfterSave(record.id, {
+        error: error.message || 'Could not save timesheet to the cloud.',
+      })
       return
     }
 
@@ -483,8 +525,6 @@ export function TimesheetView({
       cloudUserId: cloudRecord?.cloudUserId ?? user?.id ?? null,
     }
     patchSavedTimesheetRecord(record.id, cloudPatch)
-    setCompletedSyncStatus(SYNC_STATUS.CLOUD)
-    setCompletedCloudError('')
 
     if (cloudRecord) {
       setCloudTimesheets((prev) => {
@@ -494,6 +534,8 @@ export function TimesheetView({
         return [cloudRecord, ...withoutDup]
       })
     }
+
+    returnToListAfterSave(record.id, { message: 'Timesheet saved.' })
   }
 
   function handleStartEdit(record) {
@@ -501,12 +543,9 @@ export function TimesheetView({
 
     setEditingRecord(record)
     setViewingRecordId(null)
-    setCompletedRecord(null)
     setFieldErrors({})
     setFormStatusMessage('')
     setFormStatusError('')
-    setCompletedSyncStatus(null)
-    setCompletedCloudError('')
     setChargeableEdited(Boolean(record.fields?.chargeableHours?.trim()))
     setDraft({
       fields: {
@@ -517,20 +556,11 @@ export function TimesheetView({
       checked: new Set(),
       photos: record.photos ?? [],
     })
+    setMode('edit')
 
     window.requestAnimationFrame(() => {
       formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
     })
-  }
-
-  function handleCancelEdit() {
-    if (cloudSaving) return
-    setEditingRecord(null)
-    setDraft(createEmptyDraft('timesheet'))
-    setFieldErrors({})
-    setChargeableEdited(false)
-    setFormStatusMessage('')
-    setFormStatusError('')
   }
 
   function handleToggleView(record) {
@@ -589,6 +619,7 @@ export function TimesheetView({
         setEditingRecord(null)
         setDraft(createEmptyDraft('timesheet'))
         setChargeableEdited(false)
+        setMode('list')
       }
     } catch (error) {
       setDeleteError(
@@ -598,19 +629,6 @@ export function TimesheetView({
     } finally {
       setDeleting(false)
     }
-  }
-
-  function handleReset() {
-    if (cloudSaving) return
-    setDraft(createEmptyDraft('timesheet'))
-    setCompletedRecord(null)
-    setEditingRecord(null)
-    setFieldErrors({})
-    setCompletedSyncStatus(null)
-    setCompletedCloudError('')
-    setFormStatusMessage('')
-    setFormStatusError('')
-    setChargeableEdited(false)
   }
 
   function handleClearTimesheetRecords() {
@@ -623,7 +641,6 @@ export function TimesheetView({
       const next = prev.filter((record) => record.formType !== 'timesheet')
       return persistSavedRecords(next) ? next : prev
     })
-    if (completedRecord) setCompletedRecord(null)
   }
 
   function handlePrintTimesheet(record) {
@@ -652,6 +669,363 @@ export function TimesheetView({
     }
   }, [printPayload])
 
+  const isFormMode = mode === 'new' || mode === 'edit'
+
+  const savedRecordsSection = (
+    <section className="saved-records saved-records--landing no-print" aria-labelledby="timesheet-saved-heading">
+      {archiveMessage && (
+        <p className="form-hint" role="status">
+          {archiveMessage}
+        </p>
+      )}
+      <div className="saved-records__header">
+        <div>
+          <h2 id="timesheet-saved-heading" className="saved-records__title">
+            Saved timesheet records
+          </h2>
+          <p className="saved-records__count">
+            {timesheetRecords.length} record{timesheetRecords.length === 1 ? '' : 's'}
+            {user?.id && cloudRecordCount > 0
+              ? isAdmin
+                ? ` (${cloudRecordCount} from cloud — all users)`
+                : ` (${cloudRecordCount} synced from cloud)`
+              : ' on this device'}
+          </p>
+        </div>
+        {timesheetRecords.length > 0 && (
+          <button type="button" className="saved-records__clear" onClick={handleClearTimesheetRecords}>
+            Clear all
+          </button>
+        )}
+      </div>
+
+      {cloudLoadWarning && (
+        <p className="backup-warning" role="alert">
+          {cloudLoadWarning}
+        </p>
+      )}
+
+      {isAdmin && user?.id && (
+        <p className="form-hint">
+          Admin view: device records on this device plus all users&apos; cloud timesheets.
+        </p>
+      )}
+
+      {timesheetRecords.length === 0 ? (
+        <p className="saved-records__empty">
+          No saved timesheet records yet. Tap &ldquo;New Timesheet&rdquo; above to create one.
+        </p>
+      ) : (
+        <ul className="saved-records__list">
+          {timesheetRecords.map((record) => {
+            const isOtherUserCloudRecord =
+              isAdmin &&
+              record.cloudUserId &&
+              record.cloudUserId !== user?.id &&
+              resolveRecordSyncStatus(record) === SYNC_STATUS.CLOUD
+            const canManage = canManageTimesheetRecord(record, user, isAdmin)
+            const isViewing = viewingRecordId === record.id
+
+            return (
+            <li key={record.id} data-record-id={record.id} className="saved-record">
+              <div className="saved-record__header">
+                <div className="saved-record__badges">
+                  <span className="type-badge type-badge--small">{record.formTypeLabel}</span>
+                  <TimesheetCloudSyncBadge record={record} size="small" />
+                  {isOtherUserCloudRecord && (
+                    <span className="type-badge type-badge--small type-badge--cloud-user">
+                      {record.fields?.employeeName?.trim() || 'Other user'}
+                    </span>
+                  )}
+                </div>
+                <p className="saved-record__title">{getRecordTitle(record)}</p>
+              </div>
+              <dl className="saved-record__details">
+                <SummaryRow label="Employee" value={record.fields.employeeName} />
+                <SummaryRow label="Job" value={record.fields.jobProjectName} />
+                <SummaryRow label="Site" value={record.fields.siteLocation} />
+                <SummaryRow label="Date" value={formatNzDate(record.fields.date)} />
+                <SummaryRow label="Labour hours" value={record.fields.totalHoursWorked} />
+                <SummaryRow
+                  label="Chargeable"
+                  value={formatDecimalHoursDisplay(record.fields.chargeableHours)}
+                />
+                <SummaryRow label="Docket" value={record.fields.docketNumber} />
+              </dl>
+
+              <SavedRecordSignature record={record} />
+
+              <p className="saved-record__meta">
+                Saved {formatSubmittedAt(record.submittedAt)}
+              </p>
+
+              {canManage && (
+                <div className="saved-record__manage no-print">
+                  <button
+                    type="button"
+                    className="btn btn--secondary saved-record__manage-btn"
+                    onClick={() => handleToggleView(record)}
+                    disabled={deleting || cloudSaving}
+                  >
+                    {isViewing ? 'Hide' : 'View'}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn--secondary saved-record__manage-btn"
+                    onClick={() => handleStartEdit(record)}
+                    disabled={deleting || cloudSaving}
+                  >
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn--secondary btn--danger-text saved-record__manage-btn"
+                    onClick={() => openDeleteModal(record)}
+                    disabled={deleting || cloudSaving}
+                  >
+                    Delete
+                  </button>
+                </div>
+              )}
+
+              {isViewing && (
+                <div className="saved-record__view no-print">
+                  <RecordDetails record={record} />
+                </div>
+              )}
+
+              <RecordActions record={record} onPrint={handlePrintTimesheet} variant="saved" />
+              <div className="record__actions record__actions--saved no-print">
+                <AdminArchiveAction
+                  recordType={ARCHIVE_RECORD_TYPES.TIMESHEET}
+                  record={record}
+                  user={user}
+                  profile={profile}
+                  onArchived={handleRecordArchived}
+                />
+              </div>
+            </li>
+          )})}
+        </ul>
+      )}
+    </section>
+  )
+
+  const timesheetForm = (
+    <form ref={formRef} className="job-form no-print" onSubmit={handleSubmit} noValidate>
+      {mode === 'edit' && editingRecord && (
+        <p className="form-hint" role="status">
+          {isAdmin && !isOwnTimesheetRecord(editingRecord, user)
+            ? `Editing timesheet for ${getTimesheetEmployeeLabel(editingRecord)}. Changes update the same record (owner and original save date are kept).`
+            : 'Editing a saved timesheet. Changes update the same record (owner and original save date are kept).'}
+        </p>
+      )}
+      {formStatusError && (
+        <p className="validation-message validation-message--error" role="alert">
+          {formStatusError}
+        </p>
+      )}
+      <FormSection title="Date & Employee" id="timesheet-employee">
+        <FormGrid>
+          <FormField label="Date" fieldId="date" required error={fieldErrors.date}>
+            <DateField label="" value={fields.date} onChange={updateField} />
+          </FormField>
+          <FormField label="Employee / operator name" fieldId="employeeName" required error={fieldErrors.employeeName}>
+            <ComboField label="" field="employeeName" value={fields.employeeName} onChange={updateField} placeholder="Your name" options={comboOptions.operators} listId="timesheet-operators" />
+          </FormField>
+          <FormField label="Job / project name" fieldId="jobProjectName" required error={fieldErrors.jobProjectName}>
+            <TextField label="" field="jobProjectName" value={fields.jobProjectName} onChange={updateField} placeholder="e.g. Driveway excavation" />
+          </FormField>
+          <FormField label="Site location" fieldId="siteLocation" required error={fieldErrors.siteLocation}>
+            <ComboField label="" field="siteLocation" value={fields.siteLocation} onChange={updateField} placeholder="Address or site name" options={comboOptions.sites} listId="timesheet-sites" />
+          </FormField>
+          <TextField label="Customer / client name" field="customerName" value={fields.customerName} onChange={updateField} placeholder="Client or company name" />
+          <ComboField label="Machine used" field="machineUsed" value={fields.machineUsed} onChange={updateField} placeholder="e.g. EX-01" options={comboOptions.machines} listId="timesheet-machines" />
+        </FormGrid>
+      </FormSection>
+
+      <FormSection title="Hours" id="timesheet-hours">
+        <FormGrid>
+          <FormField label="Start time" fieldId="startTime" required error={fieldErrors.startTime}>
+            <TimeField
+              label=""
+              field="startTime"
+              value={fields.startTime}
+              onChange={updateField}
+              ariaLabel="Start time"
+              required
+            />
+          </FormField>
+          <FormField label="Finish time" fieldId="finishTime" required error={fieldErrors.finishTime}>
+            <TimeField
+              label=""
+              field="finishTime"
+              value={fields.finishTime}
+              onChange={updateField}
+              ariaLabel="Finish time"
+              required
+            />
+          </FormField>
+          <FormGridFull>
+            <div className="timesheet-calc" aria-live="polite" data-field-id="labourTime">
+              <span className="timesheet-calc__label">Total hours worked</span>
+              <span className="timesheet-calc__value">
+                {labourCalc.invalid
+                  ? '—'
+                  : labourCalc.value || 'Enter start and finish times'}
+              </span>
+            </div>
+            {fieldErrors.labourTime && <ValidationMessage message={fieldErrors.labourTime} />}
+          </FormGridFull>
+          <label className="field">
+            <span className="field__label">Chargeable hours</span>
+            <input
+              type="text"
+              inputMode="decimal"
+              className="field__input"
+              value={displayedChargeableHours}
+              onChange={(e) => handleChargeableChange(e.target.value)}
+              placeholder="Auto-calculated from total minus non-chargeable"
+            />
+            <span className="field__hint">
+              {chargeableEdited
+                ? 'Manual override — change times or non-chargeable to recalculate automatically'
+                : 'Auto: total hours worked minus non-chargeable hours'}
+            </span>
+          </label>
+          <TextField
+            label="Non-chargeable hours"
+            field="nonChargeableHours"
+            value={fields.nonChargeableHours}
+            onChange={updateField}
+            placeholder="e.g. 1.5"
+            type="text"
+          />
+        </FormGrid>
+      </FormSection>
+
+      <FormSection title="Breaks" id="timesheet-breaks">
+        <TextField
+          label="Break time (minutes)"
+          field="breakMinutes"
+          value={fields.breakMinutes}
+          onChange={updateField}
+          placeholder="e.g. 30"
+          type="number"
+        />
+        <FormField label="Reason for non-chargeable time" fieldId="nonChargeableReason" error={fieldErrors.nonChargeableReason}>
+          <TextField label="" field="nonChargeableReason" value={fields.nonChargeableReason} onChange={updateField} placeholder="Required if non-chargeable hours entered" />
+        </FormField>
+      </FormSection>
+
+      <FormSection title="Work" id="timesheet-work">
+        <FormField label="Work completed" fieldId="workCompleted" required error={fieldErrors.workCompleted}>
+          <textarea
+            className="field__input field__textarea"
+            value={fields.workCompleted}
+            onChange={(e) => updateField('workCompleted', e.target.value)}
+            placeholder="Describe work completed today..."
+            rows={4}
+          />
+        </FormField>
+        <TextField label="Materials used or delivered" field="materialsUsed" value={fields.materialsUsed} onChange={updateField} placeholder="Materials, quantities, deliveries..." />
+        <TextField label="Docket / reference number" field="docketNumber" value={fields.docketNumber} onChange={updateField} placeholder="Docket or job reference" />
+        <TextField label="Delays or issues" field="delaysOrIssues" value={fields.delaysOrIssues} onChange={updateField} placeholder="Any delays or issues encountered" />
+        <TextField label="Safety issues or hazards noticed" field="safetyIssues" value={fields.safetyIssues} onChange={updateField} placeholder="Hazards or safety concerns" />
+      </FormSection>
+
+      <FormSection title="Notes" id="timesheet-notes">
+        <NotesField value={fields.notes} onChange={updateField} />
+      </FormSection>
+
+      <FormSection title="Confirmation" id="timesheet-confirmation">
+        <FormField
+          label="Signature / name confirmation"
+          fieldId="signatureConfirmation"
+          required
+          error={fieldErrors.signatureConfirmation}
+        >
+          <SignatureConfirmationField
+            value={signatureConfirmation}
+            onChange={(value) => {
+              setFieldErrors((prev) => ({ ...prev, signatureConfirmation: undefined }))
+              updateDraft({ signatureConfirmation: value })
+            }}
+          />
+        </FormField>
+      </FormSection>
+
+      <FormActions>
+        {hasValidationErrors(fieldErrors) && (
+          <ValidationMessage variant="summary" messages={getValidationSummary(fieldErrors)} />
+        )}
+        <p className="form-hint">
+          {mode === 'edit'
+            ? 'Update the details below, then save your changes.'
+            : 'Complete job and time details, then submit your daily work record.'}
+        </p>
+        <div className="timesheet-form-actions">
+          <button type="submit" className="submit-btn" disabled={cloudSaving || deleting}>
+            {cloudSaving ? 'Saving…' : mode === 'edit' ? 'Save Changes' : 'Submit Record'}
+          </button>
+          <button
+            type="button"
+            className="btn btn--secondary"
+            onClick={handleCancelForm}
+            disabled={cloudSaving || deleting}
+          >
+            {mode === 'edit' ? 'Cancel edit' : 'Cancel'}
+          </button>
+        </div>
+      </FormActions>
+    </form>
+  )
+
+  if (isFormMode) {
+    return (
+      <>
+        {printPayload && (
+          <div className="print-area" aria-hidden="true">
+            <WeeklyPrintSummary {...printPayload} />
+          </div>
+        )}
+
+        <BackButton onClick={handleCancelForm} />
+
+        <FormPageHeader
+          title={formConfig.title}
+          subtitle={
+            mode === 'edit' && editingRecord
+              ? isAdmin && !isOwnTimesheetRecord(editingRecord, user)
+                ? `Edit timesheet for ${getTimesheetEmployeeLabel(editingRecord)}`
+                : 'Edit your timesheet record'
+              : 'New daily work and hours record'
+          }
+        />
+
+        {timesheetForm}
+
+        <ConfirmModal
+          open={Boolean(deleteTarget)}
+          title="Delete timesheet?"
+          message={
+            isAdmin
+              ? 'Permanently delete this timesheet? This cannot be undone and it will also be removed from the employee’s view.'
+              : 'Permanently delete this timesheet? This cannot be undone and the record will also be removed from the admin view.'
+          }
+          confirmLabel="Permanently Delete"
+          cancelLabel="Cancel"
+          processingLabel="Deleting…"
+          processing={deleting}
+          variant="danger"
+          error={deleteError}
+          onCancel={closeDeleteModal}
+          onConfirm={handleConfirmDelete}
+        />
+      </>
+    )
+  }
+
   return (
     <>
       {printPayload && (
@@ -664,385 +1038,28 @@ export function TimesheetView({
 
       <FormPageHeader
         title={formConfig.title}
-        subtitle={
-          editingRecord
-            ? isAdmin && !isOwnTimesheetRecord(editingRecord, user)
-              ? `Edit timesheet for ${getTimesheetEmployeeLabel(editingRecord)}`
-              : 'Edit your timesheet record'
-            : 'Daily work and hours record'
-        }
+        subtitle="Daily work and hours record"
       />
 
-      <form ref={formRef} className="job-form no-print" onSubmit={handleSubmit} noValidate>
-        {editingRecord && (
-          <p className="form-hint" role="status">
-            {isAdmin && !isOwnTimesheetRecord(editingRecord, user)
-              ? `Editing timesheet for ${getTimesheetEmployeeLabel(editingRecord)}. Changes update the same record (owner and original save date are kept).`
-              : 'Editing a saved timesheet. Changes update the same record (owner and original save date are kept).'}
-          </p>
-        )}
-        {formStatusMessage && (
-          <p className="form-hint" role="status">
-            {formStatusMessage}
-          </p>
-        )}
-        {formStatusError && (
-          <p className="validation-message validation-message--error" role="alert">
-            {formStatusError}
-          </p>
-        )}
-        <FormSection title="Date & Employee" id="timesheet-employee">
-          <FormGrid>
-            <FormField label="Date" fieldId="date" required error={fieldErrors.date}>
-              <DateField label="" value={fields.date} onChange={updateField} />
-            </FormField>
-            <FormField label="Employee / operator name" fieldId="employeeName" required error={fieldErrors.employeeName}>
-              <ComboField label="" field="employeeName" value={fields.employeeName} onChange={updateField} placeholder="Your name" options={comboOptions.operators} listId="timesheet-operators" />
-            </FormField>
-            <FormField label="Job / project name" fieldId="jobProjectName" required error={fieldErrors.jobProjectName}>
-              <TextField label="" field="jobProjectName" value={fields.jobProjectName} onChange={updateField} placeholder="e.g. Driveway excavation" />
-            </FormField>
-            <FormField label="Site location" fieldId="siteLocation" required error={fieldErrors.siteLocation}>
-              <ComboField label="" field="siteLocation" value={fields.siteLocation} onChange={updateField} placeholder="Address or site name" options={comboOptions.sites} listId="timesheet-sites" />
-            </FormField>
-            <TextField label="Customer / client name" field="customerName" value={fields.customerName} onChange={updateField} placeholder="Client or company name" />
-            <ComboField label="Machine used" field="machineUsed" value={fields.machineUsed} onChange={updateField} placeholder="e.g. EX-01" options={comboOptions.machines} listId="timesheet-machines" />
-          </FormGrid>
-        </FormSection>
-
-        <FormSection title="Hours" id="timesheet-hours">
-          <FormGrid>
-            <FormField label="Start time" fieldId="startTime" required error={fieldErrors.startTime}>
-              <TimeField
-                label=""
-                field="startTime"
-                value={fields.startTime}
-                onChange={updateField}
-                ariaLabel="Start time"
-                required
-              />
-            </FormField>
-            <FormField label="Finish time" fieldId="finishTime" required error={fieldErrors.finishTime}>
-              <TimeField
-                label=""
-                field="finishTime"
-                value={fields.finishTime}
-                onChange={updateField}
-                ariaLabel="Finish time"
-                required
-              />
-            </FormField>
-            <FormGridFull>
-              <div className="timesheet-calc" aria-live="polite" data-field-id="labourTime">
-                <span className="timesheet-calc__label">Total hours worked</span>
-                <span className="timesheet-calc__value">
-                  {labourCalc.invalid
-                    ? '—'
-                    : labourCalc.value || 'Enter start and finish times'}
-                </span>
-              </div>
-              {fieldErrors.labourTime && <ValidationMessage message={fieldErrors.labourTime} />}
-            </FormGridFull>
-            <label className="field">
-              <span className="field__label">Chargeable hours</span>
-              <input
-                type="text"
-                inputMode="decimal"
-                className="field__input"
-                value={displayedChargeableHours}
-                onChange={(e) => handleChargeableChange(e.target.value)}
-                placeholder="Auto-calculated from total minus non-chargeable"
-              />
-              <span className="field__hint">
-                {chargeableEdited
-                  ? 'Manual override — change times or non-chargeable to recalculate automatically'
-                  : 'Auto: total hours worked minus non-chargeable hours'}
-              </span>
-            </label>
-            <TextField
-              label="Non-chargeable hours"
-              field="nonChargeableHours"
-              value={fields.nonChargeableHours}
-              onChange={updateField}
-              placeholder="e.g. 1.5"
-              type="text"
-            />
-          </FormGrid>
-        </FormSection>
-
-        <FormSection title="Breaks" id="timesheet-breaks">
-          <TextField
-            label="Break time (minutes)"
-            field="breakMinutes"
-            value={fields.breakMinutes}
-            onChange={updateField}
-            placeholder="e.g. 30"
-            type="number"
-          />
-          <FormField label="Reason for non-chargeable time" fieldId="nonChargeableReason" error={fieldErrors.nonChargeableReason}>
-            <TextField label="" field="nonChargeableReason" value={fields.nonChargeableReason} onChange={updateField} placeholder="Required if non-chargeable hours entered" />
-          </FormField>
-        </FormSection>
-
-        <FormSection title="Work" id="timesheet-work">
-          <FormField label="Work completed" fieldId="workCompleted" required error={fieldErrors.workCompleted}>
-            <textarea
-              className="field__input field__textarea"
-              value={fields.workCompleted}
-              onChange={(e) => updateField('workCompleted', e.target.value)}
-              placeholder="Describe work completed today..."
-              rows={4}
-            />
-          </FormField>
-          <TextField label="Materials used or delivered" field="materialsUsed" value={fields.materialsUsed} onChange={updateField} placeholder="Materials, quantities, deliveries..." />
-          <TextField label="Docket / reference number" field="docketNumber" value={fields.docketNumber} onChange={updateField} placeholder="Docket or job reference" />
-          <TextField label="Delays or issues" field="delaysOrIssues" value={fields.delaysOrIssues} onChange={updateField} placeholder="Any delays or issues encountered" />
-          <TextField label="Safety issues or hazards noticed" field="safetyIssues" value={fields.safetyIssues} onChange={updateField} placeholder="Hazards or safety concerns" />
-        </FormSection>
-
-        <FormSection title="Notes" id="timesheet-notes">
-          <NotesField value={fields.notes} onChange={updateField} />
-        </FormSection>
-
-        <FormSection title="Confirmation" id="timesheet-confirmation">
-          <FormField
-            label="Signature / name confirmation"
-            fieldId="signatureConfirmation"
-            required
-            error={fieldErrors.signatureConfirmation}
-          >
-            <SignatureConfirmationField
-              value={signatureConfirmation}
-              onChange={(value) => {
-                setFieldErrors((prev) => ({ ...prev, signatureConfirmation: undefined }))
-                updateDraft({ signatureConfirmation: value })
-              }}
-            />
-          </FormField>
-        </FormSection>
-
-        <FormActions>
-          {hasValidationErrors(fieldErrors) && (
-            <ValidationMessage variant="summary" messages={getValidationSummary(fieldErrors)} />
-          )}
-          <p className="form-hint">
-            {editingRecord
-              ? 'Update the details below, then save your changes.'
-              : 'Complete job and time details, then submit your daily work record.'}
-          </p>
-          <div className="timesheet-form-actions">
-            <button type="submit" className="submit-btn" disabled={cloudSaving || deleting}>
-              {cloudSaving ? 'Saving…' : editingRecord ? 'Save Changes' : 'Submit Record'}
-            </button>
-            {editingRecord && (
-              <button
-                type="button"
-                className="btn btn--secondary"
-                onClick={handleCancelEdit}
-                disabled={cloudSaving || deleting}
-              >
-                Cancel edit
-              </button>
-            )}
-          </div>
-        </FormActions>
-      </form>
-
-      {completedRecord && (
-        <section ref={recordRef} className="record no-print" aria-labelledby="timesheet-record-heading" role="region">
-          <div className="record__header">
-            <div>
-              <span className="type-badge">{completedRecord.formTypeLabel}</span>
-              <h2 id="timesheet-record-heading" className="record__title">
-                Completed record
-              </h2>
-              <p className="record__meta">Saved {formatSubmittedAt(completedRecord.submittedAt)}</p>
-            </div>
-          </div>
-
-          <p className="record__saved" role="status">
-            Record saved to this device. Review the details below.
-          </p>
-
-          {cloudSaving ? (
-            <p className="cloud-sync-status cloud-sync-status--pending" role="status">
-              Syncing to cloud…
-            </p>
-          ) : (
-            completedSyncStatus && (
-              <>
-                <TimesheetCloudSyncBadge syncStatus={completedSyncStatus} className="cloud-sync-status--block" />
-                {completedCloudError && (
-                  <p className="validation-message validation-message--error" role="alert">
-                    {completedCloudError}
-                  </p>
-                )}
-              </>
-            )
-          )}
-
-          <RecordDetails record={completedRecord} />
-          <RecordActions record={completedRecord} onPrint={handlePrintTimesheet} />
-          <div className="record__actions record__actions--saved no-print">
-            <AdminArchiveAction
-              recordType={ARCHIVE_RECORD_TYPES.TIMESHEET}
-              record={completedRecord}
-              user={user}
-              profile={profile}
-              onArchived={handleRecordArchived}
-            />
-          </div>
-        </section>
+      {formStatusMessage && (
+        <p className="form-hint" role="status">
+          {formStatusMessage}
+        </p>
+      )}
+      {formStatusError && (
+        <p className="validation-message validation-message--error" role="alert">
+          {formStatusError}
+        </p>
       )}
 
-      <button type="button" className="reset-btn no-print" onClick={handleReset}>
-        Reset form
-      </button>
-      {completedRecord && (
-        <p className="reset-hint no-print">Clears the current form and record view.</p>
-      )}
+      <div className="timesheet-list-toolbar no-print">
+        <button type="button" className="btn btn--primary" onClick={handleStartNew}>
+          <Plus size={16} aria-hidden="true" />
+          New Timesheet
+        </button>
+      </div>
 
-      <section className="saved-records no-print" aria-labelledby="timesheet-saved-heading">
-        {archiveMessage && (
-          <p className="form-hint" role="status">
-            {archiveMessage}
-          </p>
-        )}
-        <div className="saved-records__header">
-          <div>
-            <h2 id="timesheet-saved-heading" className="saved-records__title">
-              Saved timesheet records
-            </h2>
-            <p className="saved-records__count">
-              {timesheetRecords.length} record{timesheetRecords.length === 1 ? '' : 's'}
-              {user?.id && cloudRecordCount > 0
-                ? isAdmin
-                  ? ` (${cloudRecordCount} from cloud — all users)`
-                  : ` (${cloudRecordCount} synced from cloud)`
-                : ' on this device'}
-            </p>
-          </div>
-          {timesheetRecords.length > 0 && (
-            <button type="button" className="saved-records__clear" onClick={handleClearTimesheetRecords}>
-              Clear all
-            </button>
-          )}
-        </div>
-
-        {cloudLoadWarning && (
-          <p className="backup-warning" role="alert">
-            {cloudLoadWarning}
-          </p>
-        )}
-
-        {isAdmin && user?.id && (
-          <p className="form-hint">
-            Admin view: device records on this device plus all users&apos; cloud timesheets.
-          </p>
-        )}
-
-        {timesheetRecords.length === 0 ? (
-          <p className="saved-records__empty">
-            No saved timesheet records yet. Submit a completed record to save one here.
-          </p>
-        ) : (
-          <ul className="saved-records__list">
-            {timesheetRecords.map((record) => {
-              const isOtherUserCloudRecord =
-                isAdmin &&
-                record.cloudUserId &&
-                record.cloudUserId !== user?.id &&
-                resolveRecordSyncStatus(record) === SYNC_STATUS.CLOUD
-              const canManage = canManageTimesheetRecord(record, user, isAdmin)
-              const isViewing = viewingRecordId === record.id
-              const isEditingThis = editingRecord && matchesTimesheetIdentity(editingRecord, record)
-
-              return (
-              <li key={record.id} data-record-id={record.id} className="saved-record">
-                <div className="saved-record__header">
-                  <div className="saved-record__badges">
-                    <span className="type-badge type-badge--small">{record.formTypeLabel}</span>
-                    <TimesheetCloudSyncBadge record={record} size="small" />
-                    {isOtherUserCloudRecord && (
-                      <span className="type-badge type-badge--small type-badge--cloud-user">
-                        {record.fields?.employeeName?.trim() || 'Other user'}
-                      </span>
-                    )}
-                    {isEditingThis && (
-                      <span className="type-badge type-badge--small">Editing</span>
-                    )}
-                  </div>
-                  <p className="saved-record__title">{getRecordTitle(record)}</p>
-                </div>
-                <dl className="saved-record__details">
-                  <SummaryRow label="Employee" value={record.fields.employeeName} />
-                  <SummaryRow label="Job" value={record.fields.jobProjectName} />
-                  <SummaryRow label="Site" value={record.fields.siteLocation} />
-                  <SummaryRow label="Date" value={formatNzDate(record.fields.date)} />
-                  <SummaryRow label="Labour hours" value={record.fields.totalHoursWorked} />
-                  <SummaryRow
-                    label="Chargeable"
-                    value={formatDecimalHoursDisplay(record.fields.chargeableHours)}
-                  />
-                  <SummaryRow label="Docket" value={record.fields.docketNumber} />
-                </dl>
-
-                <SavedRecordSignature record={record} />
-
-                <p className="saved-record__meta">
-                  Saved {formatSubmittedAt(record.submittedAt)}
-                </p>
-
-                {canManage && (
-                  <div className="saved-record__manage no-print">
-                    <button
-                      type="button"
-                      className="btn btn--secondary saved-record__manage-btn"
-                      onClick={() => handleToggleView(record)}
-                      disabled={deleting || cloudSaving}
-                    >
-                      {isViewing ? 'Hide' : 'View'}
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn--secondary saved-record__manage-btn"
-                      onClick={() => handleStartEdit(record)}
-                      disabled={deleting || cloudSaving || isEditingThis}
-                    >
-                      Edit
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn--secondary btn--danger-text saved-record__manage-btn"
-                      onClick={() => openDeleteModal(record)}
-                      disabled={deleting || cloudSaving}
-                    >
-                      Delete
-                    </button>
-                  </div>
-                )}
-
-                {isViewing && (
-                  <div className="saved-record__view no-print">
-                    <RecordDetails record={record} />
-                  </div>
-                )}
-
-                <RecordActions record={record} onPrint={handlePrintTimesheet} variant="saved" />
-                <div className="record__actions record__actions--saved no-print">
-                  <AdminArchiveAction
-                    recordType={ARCHIVE_RECORD_TYPES.TIMESHEET}
-                    record={record}
-                    user={user}
-                    profile={profile}
-                    onArchived={handleRecordArchived}
-                  />
-                </div>
-              </li>
-            )})}
-          </ul>
-        )}
-      </section>
+      {savedRecordsSection}
 
       <ConfirmModal
         open={Boolean(deleteTarget)}

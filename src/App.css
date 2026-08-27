@@ -4129,6 +4129,20 @@ input[type='date']::-webkit-datetime-edit {
   line-height: 1.2;
 }
 
+.timesheet-list-toolbar {
+  margin-bottom: var(--spacing-md);
+}
+
+.timesheet-list-toolbar .btn {
+  min-height: var(--tap-min);
+}
+
+.saved-records--landing {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+}
+
 .saved-records__header {
   display: flex;
   align-items: flex-start;
