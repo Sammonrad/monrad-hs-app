@@ -5814,6 +5814,26 @@ input[type='date']::-webkit-datetime-edit {
 .sssp-status-badge--submitted { background: #dbeafe; }
 .sssp-status-badge--closed { background: var(--color-grey-200); }
 .sssp-status-badge--archived { background: #fce7f3; }
+.sssp-status-badge--local-draft { background: #fff7ed; color: #9a3412; }
+
+.sssp-card--local-draft {
+  border-color: #fdba74;
+  background: #fffbeb;
+}
+
+.sssp-card__local-draft-label {
+  margin: 0.35rem 0 0;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #9a3412;
+}
+
+.sssp-card__conflict-note {
+  margin: 0.35rem 0 0;
+  font-size: 0.78rem;
+  color: var(--color-grey-700);
+  max-width: 36rem;
+}
 
 .sssp-card__meta {
   display: grid;

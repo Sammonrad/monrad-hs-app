@@ -70,6 +70,7 @@ export function SsspEditorView({
   equipment = [],
   initialCloudId = null,
   initialMode = 'view',
+  initialDraftSiteId = null,
   returnView = 'sssp',
 }) {
   const isAdmin = isAdminProfile(profile)
@@ -93,6 +94,7 @@ export function SsspEditorView({
 
   const mode = initialMode
   const isNewSssp = mode === 'create' && !initialCloudId
+  const draftSiteOrJobId = initialDraftSiteId || null
   const readOnly = !isAdmin || mode === 'view' || !isSsspEditable(record.status, isAdmin)
 
   const preparedByName =
@@ -150,7 +152,7 @@ export function SsspEditorView({
           return
         }
 
-        const draft = loadDraft(user.id)
+        const draft = loadDraft(user.id, draftSiteOrJobId)
         if (draft?.record && draft.userId === user.id) {
           if (!isMounted) return
           setRecord(normalizeSsspRecord(draft.record))
@@ -175,7 +177,7 @@ export function SsspEditorView({
     return () => {
       isMounted = false
     }
-  }, [initialCloudId, mode, user?.id, preparedByName])
+  }, [initialCloudId, mode, user?.id, preparedByName, draftSiteOrJobId])
 
   // Debounced local autosave — New SSSP only. Never writes to Supabase.
   useEffect(() => {
@@ -190,7 +192,7 @@ export function SsspEditorView({
 
     if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current)
     autosaveTimerRef.current = setTimeout(() => {
-      const ok = saveDraft(user.id, { record, sectionId: activeSection })
+      const ok = saveDraft(user.id, { record, sectionId: activeSection }, draftSiteOrJobId)
       if (ok) {
         setHasLocalDraft(true)
         setDraftStatus('saved')
@@ -200,7 +202,7 @@ export function SsspEditorView({
     return () => {
       if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current)
     }
-  }, [record, activeSection, isNewSssp, user?.id, readOnly])
+  }, [record, activeSection, isNewSssp, user?.id, readOnly, draftSiteOrJobId])
 
   const validationForReady = useMemo(() => validateSsspRecord(record, 'ready'), [record])
   const validationForApproval = useMemo(() => validateSsspRecord(record, 'approval'), [record])
@@ -261,7 +263,7 @@ export function SsspEditorView({
   function clearLocalDraftAfterCloudSuccess() {
     if (!user?.id) return
     if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current)
-    clearDraft(user.id)
+    clearDraft(user.id, draftSiteOrJobId)
     setHasLocalDraft(false)
     setDraftStatus(null)
     // Avoid immediately rewriting the draft from the post-save setRecord.
@@ -283,7 +285,7 @@ export function SsspEditorView({
       setDiscardDraftOpen(false)
       return
     }
-    clearDraft(user.id)
+    clearDraft(user.id, draftSiteOrJobId)
     setHasLocalDraft(false)
     setDiscardDraftOpen(false)
     await resetToBlankNewSssp()

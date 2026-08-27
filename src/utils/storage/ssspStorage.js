@@ -216,7 +216,10 @@ export function filterSsspRecords(records, { tab, search, isAdmin }) {
   }
 
   if (tab && tabConfig[tab]) {
-    list = list.filter((r) => tabConfig[tab].includes(r.status))
+    list = list.filter((r) => {
+      const status = r.isLocalDraft ? 'draft' : r.status
+      return tabConfig[tab].includes(status)
+    })
   }
 
   const q = search?.trim().toLowerCase()

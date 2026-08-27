@@ -18,6 +18,12 @@ import {
   appendChangeLog,
   syncIndexedFieldsFromRecordData,
 } from '../utils/storage/ssspStorage.js'
+import {
+  LOCAL_DRAFT_LIST_LABEL,
+  draftToListRecord,
+  getLocalDraftConflictNote,
+  listLocalDrafts,
+} from '../utils/storage/ssspDraft.js'
 import { formatSubmittedAt, formatNzDate } from '../utils/formatting.js'
 import { SSSP_STATUS } from '../constants/ssspStatuses.js'
 import { updateSsspRecord } from '../utils/storage/ssspCloudStorage.js'
@@ -52,27 +58,47 @@ export function SsspDashboardView({
     [isAdmin],
   )
 
+  // Read-only scan of this user's localStorage drafts — never clears or mutates them.
+  const localDraftRecords = useMemo(() => {
+    if (!isAdmin || !user?.id) return []
+    return listLocalDrafts(user.id)
+      .map((entry) => draftToListRecord(entry, ssspRecords))
+      .filter(Boolean)
+  }, [isAdmin, user?.id, ssspRecords])
+
+  const recordsForList = useMemo(
+    () => [...localDraftRecords, ...(ssspRecords ?? [])],
+    [localDraftRecords, ssspRecords],
+  )
+
   const filteredRecords = useMemo(
     () =>
-      filterSsspRecords(ssspRecords, {
+      filterSsspRecords(recordsForList, {
         tab: activeTab,
         search,
         isAdmin,
       }),
-    [ssspRecords, activeTab, search, isAdmin],
+    [recordsForList, activeTab, search, isAdmin],
   )
 
   const statusSummary = useMemo(() => {
-    const counts = { total: ssspRecords.length, drafts: 0, review: 0, approved: 0, submitted: 0, archived: 0 }
-    ssspRecords.forEach((record) => {
-      if (record.status === SSSP_STATUS.DRAFT) counts.drafts += 1
+    const counts = {
+      total: recordsForList.length,
+      drafts: 0,
+      review: 0,
+      approved: 0,
+      submitted: 0,
+      archived: 0,
+    }
+    recordsForList.forEach((record) => {
+      if (record.status === SSSP_STATUS.DRAFT || record.isLocalDraft) counts.drafts += 1
       if (record.status === SSSP_STATUS.READY_FOR_REVIEW) counts.review += 1
       if (record.status === SSSP_STATUS.APPROVED) counts.approved += 1
       if (record.status === SSSP_STATUS.SUBMITTED) counts.submitted += 1
       if (record.status === SSSP_STATUS.ARCHIVED) counts.archived += 1
     })
     return counts
-  }, [ssspRecords])
+  }, [recordsForList])
 
   const summaryCards = [
     { label: 'All plans', value: statusSummary.total, icon: FileText, tab: 'all' },
@@ -84,6 +110,13 @@ export function SsspDashboardView({
   ].filter((item) => !item.adminOnly || isAdmin)
 
   function openRecord(record, mode = 'view') {
+    if (record?.isLocalDraft) {
+      onNavigate('sssp-editor', {
+        ssspMode: 'create',
+        ssspDraftSiteId: record.localDraftSiteOrJobId ?? null,
+      })
+      return
+    }
     onNavigate('sssp-editor', { ssspCloudId: record.cloudId, ssspMode: mode })
   }
 
@@ -253,17 +286,41 @@ export function SsspDashboardView({
           <EmptyState title="No SSSPs match this filter" description="Try another status tab or create a new SSSP." />
         ) : (
           <ul className="sssp-dashboard__list">
-            {filteredRecords.map((record) => (
-              <li key={record.cloudId ?? record.id} className="sssp-card">
+            {filteredRecords.map((record) => {
+              const isLocalDraft = Boolean(record.isLocalDraft)
+              const conflictNote = isLocalDraft
+                ? getLocalDraftConflictNote(record.localDraftConflict)
+                : null
+              const listKey = isLocalDraft
+                ? record.localDraftKey ?? `local-${record.id}`
+                : record.cloudId ?? record.id
+
+              return (
+              <li
+                key={listKey}
+                className={`sssp-card${isLocalDraft ? ' sssp-card--local-draft' : ''}`}
+              >
                 <div className="sssp-card__header">
                   <div>
                     <h3 className="sssp-card__number">{record.ssspNumber || 'No number'}</h3>
                     <p className="sssp-card__project">{record.project || 'Untitled project'}</p>
+                    {isLocalDraft && (
+                      <p className="sssp-card__local-draft-label" role="status">
+                        {LOCAL_DRAFT_LIST_LABEL}
+                      </p>
+                    )}
+                    {conflictNote && (
+                      <p className="sssp-card__conflict-note" role="status">
+                        {conflictNote}
+                      </p>
+                    )}
                   </div>
                   <StatusBadge
                     status={record.status}
-                    label={getSsspStatusLabel(record.status)}
-                    className={`sssp-status-badge sssp-status-badge--${getSsspStatusModifier(record.status)}`}
+                    label={isLocalDraft ? LOCAL_DRAFT_LIST_LABEL : getSsspStatusLabel(record.status)}
+                    className={`sssp-status-badge sssp-status-badge--${
+                      isLocalDraft ? 'local-draft' : getSsspStatusModifier(record.status)
+                    }`}
                   />
                 </div>
 
@@ -277,6 +334,21 @@ export function SsspDashboardView({
                 </dl>
 
                 <div className="sssp-card__actions">
+                  {isLocalDraft ? (
+                    <>
+                      <button
+                        type="button"
+                        className="btn btn--primary"
+                        onClick={() => openRecord(record, 'create')}
+                      >
+                        Continue editing
+                      </button>
+                      <button type="button" className="btn btn--secondary" onClick={() => handlePrint(record)}>
+                        Print
+                      </button>
+                    </>
+                  ) : (
+                    <>
                   <button type="button" className="btn btn--secondary" onClick={() => openRecord(record, 'view')}>
                     Open
                   </button>
@@ -331,9 +403,12 @@ export function SsspDashboardView({
                       Acknowledge
                     </button>
                   )}
+                    </>
+                  )}
                 </div>
               </li>
-            ))}
+              )
+            })}
           </ul>
         )}
       </div>

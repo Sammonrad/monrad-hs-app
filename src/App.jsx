@@ -163,6 +163,7 @@ function App() {
     setSsspNavOptions({
       ssspCloudId: options.ssspCloudId ?? null,
       ssspMode: options.ssspMode ?? null,
+      ssspDraftSiteId: options.ssspDraftSiteId ?? null,
     })
     setEquipmentNavOptions({
       equipmentTab: options.equipmentTab ?? null,
@@ -971,6 +972,7 @@ function App() {
           equipment={mergedEquipment}
           initialCloudId={ssspNavOptions.ssspCloudId}
           initialMode={ssspNavOptions.ssspMode ?? 'view'}
+          initialDraftSiteId={ssspNavOptions.ssspDraftSiteId ?? null}
         />
       )}
 
