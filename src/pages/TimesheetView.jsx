@@ -37,7 +37,12 @@ import {
 import { useHighlightRecord } from '../hooks/useHighlightRecord.js'
 import { useDefaultFormDate } from '../hooks/useDefaultFormDate.js'
 import { createRecordId } from '../utils/ids.js'
-import { formatSubmittedAt, formatDecimalHoursDisplay, formatNzDate } from '../utils/formatting.js'
+import {
+  formatSubmittedAt,
+  formatDecimalHoursDisplay,
+  formatWeekdayName,
+  formatNzLongDate,
+} from '../utils/formatting.js'
 import { createEmptyDraft, getRecordTitle } from '../utils/records.js'
 import { persistSavedRecords } from '../utils/storage/recordsStorage.js'
 import { getSettingsOptions } from '../utils/storage/settingsStorage.js'
@@ -727,6 +732,13 @@ export function TimesheetView({
       resolveRecordSyncStatus(record) === SYNC_STATUS.CLOUD
     const canManage = canManageTimesheetRecord(record, user, isAdmin)
     const isViewing = viewingRecordId === record.id
+    const workDate = record.fields.date
+    const weekday = formatWeekdayName(workDate)
+    const longDate = formatNzLongDate(workDate)
+    const workDateIso =
+      typeof workDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(workDate.trim())
+        ? workDate.trim()
+        : undefined
 
     return (
       <li key={record.id} data-record-id={record.id} className="saved-record">
@@ -740,13 +752,20 @@ export function TimesheetView({
               </span>
             )}
           </div>
+          <p className="timesheet-card-date">
+            {weekday !== '—' && (
+              <span className="timesheet-card-date__weekday">{weekday}</span>
+            )}
+            <time className="timesheet-card-date__day" dateTime={workDateIso}>
+              {longDate}
+            </time>
+          </p>
           <p className="saved-record__title">{getRecordTitle(record)}</p>
         </div>
         <dl className="saved-record__details">
           <SummaryRow label="Employee" value={record.fields.employeeName} />
           <SummaryRow label="Job" value={record.fields.jobProjectName} />
           <SummaryRow label="Site" value={record.fields.siteLocation} />
-          <SummaryRow label="Date" value={formatNzDate(record.fields.date)} />
           <SummaryRow label="Labour hours" value={record.fields.totalHoursWorked} />
           <SummaryRow
             label="Chargeable"

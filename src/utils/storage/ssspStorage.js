@@ -151,6 +151,7 @@ export function formatHazardRiskSummary(hazard) {
   return { initial, residual }
 }
 
+/** @deprecated Prefer user-scoped helpers in ssspDraft.js. Kept for backup import/export. */
 export function loadEditorDraft() {
   try {
     const raw = localStorage.getItem(SSSP_EDITOR_DRAFT_KEY)
@@ -161,18 +162,21 @@ export function loadEditorDraft() {
       record: normalizeSsspRecord(parsed.record ?? parsed),
       savedAt: parsed.savedAt ?? null,
       sectionId: parsed.sectionId ?? 'documentControl',
+      userId: parsed.userId ?? null,
     }
   } catch {
     return null
   }
 }
 
+/** @deprecated Prefer user-scoped helpers in ssspDraft.js. Kept for backup import/export. */
 export function persistEditorDraft(record, sectionId = 'documentControl') {
   try {
     const payload = {
       record: syncIndexedFieldsFromRecordData(record),
       savedAt: new Date().toISOString(),
       sectionId,
+      userId: record?.preparedByUserId ?? null,
     }
     localStorage.setItem(SSSP_EDITOR_DRAFT_KEY, JSON.stringify(payload))
     return true
@@ -181,6 +185,7 @@ export function persistEditorDraft(record, sectionId = 'documentControl') {
   }
 }
 
+/** @deprecated Prefer user-scoped helpers in ssspDraft.js. Kept for backup import/export. */
 export function clearEditorDraft() {
   try {
     localStorage.removeItem(SSSP_EDITOR_DRAFT_KEY)

@@ -41,24 +41,24 @@ export function formatDefectSeverity(value) {
   return DEFECT_SEVERITY_LABELS[value] ?? value ?? '—'
 }
 
+const ISO_DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/
+
 /**
- * Format a date for NZ display as dd-MM-yyyy.
- * Accepts Date, ISO datetime, or YYYY-MM-DD. Empty/invalid → '—'.
- * Presentation only — does not change stored values.
+ * Parse a date for NZ/local display. YYYY-MM-DD is local midnight (not UTC)
+ * so weekday/day do not shift.
  * @param {string|number|Date|null|undefined} value
- * @returns {string}
+ * @returns {Date|null}
  */
-export function formatNzDate(value) {
-  if (value == null || value === '') return '—'
+function parseLocalDate(value) {
+  if (value == null || value === '') return null
 
   let date
   if (value instanceof Date) {
     date = value
   } else if (typeof value === 'string') {
     const trimmed = value.trim()
-    if (!trimmed) return '—'
-    // Date-only YYYY-MM-DD — parse as local midnight to avoid UTC day shift
-    if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+    if (!trimmed) return null
+    if (ISO_DATE_ONLY.test(trimmed)) {
       const [y, m, d] = trimmed.split('-').map(Number)
       date = new Date(y, m - 1, d)
     } else {
@@ -67,15 +67,46 @@ export function formatNzDate(value) {
   } else if (typeof value === 'number') {
     date = new Date(value)
   } else {
-    return '—'
+    return null
   }
 
-  if (Number.isNaN(date.getTime())) return '—'
+  if (Number.isNaN(date.getTime())) return null
+  return date
+}
+
+/**
+ * Format a date for NZ display as dd-MM-yyyy.
+ * Accepts Date, ISO datetime, or YYYY-MM-DD. Empty/invalid → '—'.
+ * Presentation only — does not change stored values.
+ * @param {string|number|Date|null|undefined} value
+ * @returns {string}
+ */
+export function formatNzDate(value) {
+  const date = parseLocalDate(value)
+  if (!date) return '—'
 
   const dd = String(date.getDate()).padStart(2, '0')
   const mm = String(date.getMonth() + 1).padStart(2, '0')
   const yyyy = date.getFullYear()
   return `${dd}-${mm}-${yyyy}`
+}
+
+/** Full weekday name in uppercase, e.g. "MONDAY". Empty/invalid → '—'. */
+export function formatWeekdayName(value) {
+  const date = parseLocalDate(value)
+  if (!date) return '—'
+  return date.toLocaleDateString('en-NZ', { weekday: 'long' }).toUpperCase()
+}
+
+/** Long NZ date, e.g. "24 August 2026". Empty/invalid → '—'. */
+export function formatNzLongDate(value) {
+  const date = parseLocalDate(value)
+  if (!date) return '—'
+  return date.toLocaleDateString('en-NZ', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  })
 }
 
 /** ISO / Date timestamp → "dd-MM-yyyy, h:mm am/pm" for saved/printed meta. */

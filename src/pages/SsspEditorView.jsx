@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { BackButton } from '../components/BackButton.jsx'
 import { CloudSyncBadge } from '../components/CloudSyncBadge.jsx'
 import { PrintableSSSP } from '../components/PrintableSSSP.jsx'
+import { ConfirmModal } from '../components/common/ConfirmModal.jsx'
 import { SsspInput, SsspTextarea } from '../components/sssp/SsspFields.jsx'
 import { FormPageHeader } from '../components/forms/FormPageHeader.jsx'
 import { FormField } from '../components/forms/FormField.jsx'
@@ -13,13 +14,15 @@ import { isAdminProfile } from '../utils/storage/userProfileStorage.js'
 import {
   createEmptySsspRecord,
   normalizeSsspRecord,
-  persistEditorDraft,
-  loadEditorDraft,
-  clearEditorDraft,
   syncIndexedFieldsFromRecordData,
   appendChangeLog,
 } from '../utils/storage/ssspStorage.js'
-import { formatSubmittedAt } from '../utils/formatting.js'
+import {
+  loadDraft,
+  saveDraft,
+  clearDraft,
+  SSSP_DRAFT_AUTOSAVE_MS,
+} from '../utils/storage/ssspDraft.js'
 import {
   fetchSsspById,
   saveSsspRecord,
@@ -42,6 +45,21 @@ import {
 } from '../utils/storage/ssspNumbering.js'
 import { SsspSectionForm, SsspSectionNav } from '../components/sssp/SsspSectionForm.jsx'
 
+function createBlankNewSssp({ ssspNumber, preparedByName, userId }) {
+  return createEmptySsspRecord({
+    ssspNumber,
+    preparedBy: preparedByName,
+    preparedByUserId: userId,
+    recordData: {
+      ...createEmptySsspRecord().recordData,
+      declaration: {
+        preparedByName,
+        preparedDate: new Date().toISOString().slice(0, 10),
+      },
+    },
+  })
+}
+
 export function SsspEditorView({
   onBack,
   onNavigate,
@@ -63,9 +81,18 @@ export function SsspEditorView({
   const [syncStatus, setSyncStatus] = useState(null)
   const [printRecord, setPrintRecord] = useState(null)
   const [revisionNote, setRevisionNote] = useState('')
-  const [draftNotice, setDraftNotice] = useState(null)
+  const [draftStatus, setDraftStatus] = useState(null)
+  const [hasLocalDraft, setHasLocalDraft] = useState(false)
+  const [discardDraftOpen, setDiscardDraftOpen] = useState(false)
+
+  const autosaveReadyRef = useRef(false)
+  const skipNextAutosaveRef = useRef(false)
+  const autosaveTimerRef = useRef(null)
+  const ssspRecordsRef = useRef(ssspRecords)
+  ssspRecordsRef.current = ssspRecords
 
   const mode = initialMode
+  const isNewSssp = mode === 'create' && !initialCloudId
   const readOnly = !isAdmin || mode === 'view' || !isSsspEditable(record.status, isAdmin)
 
   const preparedByName =
@@ -77,6 +104,8 @@ export function SsspEditorView({
     let isMounted = true
 
     async function init() {
+      autosaveReadyRef.current = false
+
       if (initialCloudId) {
         setLoading(true)
         const { record: cloudRecord, error } = await fetchSsspById(initialCloudId)
@@ -88,7 +117,7 @@ export function SsspEditorView({
         }
 
         if (mode === 'duplicate') {
-          const numbers = ssspRecords.map((r) => r.ssspNumber).filter(Boolean)
+          const numbers = ssspRecordsRef.current.map((r) => r.ssspNumber).filter(Boolean)
           const newNumber = await suggestNextSsspNumber(numbers)
           const dup = duplicateSsspRecord(cloudRecord, {
             newNumber,
@@ -105,6 +134,7 @@ export function SsspEditorView({
             }),
           )
         } else {
+          // Edit/view of an existing submitted or cloud record — never load New SSSP draft.
           setRecord(normalizeSsspRecord(cloudRecord))
         }
         setLoading(false)
@@ -112,29 +142,32 @@ export function SsspEditorView({
       }
 
       if (mode === 'create') {
-        const draft = loadEditorDraft()
-        if (draft?.record) {
-          setDraftNotice(`Restored local draft from ${draft.savedAt ? formatSubmittedAt(draft.savedAt) : 'earlier'}.`)
+        if (!user?.id) {
+          const numbers = ssspRecordsRef.current.map((r) => r.ssspNumber).filter(Boolean)
+          const newNumber = await suggestNextSsspNumber(numbers)
+          if (!isMounted) return
+          setRecord(createBlankNewSssp({ ssspNumber: newNumber, preparedByName, userId: null }))
+          return
+        }
+
+        const draft = loadDraft(user.id)
+        if (draft?.record && draft.userId === user.id) {
+          if (!isMounted) return
           setRecord(normalizeSsspRecord(draft.record))
           if (draft.sectionId) setActiveSection(draft.sectionId)
-        } else {
-          const numbers = ssspRecords.map((r) => r.ssspNumber).filter(Boolean)
-          const newNumber = await suggestNextSsspNumber(numbers)
-          setRecord(
-            createEmptySsspRecord({
-              ssspNumber: newNumber,
-              preparedBy: preparedByName,
-              preparedByUserId: user?.id,
-              recordData: {
-                ...createEmptySsspRecord().recordData,
-                declaration: {
-                  preparedByName,
-                  preparedDate: new Date().toISOString().slice(0, 10),
-                },
-              },
-            }),
-          )
+          setDraftStatus('restored')
+          setHasLocalDraft(true)
+          skipNextAutosaveRef.current = true
+          autosaveReadyRef.current = true
+          return
         }
+
+        const numbers = ssspRecordsRef.current.map((r) => r.ssspNumber).filter(Boolean)
+        const newNumber = await suggestNextSsspNumber(numbers)
+        if (!isMounted) return
+        setRecord(createBlankNewSssp({ ssspNumber: newNumber, preparedByName, userId: user.id }))
+        skipNextAutosaveRef.current = true
+        autosaveReadyRef.current = true
       }
     }
 
@@ -142,13 +175,32 @@ export function SsspEditorView({
     return () => {
       isMounted = false
     }
-  }, [initialCloudId, mode, user?.id, preparedByName, ssspRecords])
+  }, [initialCloudId, mode, user?.id, preparedByName])
 
+  // Debounced local autosave — New SSSP only. Never writes to Supabase.
   useEffect(() => {
-    if (mode === 'create' || (mode === 'edit' && record.status === SSSP_STATUS.DRAFT)) {
-      persistEditorDraft(record, activeSection)
+    if (!isNewSssp || !user?.id || readOnly || !autosaveReadyRef.current) return undefined
+
+    if (skipNextAutosaveRef.current) {
+      skipNextAutosaveRef.current = false
+      return undefined
     }
-  }, [record, activeSection, mode])
+
+    setDraftStatus('saving')
+
+    if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current)
+    autosaveTimerRef.current = setTimeout(() => {
+      const ok = saveDraft(user.id, { record, sectionId: activeSection })
+      if (ok) {
+        setHasLocalDraft(true)
+        setDraftStatus('saved')
+      }
+    }, SSSP_DRAFT_AUTOSAVE_MS)
+
+    return () => {
+      if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current)
+    }
+  }, [record, activeSection, isNewSssp, user?.id, readOnly])
 
   const validationForReady = useMemo(() => validateSsspRecord(record, 'ready'), [record])
   const validationForApproval = useMemo(() => validateSsspRecord(record, 'approval'), [record])
@@ -165,6 +217,15 @@ export function SsspEditorView({
     [record.hazards, record.recordData],
   )
   const progressPercent = Math.round((completedSectionCount / SSSP_SECTIONS.length) * 100)
+
+  const draftStatusLabel =
+    draftStatus === 'saving'
+      ? 'Saving draft…'
+      : draftStatus === 'saved'
+        ? 'Draft saved'
+        : draftStatus === 'restored'
+          ? 'Draft restored'
+          : null
 
   function selectAdjacentSection(direction) {
     const nextSection = SSSP_SECTIONS[activeSectionIndex + direction]
@@ -195,6 +256,37 @@ export function SsspEditorView({
         recordData: { ...prev.recordData, hazards: next },
       }),
     )
+  }
+
+  function clearLocalDraftAfterCloudSuccess() {
+    if (!user?.id) return
+    if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current)
+    clearDraft(user.id)
+    setHasLocalDraft(false)
+    setDraftStatus(null)
+    // Avoid immediately rewriting the draft from the post-save setRecord.
+    skipNextAutosaveRef.current = true
+  }
+
+  async function resetToBlankNewSssp() {
+    const numbers = ssspRecordsRef.current.map((r) => r.ssspNumber).filter(Boolean)
+    const newNumber = await suggestNextSsspNumber(numbers)
+    skipNextAutosaveRef.current = true
+    setActiveSection('documentControl')
+    setRecord(createBlankNewSssp({ ssspNumber: newNumber, preparedByName, userId: user?.id }))
+    setErrors([])
+    setDraftStatus(null)
+  }
+
+  async function handleDiscardDraft() {
+    if (!user?.id) {
+      setDiscardDraftOpen(false)
+      return
+    }
+    clearDraft(user.id)
+    setHasLocalDraft(false)
+    setDiscardDraftOpen(false)
+    await resetToBlankNewSssp()
   }
 
   async function persistToCloud(nextRecord) {
@@ -241,14 +333,16 @@ export function SsspEditorView({
     setSaving(false)
 
     if (error) {
-      setErrors([error.message])
+      setErrors([
+        `${error.message} Your local draft has been kept — you can retry when connection is available.`,
+      ])
       setSyncStatus(SYNC_STATUS.CLOUD_FAILED)
       return
     }
 
     setRecord(saved)
     setSyncStatus(SYNC_STATUS.CLOUD)
-    clearEditorDraft()
+    clearLocalDraftAfterCloudSuccess()
     setSsspRecords((prev) => {
       const without = prev.filter((r) => r.cloudId !== saved.cloudId)
       return [saved, ...without]
@@ -322,13 +416,15 @@ export function SsspEditorView({
     setSaving(false)
 
     if (error) {
-      setErrors([error.message])
+      setErrors([
+        `${error.message} Final save failed — your local draft has been kept.`,
+      ])
       return
     }
 
     setRecord(saved)
     setSyncStatus(SYNC_STATUS.CLOUD)
-    clearEditorDraft()
+    clearLocalDraftAfterCloudSuccess()
     setSsspRecords((prev) => {
       const without = prev.filter((r) => r.cloudId !== saved.cloudId)
       return [saved, ...without]
@@ -360,7 +456,21 @@ export function SsspEditorView({
       />
 
       {loading && <p className="progress">Loading SSSP…</p>}
-      {draftNotice && <p className="sssp-editor__draft-notice">{draftNotice}</p>}
+
+      {isNewSssp && (draftStatusLabel || hasLocalDraft) && (
+        <p className="sssp-editor__draft-status" aria-live="polite">
+          {draftStatusLabel && <span>{draftStatusLabel}</span>}
+          {hasLocalDraft && !readOnly && (
+            <button
+              type="button"
+              className="btn btn--link sssp-editor__discard-draft"
+              onClick={() => setDiscardDraftOpen(true)}
+            >
+              Discard draft
+            </button>
+          )}
+        </p>
+      )}
 
       <section className="sssp-editor__overview" aria-label="SSSP completion">
         <div className="sssp-editor__overview-copy">
@@ -552,6 +662,17 @@ export function SsspEditorView({
           </>
         )}
       </FormActions>
+
+      <ConfirmModal
+        open={discardDraftOpen}
+        title="Discard draft?"
+        message="This permanently deletes your local New SSSP draft from this device. This cannot be undone."
+        confirmLabel="Discard draft"
+        cancelLabel="Keep draft"
+        variant="danger"
+        onConfirm={handleDiscardDraft}
+        onCancel={() => setDiscardDraftOpen(false)}
+      />
     </>
   )
 }

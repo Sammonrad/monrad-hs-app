@@ -4234,7 +4234,39 @@ input[type='date']::-webkit-datetime-edit {
   margin: 0;
 }
 
+.timesheet-card-date {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin: 0 0 0.2rem;
+  line-height: 1.15;
+}
+
+.timesheet-card-date + .saved-record__title {
+  margin-bottom: 0.25rem;
+}
+
+.timesheet-card-date__weekday {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-primary);
+}
+
+.timesheet-card-date__day {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--color-grey-600);
+}
+
 @media (min-width: 480px) {
+  .timesheet-card-date {
+    flex-direction: row;
+    align-items: baseline;
+    gap: 0.4rem;
+  }
+
   .timesheet-week-group__heading {
     flex-direction: row;
     align-items: baseline;
@@ -7295,6 +7327,21 @@ input[type='date']::-webkit-datetime-edit {
 .sssp-editor,
 .sssp-editor__content {
   min-width: 0;
+}
+
+.sssp-editor__draft-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.75rem;
+  margin: 0 0 var(--spacing-sm);
+  color: var(--color-grey-600);
+  font-size: 0.85rem;
+}
+
+.sssp-editor__discard-draft {
+  padding: 0;
+  font-size: inherit;
 }
 
 .sssp-editor__overview {
