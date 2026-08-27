@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Plus } from 'lucide-react'
+import { ChevronDown, Plus } from 'lucide-react'
 import { FORM_TYPES } from '../constants/index.js'
 import { BackButton } from '../components/BackButton.jsx'
 import { SignatureConfirmationField } from '../components/SignatureConfirmationField.jsx'
@@ -10,7 +10,14 @@ import { SavedRecordSignature } from '../components/SavedRecordSignature.jsx'
 import { TimesheetCloudSyncBadge } from '../components/TimesheetCloudSyncBadge.jsx'
 import { WeeklyPrintSummary } from '../components/WeeklyPrintSummary.jsx'
 import { ConfirmModal } from '../components/common/ConfirmModal.jsx'
-import { buildWeeklyPrintSheetForRecord } from '../utils/weeklyTimesheet.js'
+import { EmptyState } from '../components/common/EmptyState.jsx'
+import {
+  buildWeeklyPrintSheetForRecord,
+  formatHoursTotal,
+  getCurrentWeekStart,
+  getWeekStartMonday,
+  groupTimesheetsByWeek,
+} from '../utils/weeklyTimesheet.js'
 import { FormSection } from '../components/forms/FormSection.jsx'
 import { FormField } from '../components/forms/FormField.jsx'
 import { FormActions } from '../components/forms/FormActions.jsx'
@@ -132,6 +139,25 @@ export function TimesheetView({
     [savedRecords, cloudTimesheets],
   )
 
+  const weekGroups = useMemo(
+    () => groupTimesheetsByWeek(timesheetRecords),
+    [timesheetRecords],
+  )
+
+  const [expandedWeeks, setExpandedWeeks] = useState(() => {
+    const current = getCurrentWeekStart()
+    return current ? new Set([current]) : new Set()
+  })
+
+  function toggleWeekExpanded(weekKey) {
+    setExpandedWeeks((prev) => {
+      const next = new Set(prev)
+      if (next.has(weekKey)) next.delete(weekKey)
+      else next.add(weekKey)
+      return next
+    })
+  }
+
   const cloudRecordCount = timesheetRecords.filter(
     (record) => resolveRecordSyncStatus(record) === SYNC_STATUS.CLOUD,
   ).length
@@ -228,6 +254,12 @@ export function TimesheetView({
   useEffect(() => {
     if (!scrollToRecordId || mode !== 'list') return undefined
 
+    const record = timesheetRecords.find((item) => item.id === scrollToRecordId)
+    const weekKey = record ? getWeekStartMonday(record.fields?.date) : null
+    if (weekKey) {
+      setExpandedWeeks((prev) => (prev.has(weekKey) ? prev : new Set([...prev, weekKey])))
+    }
+
     const timer = window.setTimeout(() => {
       const el = document.querySelector(`[data-record-id="${scrollToRecordId}"]`)
       if (el) {
@@ -240,7 +272,7 @@ export function TimesheetView({
       } else {
         setScrollToRecordId(null)
       }
-    }, 350)
+    }, weekKey ? 450 : 350)
 
     return () => window.clearTimeout(timer)
   }, [scrollToRecordId, mode, timesheetRecords])
@@ -671,6 +703,97 @@ export function TimesheetView({
 
   const isFormMode = mode === 'new' || mode === 'edit'
 
+  function renderTimesheetRecordCard(record) {
+    const isOtherUserCloudRecord =
+      isAdmin &&
+      record.cloudUserId &&
+      record.cloudUserId !== user?.id &&
+      resolveRecordSyncStatus(record) === SYNC_STATUS.CLOUD
+    const canManage = canManageTimesheetRecord(record, user, isAdmin)
+    const isViewing = viewingRecordId === record.id
+
+    return (
+      <li key={record.id} data-record-id={record.id} className="saved-record">
+        <div className="saved-record__header">
+          <div className="saved-record__badges">
+            <span className="type-badge type-badge--small">{record.formTypeLabel}</span>
+            <TimesheetCloudSyncBadge record={record} size="small" />
+            {isOtherUserCloudRecord && (
+              <span className="type-badge type-badge--small type-badge--cloud-user">
+                {record.fields?.employeeName?.trim() || 'Other user'}
+              </span>
+            )}
+          </div>
+          <p className="saved-record__title">{getRecordTitle(record)}</p>
+        </div>
+        <dl className="saved-record__details">
+          <SummaryRow label="Employee" value={record.fields.employeeName} />
+          <SummaryRow label="Job" value={record.fields.jobProjectName} />
+          <SummaryRow label="Site" value={record.fields.siteLocation} />
+          <SummaryRow label="Date" value={formatNzDate(record.fields.date)} />
+          <SummaryRow label="Labour hours" value={record.fields.totalHoursWorked} />
+          <SummaryRow
+            label="Chargeable"
+            value={formatDecimalHoursDisplay(record.fields.chargeableHours)}
+          />
+          <SummaryRow label="Docket" value={record.fields.docketNumber} />
+        </dl>
+
+        <SavedRecordSignature record={record} />
+
+        <p className="saved-record__meta">
+          Saved {formatSubmittedAt(record.submittedAt)}
+        </p>
+
+        {canManage && (
+          <div className="saved-record__manage no-print">
+            <button
+              type="button"
+              className="btn btn--secondary saved-record__manage-btn"
+              onClick={() => handleToggleView(record)}
+              disabled={deleting || cloudSaving}
+            >
+              {isViewing ? 'Hide' : 'View'}
+            </button>
+            <button
+              type="button"
+              className="btn btn--secondary saved-record__manage-btn"
+              onClick={() => handleStartEdit(record)}
+              disabled={deleting || cloudSaving}
+            >
+              Edit
+            </button>
+            <button
+              type="button"
+              className="btn btn--secondary btn--danger-text saved-record__manage-btn"
+              onClick={() => openDeleteModal(record)}
+              disabled={deleting || cloudSaving}
+            >
+              Delete
+            </button>
+          </div>
+        )}
+
+        {isViewing && (
+          <div className="saved-record__view no-print">
+            <RecordDetails record={record} />
+          </div>
+        )}
+
+        <RecordActions record={record} onPrint={handlePrintTimesheet} variant="saved" />
+        <div className="record__actions record__actions--saved no-print">
+          <AdminArchiveAction
+            recordType={ARCHIVE_RECORD_TYPES.TIMESHEET}
+            record={record}
+            user={user}
+            profile={profile}
+            onArchived={handleRecordArchived}
+          />
+        </div>
+      </li>
+    )
+  }
+
   const savedRecordsSection = (
     <section className="saved-records saved-records--landing no-print" aria-labelledby="timesheet-saved-heading">
       {archiveMessage && (
@@ -712,101 +835,64 @@ export function TimesheetView({
       )}
 
       {timesheetRecords.length === 0 ? (
-        <p className="saved-records__empty">
-          No saved timesheet records yet. Tap &ldquo;New Timesheet&rdquo; above to create one.
-        </p>
+        <EmptyState
+          title="No saved timesheets yet"
+          description='Tap "New Timesheet" above to create your first daily work record.'
+        />
       ) : (
-        <ul className="saved-records__list">
-          {timesheetRecords.map((record) => {
-            const isOtherUserCloudRecord =
-              isAdmin &&
-              record.cloudUserId &&
-              record.cloudUserId !== user?.id &&
-              resolveRecordSyncStatus(record) === SYNC_STATUS.CLOUD
-            const canManage = canManageTimesheetRecord(record, user, isAdmin)
-            const isViewing = viewingRecordId === record.id
+        <div className="timesheet-week-groups">
+          {weekGroups.map((group) => {
+            const isExpanded = expandedWeeks.has(group.weekKey)
+            const panelId = `timesheet-week-${group.weekKey}`
+            const recordLabel = `${group.totals.recordCount} timesheet${
+              group.totals.recordCount === 1 ? '' : 's'
+            }`
+            const hoursLabel = formatHoursTotal(group.totals.totalHoursWorked)
 
             return (
-            <li key={record.id} data-record-id={record.id} className="saved-record">
-              <div className="saved-record__header">
-                <div className="saved-record__badges">
-                  <span className="type-badge type-badge--small">{record.formTypeLabel}</span>
-                  <TimesheetCloudSyncBadge record={record} size="small" />
-                  {isOtherUserCloudRecord && (
-                    <span className="type-badge type-badge--small type-badge--cloud-user">
-                      {record.fields?.employeeName?.trim() || 'Other user'}
+              <section
+                key={group.weekKey}
+                className="timesheet-week-group no-print"
+                aria-labelledby={`${panelId}-heading`}
+              >
+                <button
+                  type="button"
+                  id={`${panelId}-heading`}
+                  className={`timesheet-week-group__header${
+                    isExpanded ? ' timesheet-week-group__header--open' : ''
+                  }`}
+                  aria-expanded={isExpanded}
+                  aria-controls={panelId}
+                  onClick={() => toggleWeekExpanded(group.weekKey)}
+                >
+                  <span className="timesheet-week-group__heading">
+                    <span className="timesheet-week-group__label">{group.friendlyLabel}</span>
+                    <span className="timesheet-week-group__summary">
+                      {recordLabel} • {hoursLabel}
                     </span>
-                  )}
+                  </span>
+                  <ChevronDown
+                    className="timesheet-week-group__chevron"
+                    size={16}
+                    strokeWidth={2}
+                    aria-hidden="true"
+                  />
+                </button>
+                <div
+                  id={panelId}
+                  className={`timesheet-week-group__panel${
+                    isExpanded ? ' timesheet-week-group__panel--open' : ''
+                  }`}
+                  hidden={!isExpanded}
+                >
+                  <ul className="saved-records__list timesheet-week-group__list">
+                    {group.records.map((record) => renderTimesheetRecordCard(record))}
+                  </ul>
                 </div>
-                <p className="saved-record__title">{getRecordTitle(record)}</p>
-              </div>
-              <dl className="saved-record__details">
-                <SummaryRow label="Employee" value={record.fields.employeeName} />
-                <SummaryRow label="Job" value={record.fields.jobProjectName} />
-                <SummaryRow label="Site" value={record.fields.siteLocation} />
-                <SummaryRow label="Date" value={formatNzDate(record.fields.date)} />
-                <SummaryRow label="Labour hours" value={record.fields.totalHoursWorked} />
-                <SummaryRow
-                  label="Chargeable"
-                  value={formatDecimalHoursDisplay(record.fields.chargeableHours)}
-                />
-                <SummaryRow label="Docket" value={record.fields.docketNumber} />
-              </dl>
-
-              <SavedRecordSignature record={record} />
-
-              <p className="saved-record__meta">
-                Saved {formatSubmittedAt(record.submittedAt)}
-              </p>
-
-              {canManage && (
-                <div className="saved-record__manage no-print">
-                  <button
-                    type="button"
-                    className="btn btn--secondary saved-record__manage-btn"
-                    onClick={() => handleToggleView(record)}
-                    disabled={deleting || cloudSaving}
-                  >
-                    {isViewing ? 'Hide' : 'View'}
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn--secondary saved-record__manage-btn"
-                    onClick={() => handleStartEdit(record)}
-                    disabled={deleting || cloudSaving}
-                  >
-                    Edit
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn--secondary btn--danger-text saved-record__manage-btn"
-                    onClick={() => openDeleteModal(record)}
-                    disabled={deleting || cloudSaving}
-                  >
-                    Delete
-                  </button>
-                </div>
-              )}
-
-              {isViewing && (
-                <div className="saved-record__view no-print">
-                  <RecordDetails record={record} />
-                </div>
-              )}
-
-              <RecordActions record={record} onPrint={handlePrintTimesheet} variant="saved" />
-              <div className="record__actions record__actions--saved no-print">
-                <AdminArchiveAction
-                  recordType={ARCHIVE_RECORD_TYPES.TIMESHEET}
-                  record={record}
-                  user={user}
-                  profile={profile}
-                  onArchived={handleRecordArchived}
-                />
-              </div>
-            </li>
-          )})}
-        </ul>
+              </section>
+            )
+          })}
+        </div>
       )}
     </section>
   )

@@ -90,6 +90,56 @@ export function formatWeekLabel(weekStart) {
   return `${startLabel} – ${endLabel}`
 }
 
+/** Monday week start for a reference date (defaults to today). */
+export function getCurrentWeekStart(referenceDate = new Date()) {
+  return getWeekStartMonday(formatDateLocal(referenceDate))
+}
+
+/**
+ * Compact NZ-friendly week range, e.g. "10–16 August 2026".
+ * Uses en-NZ month names; day numbers omit leading zeros.
+ */
+export function formatWeekDateRangeLabel(weekStart) {
+  if (!weekStart || weekStart === 'unknown') return 'No date'
+
+  const [y, m, d] = weekStart.split('-').map(Number)
+  const start = new Date(y, m - 1, d)
+  const end = new Date(y, m - 1, d)
+  end.setDate(end.getDate() + 6)
+
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return 'Unknown week'
+
+  const startDay = start.getDate()
+  const endDay = end.getDate()
+  const startMonth = start.toLocaleDateString('en-NZ', { month: 'long' })
+  const endMonth = end.toLocaleDateString('en-NZ', { month: 'long' })
+  const startYear = start.getFullYear()
+  const endYear = end.getFullYear()
+
+  if (startYear === endYear && startMonth === endMonth) {
+    return `${startDay}–${endDay} ${startMonth} ${startYear}`
+  }
+  if (startYear === endYear) {
+    return `${startDay} ${startMonth} – ${endDay} ${endMonth} ${startYear}`
+  }
+  return `${startDay} ${startMonth} ${startYear} – ${endDay} ${endMonth} ${endYear}`
+}
+
+/** "This Week", "Last Week", or a compact date range for older weeks. */
+export function getFriendlyWeekLabel(weekStart, referenceDate = new Date()) {
+  if (!weekStart || weekStart === 'unknown') return 'No date'
+
+  const currentWeekStart = getCurrentWeekStart(referenceDate)
+  if (weekStart === currentWeekStart) return 'This Week'
+
+  const lastWeekRef = new Date(referenceDate)
+  lastWeekRef.setDate(lastWeekRef.getDate() - 7)
+  const lastWeekStart = getCurrentWeekStart(lastWeekRef)
+  if (weekStart === lastWeekStart) return 'Last Week'
+
+  return formatWeekDateRangeLabel(weekStart)
+}
+
 export function formatWeekRangeParts(weekStart) {
   if (!weekStart || weekStart === 'unknown') {
     return { startLabel: '—', endLabel: '—', weekLabel: 'No date' }
@@ -246,6 +296,15 @@ export function groupByWeek(records) {
       }),
     }))
     .sort((a, b) => b.weekKey.localeCompare(a.weekKey))
+}
+
+/** Group timesheets by calendar week with friendly labels and hour totals. */
+export function groupTimesheetsByWeek(records, referenceDate = new Date()) {
+  return groupByWeek(records).map((group) => ({
+    ...group,
+    friendlyLabel: getFriendlyWeekLabel(group.weekKey, referenceDate),
+    totals: calculateTotals(group.records),
+  }))
 }
 
 export function calculateTotals(records) {
