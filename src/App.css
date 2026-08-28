@@ -232,7 +232,7 @@ body {
   object-position: center;
 }
 
-.monrad-logo--print {
+.monrad-logo--print:not(.sssp-print-logo) {
   width: auto;
   height: 2.25rem;
   max-width: 7.5rem;
@@ -4728,6 +4728,10 @@ input[type='date']::-webkit-datetime-edit {
   display: none;
 }
 
+.print-area--sssp {
+  display: none;
+}
+
 .print-record {
   max-width: 42rem;
   margin: 0 auto;
@@ -5343,6 +5347,12 @@ input[type='date']::-webkit-datetime-edit {
   margin: 8mm;
 }
 
+/* Named page for SSSP documents */
+@page sssp {
+  size: A4 portrait;
+  margin: 14mm;
+}
+
 @media print {
   @page {
     margin: 1.2cm;
@@ -5396,6 +5406,39 @@ input[type='date']::-webkit-datetime-edit {
     color: #000000 !important;
     box-shadow: none !important;
     border: none !important;
+  }
+
+  /* SSSP dedicated print mode — portal renders at body; hide app entirely */
+  body.sssp-print-mode #app {
+    display: none !important;
+  }
+
+  body.sssp-print-mode .print-area--sssp {
+    display: block !important;
+    position: static;
+    left: auto;
+    top: auto;
+    width: 100%;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    visibility: visible !important;
+    z-index: auto;
+  }
+
+  body.sssp-print-mode .print-area--sssp,
+  body.sssp-print-mode .print-area--sssp * {
+    visibility: visible !important;
+  }
+
+  body.sssp-print-mode .sssp-print-root {
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    padding: 0;
+    text-align: left;
+    page: sssp;
+    box-sizing: border-box;
   }
 
   .print-area {
@@ -5464,7 +5507,7 @@ input[type='date']::-webkit-datetime-edit {
     color: #000000 !important;
   }
 
-  .monrad-logo--print {
+  .monrad-logo--print:not(.sssp-print-logo) {
     height: 2rem;
     max-width: 6.5rem;
     margin-bottom: 0.35rem;
@@ -5617,17 +5660,305 @@ input[type='date']::-webkit-datetime-edit {
     color: #000000 !important;
   }
 
-  .print-sssp,
-  .print-sssp__section,
-  .print-sssp__table {
+  /* SSSP print document */
+  .print-sssp {
+    page: sssp;
     color: #000000 !important;
     background: #ffffff !important;
+    font-size: 9.5pt;
+    line-height: 1.35;
+    padding: 0 !important;
+    max-width: none !important;
+    width: 100%;
+    overflow: visible !important;
+    box-sizing: border-box;
+  }
+
+  .print-sssp__section,
+  .print-sssp__declaration,
+  .print-sssp__risk-legend {
+    color: #000000 !important;
+    background: #ffffff !important;
+  }
+
+  .print-sssp__running-header {
+    display: none !important;
+  }
+
+  .print-sssp__content {
+    padding-top: 0;
+  }
+
+  .print-sssp__running-footer {
+    display: none !important;
+  }
+
+  .sssp-print-cover {
+    break-after: page;
+    page-break-after: always;
+    padding-top: 0;
+    page: sssp;
+  }
+
+  .sssp-print-cover-running {
+    display: none !important;
+  }
+
+  .sssp-print-hero {
+    display: none !important;
+  }
+
+  .sssp-print-cover-status {
+    background: #ececec !important;
+    border-color: #cccccc !important;
+    color: #333333 !important;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  .print-sssp__section-title {
+    break-after: avoid;
+    page-break-after: avoid;
+    color: #ffffff !important;
+    background: #2a2a2a !important;
+    border-bottom: 3px solid var(--monrad-red) !important;
+    border-left: none !important;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  .print-sssp__section--scope,
+  .print-sssp__section--training {
     break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .print-sssp__section--declaration {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .print-sssp__section-continued {
+    break-before: page;
+    page-break-before: always;
+  }
+
+  .print-sssp__section-continued .print-sssp__section-title {
+    break-after: avoid;
+    page-break-after: avoid;
+    color: #ffffff !important;
+    background: #2a2a2a !important;
+    border-bottom: 3px solid var(--monrad-red) !important;
+    border-left: none !important;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  .print-sssp__section-number {
+    color: #ffffff !important;
+  }
+
+  .print-sssp__declaration {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .print-sssp__signature-row {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .print-sssp__repeatable-block {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .print-sssp__risk-table-wrap--second {
+    break-before: page;
+    page-break-before: always;
+  }
+
+  .print-sssp__hazard-row {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .print-sssp__field-table th {
+    background: #ececec !important;
+    color: #444444 !important;
+    border-color: #bbbbbb !important;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  .print-sssp__field-table td {
+    color: #000000 !important;
+    border-color: #bbbbbb !important;
+  }
+
+  .print-sssp__table-wrap {
+    break-inside: auto;
+    page-break-inside: auto;
   }
 
   .print-sssp__table {
-    font-size: 0.55rem;
+    font-size: 8pt;
     break-inside: auto;
+    page-break-inside: auto;
+  }
+
+  .print-sssp__table--hazards {
+    table-layout: fixed;
+    font-size: 7.5pt;
+  }
+
+  .print-sssp__table--hazards th,
+  .print-sssp__table--hazards td {
+    overflow-wrap: normal;
+    word-break: normal;
+    hyphens: none;
+    padding: 0.28rem 0.32rem;
+    vertical-align: top;
+  }
+
+  .print-sssp__col-activity {
+    width: 15%;
+  }
+
+  .print-sssp__col-hazard {
+    width: 16%;
+    min-width: 0;
+  }
+
+  .print-sssp__col-harm {
+    width: 18%;
+    min-width: 0;
+  }
+
+  .print-sssp__col-controls {
+    min-width: 0;
+  }
+
+  .print-sssp__col-risk {
+    width: 4.75rem;
+  }
+
+  .print-sssp__table thead {
+    display: table-header-group;
+  }
+
+  .print-sssp__table tbody {
+    display: table-row-group;
+  }
+
+  .print-sssp__table tr {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .print-sssp__table th {
+    background: #e8e8e8 !important;
+    color: #1a1a1a !important;
+    border-color: #aaaaaa !important;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  .print-sssp__table th,
+  .print-sssp__table td {
+    border-color: #aaaaaa !important;
+    color: #000000 !important;
+  }
+
+  .print-sssp__field-row dt {
+    color: #555555 !important;
+  }
+
+  .print-sssp__risk-legend {
+    background: #f7f7f7 !important;
+    border-color: #cccccc !important;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  .print-sssp__na {
+    border-color: #cccccc !important;
+    border-left-color: var(--monrad-red) !important;
+    background: #f5f5f5 !important;
+    color: #444444 !important;
+  }
+
+  .print-sssp__signature-line {
+    border-bottom-color: #333333 !important;
+  }
+
+  .print-sssp__risk {
+    border-color: #aaaaaa !important;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  .print-sssp__risk--low {
+    background: #dcfce7 !important;
+    border-color: #86efac !important;
+  }
+
+  .print-sssp__risk--medium {
+    background: #fef9c3 !important;
+    border-color: #fde047 !important;
+  }
+
+  .print-sssp__risk--high {
+    background: #fed7aa !important;
+    border-color: #fdba74 !important;
+  }
+
+  .print-sssp__risk--extreme {
+    background: #fecaca !important;
+    border-color: #f87171 !important;
+    font-weight: 700;
+  }
+
+  .sssp-print-document-control {
+    background: #ececec !important;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  .print-sssp .sssp-risk-matrix__cell--low { background: #dcfce7 !important; }
+  .print-sssp .sssp-risk-matrix__cell--medium { background: #fef9c3 !important; }
+  .print-sssp .sssp-risk-matrix__cell--high { background: #fed7aa !important; }
+  .print-sssp .sssp-risk-matrix__cell--extreme { background: #fecaca !important; }
+
+  .print-sssp .sssp-risk-matrix__cell,
+  .print-sssp .sssp-risk-matrix__header-col,
+  .print-sssp .sssp-risk-matrix__header-row {
+    border-color: #bbbbbb !important;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  .print-sssp__running-footer {
+    display: none !important;
+  }
+
+  /* Hide SSSP editor chrome if printing without dedicated print mount */
+  .sssp-editor,
+  .sssp-editor__overview,
+  .sssp-editor__meta,
+  .sssp-editor__nav-panel,
+  .sssp-editor__section-header,
+  .sssp-editor__section-actions,
+  .sssp-editor__links,
+  .sssp-editor__draft-status,
+  .sssp-section-nav,
+  .form-actions,
+  .validation-summary,
+  .sssp-incomplete-sections,
+  .sssp-dashboard,
+  .sssp-card,
+  .sssp-filters {
+    display: none !important;
   }
 }
 
@@ -6038,71 +6369,377 @@ input[type='date']::-webkit-datetime-edit {
   color: var(--color-success-text, #166534);
 }
 
+/* ── SSSP print document (screen preview + print/PDF) ── */
 .print-sssp {
   background: #ffffff;
   color: #000000;
-  padding: 1.5rem;
-  max-width: 210mm;
-  margin: 0 auto;
+  padding: 0;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  font-family: 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 0.9rem;
+  line-height: 1.35;
 }
 
-.print-sssp__cover {
-  text-align: center;
-  margin-bottom: 2rem;
-  padding-bottom: 1rem;
-  border-bottom: 2px solid #c41e3a;
+.print-sssp__content {
+  position: relative;
+  width: 100%;
 }
 
-.print-sssp__title {
-  font-size: 1.5rem;
-  margin: 1rem 0 0.25rem;
+.print-sssp__running-header {
+  display: none;
 }
 
-.print-sssp__number {
-  font-size: 1.1rem;
-  font-weight: 700;
-  color: #c41e3a;
+.print-sssp__running-footer {
+  display: none;
 }
 
 .print-sssp__section {
-  margin-bottom: 1.25rem;
-  break-inside: avoid;
+  margin-bottom: 0.85rem;
+  break-inside: auto;
+  page-break-inside: auto;
 }
 
 .print-sssp__section-title {
-  font-size: 1rem;
-  border-bottom: 1px solid #ccc;
-  padding-bottom: 0.25rem;
-  margin-bottom: 0.5rem;
-}
-
-.print-sssp__fields,
-.print-sssp__cover-meta {
-  display: grid;
-  gap: 0.35rem;
-}
-
-.print-sssp__field dt {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0 0 0;
+  padding: 0.45rem 0.7rem;
+  font-size: 0.76rem;
   font-weight: 700;
-  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #ffffff;
+  background: #2a2a2a;
+  border-bottom: 3px solid var(--monrad-red);
 }
 
-.print-sssp__field dd {
-  margin: 0 0 0.5rem;
+.print-sssp__section-number {
+  flex-shrink: 0;
+  color: #ffffff;
+  font-weight: 800;
+}
+
+.print-sssp__section-name {
+  min-width: 0;
+}
+
+.print-sssp__section-body {
+  padding: 0;
+}
+
+.print-sssp__field-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0;
+  font-size: 0.84rem;
+}
+
+.print-sssp__field-table th,
+.print-sssp__field-table td {
+  border: 1px solid #cccccc;
+  padding: 0.4rem 0.55rem;
+  vertical-align: top;
+  text-align: left;
+  word-break: break-word;
+}
+
+.print-sssp__field-table th {
+  width: 32%;
+  background: #ececec;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #444444;
+}
+
+.print-sssp__field-table td {
+  color: #000000;
   white-space: pre-wrap;
+  line-height: 1.45;
+}
+
+.print-sssp__repeatable-blocks {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.print-sssp__repeatable-block + .print-sssp__repeatable-block {
+  border-top: 2px solid #dddddd;
+  margin-top: 0;
+  padding-top: 0;
+}
+
+.print-sssp__repeatable-block {
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+.print-sssp__empty {
+  margin: 0;
+  font-size: 0.85rem;
+  font-style: italic;
+  color: #666666;
+}
+
+.print-sssp__table-wrap {
+  overflow-x: auto;
+  margin: 0.15rem 0;
 }
 
 .print-sssp__table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.65rem;
+  font-size: 0.78rem;
 }
 
 .print-sssp__table th,
 .print-sssp__table td {
-  border: 1px solid #ccc;
-  padding: 0.25rem;
+  border: 1px solid #bbbbbb;
+  padding: 0.45rem 0.55rem;
   vertical-align: top;
+  text-align: left;
+  word-break: break-word;
+}
+
+.print-sssp__table th {
+  background: #e8e8e8;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: #1a1a1a;
+}
+
+.print-sssp__table-index {
+  width: 2rem;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.print-sssp__table--hazards {
+  table-layout: fixed;
+  font-size: 0.72rem;
+}
+
+.print-sssp__table--hazards th,
+.print-sssp__table--hazards td {
+  overflow-wrap: normal;
+  word-break: normal;
+  hyphens: none;
+  padding: 0.35rem 0.4rem;
+}
+
+.print-sssp__col-activity {
+  width: 15%;
+  min-width: 0;
+}
+
+.print-sssp__col-hazard {
+  width: 16%;
+  min-width: 0;
+}
+
+.print-sssp__col-harm {
+  width: 18%;
+  min-width: 0;
+}
+
+.print-sssp__col-controls {
+  min-width: 0;
+}
+
+.print-sssp__col-risk {
+  width: 5.5rem;
+  white-space: nowrap;
+}
+
+.print-sssp__cell-emphasis {
+  font-weight: 700;
+  color: #1a1a1a;
+}
+
+.print-sssp__cell-muted {
+  color: #444444;
+  font-size: 0.95em;
+}
+
+.print-sssp__risk {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.05rem;
+  padding: 0.2rem 0.45rem;
+  border: 1px solid #cccccc;
+  border-radius: 2px;
+  font-size: 0.68rem;
+  line-height: 1.15;
+  text-align: center;
+}
+
+.print-sssp__risk-score {
+  font-weight: 800;
+  font-size: 0.85rem;
+}
+
+.print-sssp__risk-label {
+  font-size: 0.62rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.print-sssp__risk--low {
+  background: #dcfce7;
+  border-color: #86efac;
+}
+
+.print-sssp__risk--medium {
+  background: #fef9c3;
+  border-color: #fde047;
+}
+
+.print-sssp__risk--high {
+  background: #fed7aa;
+  border-color: #fdba74;
+}
+
+.print-sssp__risk--extreme {
+  background: #fecaca;
+  border-color: #f87171;
+  font-weight: 700;
+}
+
+.print-sssp__note {
+  margin-top: 0.3rem;
+  font-size: 0.68rem;
+  color: #444444;
+  font-style: italic;
+  white-space: normal;
+}
+
+.print-sssp__risk-legend {
+  margin-top: 0.75rem;
+  padding: 0.45rem 0.55rem;
+  border: 1px solid #cccccc;
+  background: #f7f7f7;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+.print-sssp__risk-legend-title {
+  display: block;
+  margin-bottom: 0.35rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #444444;
+}
+
+.print-sssp__risk-legend-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.75rem;
+}
+
+.print-sssp__risk-legend-item {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.print-sssp__risk-legend-item--low { color: #166534; }
+.print-sssp__risk-legend-item--medium { color: #854d0e; }
+.print-sssp__risk-legend-item--high { color: #c2410c; }
+.print-sssp__risk-legend-item--extreme { color: #b91c1c; }
+
+.print-sssp__section--scope,
+.print-sssp__section--training {
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+.print-sssp__section--declaration {
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+.print-sssp__section-continued {
+  break-before: page;
+  page-break-before: always;
+}
+
+.print-sssp__risk-table-wrap--second {
+  break-before: page;
+  page-break-before: always;
+}
+
+.print-sssp__hazard-row {
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+.print-sssp__declaration {
+  margin-top: 0;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+.print-sssp__signature-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.5rem;
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid #cccccc;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+.print-sssp__signature-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem 0.5rem;
+  font-size: 0.84rem;
+  color: #000000;
+}
+
+.print-sssp__signature-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #555555;
+}
+
+.print-sssp__signature-name {
+  font-weight: 600;
+}
+
+.print-sssp__signature-prompt {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #555555;
+}
+
+.print-sssp__signature-line {
+  flex: 1 1 6rem;
+  min-width: 6rem;
+  height: 1.25rem;
+  border-bottom: 1px solid #333333;
+}
+
+.print-sssp__signature-date {
+  font-weight: 600;
 }
 
 @media (min-width: 1024px) {
@@ -7376,8 +8013,15 @@ input[type='date']::-webkit-datetime-edit {
 
 .print-sssp__na {
   margin: 0;
-  font-style: italic;
-  color: var(--color-grey-700, #444);
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #cccccc;
+  border-left: 3px solid var(--monrad-red);
+  background: #f5f5f5;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #555555;
 }
 
 .sssp-editor,
@@ -8831,5 +9475,317 @@ input[type='date']::-webkit-datetime-edit {
 @media (min-width: 640px) {
   .gm-dashboard__filters .filter-disclosure {
     width: auto;
+  }
+}
+
+/* ── SSSP print cover (sssp-print-* namespace — isolated from legacy .print-sssp) ── */
+
+.sssp-print-root {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  text-align: left;
+}
+
+.sssp-print-cover {
+  margin-bottom: 0;
+  width: 100%;
+  break-after: page;
+  page-break-after: always;
+}
+
+.sssp-print-cover-running {
+  display: none;
+  margin: 0 0 0.5rem;
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: #555555;
+  text-align: right;
+}
+
+.sssp-print-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1.25rem;
+  width: 100%;
+  padding-bottom: 0.55rem;
+}
+
+.sssp-print-header-brand {
+  flex-shrink: 0;
+}
+
+.sssp-print-logo {
+  display: block;
+  width: auto;
+  height: 4.75rem;
+  max-width: 15rem;
+  margin: 0;
+  object-fit: contain;
+  object-position: left center;
+}
+
+.sssp-print-header-doc {
+  flex: 1;
+  min-width: 0;
+  text-align: right;
+}
+
+.sssp-print-title {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #1a1a1a;
+  text-align: right;
+}
+
+.sssp-print-header-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.45rem 0.75rem;
+  margin-top: 0.35rem;
+  text-align: right;
+}
+
+.sssp-print-revision {
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #444444;
+}
+
+.sssp-print-ref {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #1a1a1a;
+}
+
+.sssp-print-ref--draft {
+  font-size: 0.92rem;
+  font-style: italic;
+  color: var(--monrad-red);
+}
+
+.sssp-print-status-badge {
+  display: inline-block;
+  padding: 0.12rem 0.45rem;
+  border: 1px solid #cccccc;
+  border-radius: 2px;
+  background: #f5f5f5;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #444444;
+  white-space: nowrap;
+}
+
+.sssp-print-hero {
+  margin: 0.75rem 0 0.5rem;
+  text-align: center;
+}
+
+.sssp-print-hero-title {
+  margin: 0;
+  font-size: 1.65rem;
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #1a1a1a;
+}
+
+.sssp-print-hero-ref {
+  margin: 0.4rem 0 0;
+  font-size: 0.92rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #333333;
+}
+
+.sssp-print-cover-status {
+  margin: 0.65rem 0 0;
+  padding: 0.35rem 0.55rem;
+  border: 1px solid #cccccc;
+  background: #f0f0f0;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-align: center;
+  color: #333333;
+}
+
+.sssp-print-header-accent {
+  width: 100%;
+  height: 0;
+  margin: 0.35rem 0 0.55rem;
+  border: none;
+  border-top: 4px solid var(--monrad-red);
+}
+
+.sssp-print-project,
+.sssp-print-document-control {
+  width: 100%;
+  margin-top: 0.35rem;
+  padding: 0.55rem 0.7rem 0.45rem;
+  border: 1px solid #dddddd;
+  background: #fafafa;
+  text-align: left;
+}
+
+.sssp-print-document-control {
+  margin-top: 0.45rem;
+  background: #ececec;
+}
+
+.sssp-print-panel-title {
+  margin: 0 0 0.4rem;
+  padding-bottom: 0.25rem;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #1a1a1a;
+  border-bottom: 2px solid var(--monrad-red);
+  text-align: left;
+}
+
+.sssp-print-grid,
+.sssp-print-control-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 1.75rem;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+.sssp-print-field-list {
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+
+.sssp-print-control-grid .sssp-print-meta-row--full {
+  grid-column: 1 / -1;
+}
+
+.sssp-print-meta-row {
+  display: grid;
+  grid-template-columns: minmax(5.75rem, 7.25rem) minmax(0, 1fr);
+  gap: 0.5rem;
+  align-items: baseline;
+  margin: 0;
+  padding: 0.22rem 0;
+  border-bottom: 1px solid #e8e8e8;
+  text-align: left;
+}
+
+.sssp-print-meta-row dt {
+  margin: 0;
+  font-size: 0.64rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #666666;
+  text-align: left;
+}
+
+.sssp-print-meta-row dd {
+  margin: 0;
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: #000000;
+  word-break: break-word;
+  text-align: left;
+}
+
+@media print {
+  body.sssp-print-mode .sssp-print-root,
+  body.sssp-print-mode .print-area--sssp {
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    padding: 0;
+    text-align: left;
+    page: sssp;
+    box-sizing: border-box;
+  }
+
+  .sssp-print-project {
+    background: #f7f7f7;
+    border-color: #dddddd;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  .sssp-print-document-control {
+    background: #ececec !important;
+    border-color: #dddddd;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  .sssp-print-panel-title {
+    color: #1a1a1a;
+    border-bottom-color: var(--monrad-red);
+  }
+
+  .sssp-print-grid,
+  .sssp-print-control-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    width: 100%;
+  }
+
+  .sssp-print-meta-row {
+    border-bottom-color: #dddddd;
+  }
+
+  .sssp-print-meta-row dt {
+    color: #555555;
+  }
+
+  .sssp-print-status-badge {
+    background: #f0f0f0;
+    border-color: #cccccc;
+    color: #444444;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  .sssp-print-ref {
+    color: #1a1a1a;
+  }
+
+  .sssp-print-ref--draft {
+    color: var(--monrad-red);
+  }
+
+  .sssp-print-header-accent {
+    border-top-width: 3pt;
+    border-top-color: var(--monrad-red);
+    margin-bottom: 0.45rem;
+  }
+
+  .sssp-print-logo {
+    height: 45mm;
+    width: auto;
+    max-width: 50mm;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
   }
 }
