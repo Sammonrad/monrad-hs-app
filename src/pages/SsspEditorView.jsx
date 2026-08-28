@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { BackButton } from '../components/BackButton.jsx'
 import { CloudSyncBadge } from '../components/CloudSyncBadge.jsx'
-import { PrintableSSSP } from '../components/PrintableSSSP.jsx'
+import { SsspPrintPortal } from '../components/SsspPrintPortal.jsx'
 import { ConfirmModal } from '../components/common/ConfirmModal.jsx'
 import { SsspInput, SsspTextarea } from '../components/sssp/SsspFields.jsx'
 import { FormPageHeader } from '../components/forms/FormPageHeader.jsx'
@@ -205,17 +205,6 @@ export function SsspEditorView({
       if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current)
     }
   }, [record, activeSection, isNewSssp, user?.id, readOnly, draftSiteOrJobId])
-
-  useEffect(() => {
-    if (!printRecord) return undefined
-    const timer = window.setTimeout(() => window.print(), 350)
-    const handleAfterPrint = () => setPrintRecord(null)
-    window.addEventListener('afterprint', handleAfterPrint)
-    return () => {
-      window.clearTimeout(timer)
-      window.removeEventListener('afterprint', handleAfterPrint)
-    }
-  }, [printRecord])
 
   const validationForReady = useMemo(() => validateSsspRecord(record, 'ready'), [record])
   const validationForApproval = useMemo(() => validateSsspRecord(record, 'approval'), [record])
@@ -498,11 +487,11 @@ export function SsspEditorView({
 
   return (
     <>
-      {printRecord && (
-        <div className="print-area" aria-hidden="true">
-          <PrintableSSSP record={printRecord} includeAcknowledgements />
-        </div>
-      )}
+      <SsspPrintPortal
+        record={printRecord}
+        includeAcknowledgements
+        onDone={() => setPrintRecord(null)}
+      />
 
       <BackButton onClick={onBack} />
 
@@ -528,7 +517,7 @@ export function SsspEditorView({
         </p>
       )}
 
-      <section className="sssp-editor__overview" aria-label="SSSP completion">
+      <section className="sssp-editor__overview no-print" aria-label="SSSP completion">
         <div className="sssp-editor__overview-copy">
           <div>
             <span className="sssp-editor__eyebrow">Document progress</span>
@@ -550,7 +539,7 @@ export function SsspEditorView({
       </section>
 
       {!readOnly && (
-        <div className="sssp-editor__meta">
+        <div className="sssp-editor__meta no-print">
           <FormField label="SSSP number" required>
             <SsspInput
               value={record.ssspNumber}
@@ -616,7 +605,7 @@ export function SsspEditorView({
         </FormField>
       )}
 
-      <div className="sssp-editor sssp-editor--layout">
+      <div className="sssp-editor sssp-editor--layout no-print">
         <aside className="sssp-editor__nav-panel">
           <p className="sssp-editor__nav-title">Plan sections</p>
           <SsspSectionNav
@@ -680,7 +669,7 @@ export function SsspEditorView({
         </div>
       </div>
 
-      <FormActions>
+      <FormActions className="no-print">
         <button type="button" className="btn btn--secondary" onClick={handlePrintSavePdf}>
           Print / Save PDF
         </button>

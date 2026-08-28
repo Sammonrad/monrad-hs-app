@@ -5,7 +5,7 @@ import { EmptyState } from '../components/common/EmptyState.jsx'
 import { LoadingState } from '../components/common/LoadingState.jsx'
 import { StatusBadge } from '../components/common/StatusBadge.jsx'
 import { FormPageHeader } from '../components/forms/FormPageHeader.jsx'
-import { PrintableSSSP } from '../components/PrintableSSSP.jsx'
+import { SsspPrintPortal } from '../components/SsspPrintPortal.jsx'
 import { ArchiveRecordModal } from '../components/ArchiveRecordModal.jsx'
 import {
   SSSP_DASHBOARD_TABS,
@@ -126,7 +126,6 @@ export function SsspDashboardView({
 
   function handlePrint(record) {
     setPrintRecord(record)
-    window.setTimeout(() => window.print(), 350)
   }
 
   async function handleReactivate(record) {
@@ -196,11 +195,11 @@ export function SsspDashboardView({
 
   return (
     <>
-      {printRecord && (
-        <div className="print-area" aria-hidden="true">
-          <PrintableSSSP record={printRecord} includeAcknowledgements={isAdmin} />
-        </div>
-      )}
+      <SsspPrintPortal
+        record={printRecord}
+        includeAcknowledgements={isAdmin}
+        onDone={() => setPrintRecord(null)}
+      />
 
       <BackButton onClick={onBack} />
 
