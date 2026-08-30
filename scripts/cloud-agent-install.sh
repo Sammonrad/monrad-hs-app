@@ -17,7 +17,12 @@ export DEBIAN_FRONTEND=noninteractive
 sudo apt-get update -qq
 # fuse-overlayfs lets Docker use an overlay-based storage driver inside the
 # nested (unprivileged) VM, which is far faster than the vfs fallback.
-sudo apt-get install -y -qq docker.io fuse-overlayfs || true
+# --force-confold/confdef keep the install non-interactive when a package ships
+# a conffile that already exists on the base image (e.g. /etc/fuse.conf).
+sudo apt-get install -y -q \
+  -o Dpkg::Options::="--force-confold" \
+  -o Dpkg::Options::="--force-confdef" \
+  docker.io fuse-overlayfs
 
 log "Configuring Docker daemon for the nested VM"
 # - fuse-overlayfs storage driver: works without a host overlay mount.
