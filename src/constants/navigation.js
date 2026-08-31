@@ -80,6 +80,13 @@ export const NAV_ITEMS = {
     pageTitle: 'Visitor Sign-In',
     pageDescription: 'Register visitors and manage on-site roll call',
   },
+  'subcontractor-induction': {
+    id: 'subcontractor-induction',
+    title: 'Subcontractor Induction',
+    adminOnly: false,
+    pageTitle: 'Subcontractor Induction',
+    pageDescription: 'Record site and company inductions for subcontractors',
+  },
   sssp: {
     id: 'sssp',
     title: 'SSSP',
@@ -178,6 +185,7 @@ export const DESKTOP_SIDEBAR_GROUPS = [
       'timesheet',
       'critical-risks',
       'visitor-sign-in',
+      'subcontractor-induction',
     ],
   },
   {
@@ -239,6 +247,7 @@ export const DASHBOARD_GROUPS = [
       'incident',
       'critical-risks',
       'visitor-sign-in',
+      'subcontractor-induction',
     ],
   },
   {
@@ -298,6 +307,15 @@ export const DASHBOARD_CARDS = [
   {
     id: 'visitor-sign-in',
     title: 'Visitor Sign-In',
+    group: 'site-safety',
+    placement: 'mainDashboard',
+    available: true,
+    fullWidth: true,
+  },
+  {
+    id: 'subcontractor-induction',
+    title: 'Subcontractor Induction',
+    subtitle: 'Company and site induction record',
     group: 'site-safety',
     placement: 'mainDashboard',
     available: true,

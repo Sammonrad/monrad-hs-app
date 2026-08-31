@@ -26,10 +26,12 @@ import { SsspAcknowledgementView } from './pages/SsspAcknowledgementView.jsx'
 import { EquipmentView } from './pages/EquipmentView.jsx'
 import { EquipmentProfileView } from './pages/EquipmentProfileView.jsx'
 import { GeneralMeetingView } from './pages/GeneralMeetingView.jsx'
+import { SubcontractorInductionView } from './pages/SubcontractorInductionView.jsx'
 import { PrintableRecord } from './components/PrintableRecord.jsx'
 import { loadSavedRecords } from './utils/storage/recordsStorage.js'
 import { loadActions, persistActions, syncActionsFromRecord, syncActionsFromGeneralMeeting, patchAction } from './utils/storage/actionsStorage.js'
 import { loadMeetings } from './utils/storage/generalMeetingStorage.js'
+import { loadSubcontractorInductions } from './utils/storage/subcontractorInductionStorage.js'
 import { loadSettings } from './utils/storage/settingsStorage.js'
 import { loadVisitorRecords, persistVisitorRecords } from './utils/storage/visitorSignInStorage.js'
 import { AppShell } from './components/layout/AppShell.jsx'
@@ -61,6 +63,7 @@ import {
   loadLocalDefectRecords,
 } from './utils/storage/equipmentDefectStorage.js'
 import { fetchGeneralMeetingRecords } from './utils/storage/generalMeetingCloudStorage.js'
+import { fetchSubcontractorInductions } from './utils/storage/subcontractorInductionCloudStorage.js'
 import {
   getRoleLabel,
   getStatusLabel,
@@ -109,6 +112,8 @@ function App() {
   const [localDefectRecords, setLocalDefectRecords] = useState(() => loadLocalDefectRecords())
   const [generalMeetings, setGeneralMeetings] = useState(() => loadMeetings())
   const [cloudGeneralMeetings, setCloudGeneralMeetings] = useState([])
+  const [subcontractorInductions, setSubcontractorInductions] = useState(() => loadSubcontractorInductions())
+  const [cloudSubcontractorInductions, setCloudSubcontractorInductions] = useState([])
   const [generalMeetingNavOptions, setGeneralMeetingNavOptions] = useState({})
   const [printContent, setPrintContent] = useState(null)
   const [profile, setProfile] = useState(null)
@@ -509,6 +514,10 @@ function App() {
       const { records } = await fetchGeneralMeetingRecords(session.user.id, { isAdmin })
       if (isMounted) setCloudGeneralMeetings(records)
     }
+    async function loadCloudSubcontractorInductions() {
+      const { records } = await fetchSubcontractorInductions(session.user.id, { isAdmin })
+      if (isMounted) setCloudSubcontractorInductions(records)
+    }
 
     loadCloudTimesheets()
     loadCloudJobStarts()
@@ -523,6 +532,7 @@ function App() {
     loadCloudDocumentRecords()
     loadCloudDefectRecords()
     loadCloudGeneralMeetings()
+    loadCloudSubcontractorInductions()
 
     return () => {
       isMounted = false
@@ -1077,6 +1087,18 @@ function App() {
           user={session?.user ?? null}
           profile={profile}
           initialMeetingId={generalMeetingNavOptions.meetingId}
+        />
+      )}
+
+      {currentView === 'subcontractor-induction' && (
+        <SubcontractorInductionView
+          onBack={goToDashboard}
+          records={subcontractorInductions}
+          setRecords={setSubcontractorInductions}
+          cloudRecords={cloudSubcontractorInductions}
+          setCloudRecords={setCloudSubcontractorInductions}
+          user={session?.user ?? null}
+          profile={profile}
         />
       )}
 
