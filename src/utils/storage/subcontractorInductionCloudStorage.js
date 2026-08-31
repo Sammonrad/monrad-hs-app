@@ -33,3 +33,12 @@ export async function saveSubcontractorInduction(user, record) {
   return { record: data ? rowToRecord(data) : null, error }
 }
 
+export async function deleteSubcontractorInduction(user, record, { isAdmin = false } = {}) {
+  if (!isSupabaseConfigured || !supabase) return { ok: false, error: new Error('Supabase is not configured.') }
+  if (!user?.id) return { ok: false, error: new Error('You must be signed in to delete a cloud record.') }
+  if (!record?.cloudId) return { ok: true, error: null }
+  let query = supabase.from('subcontractor_induction_records').delete().eq('id', record.cloudId)
+  if (!isAdmin) query = query.eq('user_id', user.id)
+  const { error } = await query
+  return { ok: !error, error }
+}
