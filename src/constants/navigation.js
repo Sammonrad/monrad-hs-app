@@ -244,10 +244,10 @@ export const DASHBOARD_GROUPS = [
       'job-start',
       'pre-start',
       'toolbox',
+      'subcontractor-induction',
       'incident',
       'critical-risks',
       'visitor-sign-in',
-      'subcontractor-induction',
     ],
   },
   {
@@ -319,7 +319,6 @@ export const DASHBOARD_CARDS = [
     group: 'site-safety',
     placement: 'mainDashboard',
     available: true,
-    fullWidth: true,
   },
   {
     id: 'machines-equipment',

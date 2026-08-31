@@ -1,4 +1,4 @@
-import { REPORT_TYPE_LABELS, DEFECT_SEVERITY_LABELS } from '../constants/index.js'
+import { REPORT_TYPE_LABELS, DEFECT_SEVERITY_LABELS, NZ_TIME_ZONE } from '../constants/index.js'
 import { formatTime12Hour } from './time12Hour.js'
 
 const TIME_DISPLAY_KEYS = new Set(['startTime', 'finishTime', 'time', 'meetingTime'])
@@ -82,20 +82,27 @@ function parseLocalDate(value) {
  * @returns {string}
  */
 export function formatNzDate(value) {
+  if (typeof value === 'string' && ISO_DATE_ONLY.test(value.trim())) {
+    const [yyyy, mm, dd] = value.trim().split('-')
+    return `${dd}-${mm}-${yyyy}`
+  }
   const date = parseLocalDate(value)
   if (!date) return '—'
-
-  const dd = String(date.getDate()).padStart(2, '0')
-  const mm = String(date.getMonth() + 1).padStart(2, '0')
-  const yyyy = date.getFullYear()
-  return `${dd}-${mm}-${yyyy}`
+  const parts = new Intl.DateTimeFormat('en-NZ', {
+    timeZone: NZ_TIME_ZONE,
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  }).formatToParts(date)
+  const values = Object.fromEntries(parts.map(({ type, value: part }) => [type, part]))
+  return `${values.day}-${values.month}-${values.year}`
 }
 
 /** Full weekday name in uppercase, e.g. "MONDAY". Empty/invalid → '—'. */
 export function formatWeekdayName(value) {
   const date = parseLocalDate(value)
   if (!date) return '—'
-  return date.toLocaleDateString('en-NZ', { weekday: 'long' }).toUpperCase()
+  return date.toLocaleDateString('en-NZ', { weekday: 'long', timeZone: NZ_TIME_ZONE }).toUpperCase()
 }
 
 /** Long NZ date, e.g. "24 August 2026". Empty/invalid → '—'. */
@@ -103,6 +110,7 @@ export function formatNzLongDate(value) {
   const date = parseLocalDate(value)
   if (!date) return '—'
   return date.toLocaleDateString('en-NZ', {
+    timeZone: NZ_TIME_ZONE,
     day: 'numeric',
     month: 'long',
     year: 'numeric',
@@ -115,6 +123,7 @@ export function formatSubmittedAt(isoString) {
   const date = isoString instanceof Date ? isoString : new Date(isoString)
   if (Number.isNaN(date.getTime())) return '—'
   const timePart = date.toLocaleTimeString('en-NZ', {
+    timeZone: NZ_TIME_ZONE,
     hour: 'numeric',
     minute: '2-digit',
     hour12: true,

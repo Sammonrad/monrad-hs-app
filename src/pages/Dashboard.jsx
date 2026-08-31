@@ -37,6 +37,7 @@ const CARD_ICONS = {
   incident: TriangleAlert,
   'critical-risks': OctagonAlert,
   'visitor-sign-in': ClipboardSignature,
+  'subcontractor-induction': UsersRound,
   sssp: ShieldCheck,
   'general-meeting': UsersRound,
   timesheet: Clock,

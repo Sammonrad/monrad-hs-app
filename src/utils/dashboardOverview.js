@@ -1,4 +1,4 @@
-import { TODAY } from '../constants/index.js'
+import { NZ_TIME_ZONE, TODAY } from '../constants/index.js'
 import { formatNzDate } from './formatting.js'
 import { getSafetyAlerts } from './safetyAlerts.js'
 import { getMergedJobStartRecords } from './storage/jobStartCloudStorage.js'
@@ -6,7 +6,11 @@ import { getMergedPreStartRecords } from './storage/preStartCloudStorage.js'
 import { getMergedTimesheetRecords } from './storage/timesheetCloudStorage.js'
 
 export function getTimeGreeting() {
-  const hour = new Date().getHours()
+  const hour = Number(new Intl.DateTimeFormat('en-NZ', {
+    timeZone: NZ_TIME_ZONE,
+    hour: '2-digit',
+    hourCycle: 'h23',
+  }).format(new Date()))
   if (hour < 12) return 'Good morning'
   if (hour < 17) return 'Good afternoon'
   return 'Good evening'

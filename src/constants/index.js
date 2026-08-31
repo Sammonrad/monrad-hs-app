@@ -19,7 +19,17 @@ import {
 } from './storageKeys.js'
 
 export const MACHINE_TYPES = ['Excavator', 'Truck', 'Loader', 'Roller', 'Other']
-export const TODAY = () => new Date().toISOString().slice(0, 10)
+export const NZ_TIME_ZONE = 'Pacific/Auckland'
+export const TODAY = () => {
+  const parts = new Intl.DateTimeFormat('en-NZ', {
+    timeZone: NZ_TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date())
+  const values = Object.fromEntries(parts.map(({ type, value }) => [type, value]))
+  return `${values.year}-${values.month}-${values.day}`
+}
 
 export const JOB_START_CHECKLIST = [
   'Arrived on site safely',
