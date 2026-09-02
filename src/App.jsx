@@ -97,6 +97,7 @@ function App() {
   const [cloudIncidents, setCloudIncidents] = useState([])
   const [cloudActions, setCloudActions] = useState([])
   const [cloudVisitorRecords, setCloudVisitorRecords] = useState([])
+  const [visitorCloudLoaded, setVisitorCloudLoaded] = useState(false)
   const [cloudSsspRecords, setCloudSsspRecords] = useState([])
   const [ssspLoadError, setSsspLoadError] = useState(null)
   const [ssspLoading, setSsspLoading] = useState(false)
@@ -373,6 +374,7 @@ function App() {
       setCloudIncidents([])
       setCloudActions([])
       setCloudVisitorRecords([])
+      setVisitorCloudLoaded(false)
       setCloudSsspRecords([])
       setCloudEquipment([])
       setCloudServiceRecords([])
@@ -425,6 +427,7 @@ function App() {
       setCloudIncidents([])
       setCloudActions([])
       setCloudVisitorRecords([])
+      setVisitorCloudLoaded(false)
       setCloudSsspRecords([])
       setCloudEquipment([])
       setCloudServiceRecords([])
@@ -469,8 +472,12 @@ function App() {
     }
 
     async function loadCloudVisitorRecords() {
-      const { records } = await fetchVisitorSignInRecords(session.user.id)
-      if (isMounted) setCloudVisitorRecords(records)
+      const { records, error } = await fetchVisitorSignInRecords(session.user.id)
+      if (!isMounted) return
+      setVisitorCloudLoaded(true)
+      if (!error) {
+        setCloudVisitorRecords(records)
+      }
     }
 
     async function loadCloudSsspRecords() {
@@ -562,7 +569,7 @@ function App() {
   }, [cloudActions, session?.user?.id])
 
   useEffect(() => {
-    if (!session?.user?.id) return undefined
+    if (!session?.user?.id || !visitorCloudLoaded) return undefined
 
     setVisitorRecords((prev) => {
       const activeMerged = getMergedVisitorRecords(prev, cloudVisitorRecords)
@@ -581,7 +588,7 @@ function App() {
       }
       return prev
     })
-  }, [cloudVisitorRecords, session?.user?.id])
+  }, [cloudVisitorRecords, session?.user?.id, visitorCloudLoaded])
 
   useEffect(() => {
     if (!session?.user?.id) return undefined

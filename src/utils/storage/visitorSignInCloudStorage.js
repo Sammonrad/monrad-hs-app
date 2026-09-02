@@ -136,12 +136,24 @@ export function rowToVisitorRecord(row) {
   )
 }
 
+function prefersLocalSyncState(record) {
+  return (
+    record?.syncStatus === SYNC_STATUS.CLOUD_FAILED ||
+    record?.syncStatus === SYNC_STATUS.CLOUD_MISSING ||
+    record?.syncStatus === SYNC_STATUS.OFFLINE ||
+    record?.syncStatus === SYNC_STATUS.LOCAL_ONLY ||
+    record?.syncStatus === SYNC_STATUS.SYNCING
+  )
+}
+
+function isLocalUnsyncedVisitor(record) {
+  if (!record) return false
+  if (!record.cloudId) return true
+  return prefersLocalSyncState(record)
+}
+
 function mergePair(local, cloud) {
-  const preferLocalSync =
-    local.syncStatus === SYNC_STATUS.CLOUD_FAILED ||
-    local.syncStatus === SYNC_STATUS.CLOUD_MISSING ||
-    local.syncStatus === SYNC_STATUS.OFFLINE ||
-    local.syncStatus === SYNC_STATUS.LOCAL_ONLY
+  const preferLocalSync = prefersLocalSyncState(local)
 
   return withSyncStatus(
     normalizeVisitorRecord({
@@ -151,6 +163,8 @@ function mergePair(local, cloud) {
       cloudId: cloud.cloudId || local.cloudId,
       cloudUserId: cloud.cloudUserId || local.cloudUserId,
       storageSource: 'both',
+      // Cloud is source of truth for archive when a row exists in Supabase.
+      archived: cloud.archived === true,
       departureTime:
         preferLocalSync && local.departureTime
           ? local.departureTime
@@ -164,36 +178,84 @@ function mergePair(local, cloud) {
   )
 }
 
+/**
+ * Cloud rows are the primary history source on every device.
+ * localStorage only supplements unsynced / local-only rows.
+ */
 export function mergeVisitorRecords(localRecords, cloudRecords) {
   const byId = new Map()
+  const byCloudId = new Map()
 
-  function upsert(record) {
-    const normalized = withSyncStatus(normalizeVisitorRecord(record))
-    const existing = byId.get(normalized.id)
-    byId.set(normalized.id, existing ? mergePair(existing, normalized) : normalized)
-  }
+  function register(record, source) {
+    const entry = withSyncStatus(
+      normalizeVisitorRecord({
+        ...record,
+        storageSource:
+          record.storageSource === 'cloud' && source === 'local'
+            ? 'both'
+            : record.storageSource === 'local' && source === 'cloud'
+              ? 'both'
+              : source,
+      }),
+    )
 
-  function findByCloudId(cloudId) {
-    if (!cloudId) return null
-    for (const record of byId.values()) {
-      if (record.cloudId === cloudId) return record
+    if (entry.storageSource === 'both' || entry.cloudId) {
+      if (!prefersLocalSyncState(entry)) {
+        entry.syncStatus = SYNC_STATUS.CLOUD
+      }
     }
-    return null
+
+    byId.set(entry.id, entry)
+    if (entry.cloudId) byCloudId.set(entry.cloudId, entry)
+    return entry
   }
 
-  localRecords.forEach((record) => {
-    upsert({ ...record, storageSource: record.cloudId ? 'both' : 'local' })
+  function replaceEntry(existing, merged) {
+    byId.delete(existing.id)
+    if (existing.cloudId) byCloudId.delete(existing.cloudId)
+
+    byId.set(merged.id, merged)
+    if (merged.cloudId) byCloudId.set(merged.cloudId, merged)
+  }
+
+  ;(cloudRecords ?? []).forEach((cloudRecord) => {
+    const cloud = normalizeVisitorRecord({ ...cloudRecord, storageSource: 'cloud' })
+    register(
+      {
+        ...cloud,
+        id: cloud.cloudId || cloud.id,
+        syncStatus: SYNC_STATUS.CLOUD,
+      },
+      'cloud',
+    )
   })
 
-  cloudRecords.forEach((cloudRecord) => {
-    const cloud = normalizeVisitorRecord({ ...cloudRecord, storageSource: 'cloud' })
-    const existing = findByCloudId(cloud.cloudId) || (cloud.id ? byId.get(cloud.id) : null)
+  ;(localRecords ?? []).forEach((localRecord) => {
+    const local = normalizeVisitorRecord({
+      ...localRecord,
+      storageSource: localRecord.cloudId ? 'both' : 'local',
+    })
+    const cloudId = local.cloudId
 
-    if (existing) {
-      byId.set(existing.id, mergePair(existing, cloud))
-    } else {
-      upsert({ ...cloud, id: cloud.cloudId || cloud.id })
+    if (cloudId && byCloudId.has(cloudId)) {
+      const existing = byCloudId.get(cloudId)
+      const merged = mergePair(local, existing)
+      replaceEntry(existing, merged)
+      return
     }
+
+    if (cloudId && byId.has(cloudId)) {
+      const existing = byId.get(cloudId)
+      const merged = mergePair(local, existing)
+      replaceEntry(existing, merged)
+      return
+    }
+
+    if (!isLocalUnsyncedVisitor(local)) {
+      return
+    }
+
+    register(local, 'local')
   })
 
   return [...byId.values()].sort(

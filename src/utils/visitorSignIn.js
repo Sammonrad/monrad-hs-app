@@ -1,5 +1,19 @@
+import { NZ_TIME_ZONE } from '../constants/index.js'
 import { formatDurationMinutes } from './formatting.js'
 import { isVisitorOnSite } from './storage/visitorSignInStorage.js'
+
+/** YYYY-MM-DD in Pacific/Auckland for history date filters. */
+export function getVisitorArrivalNzDateKey(isoString) {
+  if (isoString == null || isoString === '') return ''
+  const date = isoString instanceof Date ? isoString : new Date(isoString)
+  if (Number.isNaN(date.getTime())) return ''
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: NZ_TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(date)
+}
 
 export function formatVisitorDuration(arrivalTime, departureTime) {
   const start = new Date(arrivalTime)
@@ -27,7 +41,7 @@ export function filterVisitorHistory(records, { search = '', date = '', site = '
     }
 
     if (date) {
-      const arrivalDate = record.arrivalTime?.slice(0, 10) ?? ''
+      const arrivalDate = getVisitorArrivalNzDateKey(record.arrivalTime)
       if (arrivalDate !== date) return false
     }
 
