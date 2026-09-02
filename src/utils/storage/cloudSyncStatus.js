@@ -5,7 +5,16 @@ export const SYNC_STATUS = {
   LOCAL_ONLY: 'local-only',
   OFFLINE: 'offline',
   CLOUD_FAILED: 'cloud-failed',
+  CLOUD_MISSING: 'cloud-missing',
+  SYNCING: 'syncing',
 }
+
+/** User-facing copy when local save succeeded but cloud sync did not. */
+export const LOCAL_SAFE_CLOUD_FAILED_MESSAGE =
+  'Saved locally. Cloud sync failed — this record is safe on this device and will retry.'
+
+export const CLOUD_VERIFY_MAX_PER_LOAD = 20
+export const CLOUD_VERIFY_STALE_MINUTES = 30
 
 /** Exact UI copy when cloud save is skipped because there is no Supabase session. */
 export const NOT_SIGNED_IN_CLOUD_MESSAGE = 'Saved to device only — not signed into cloud'
@@ -29,14 +38,77 @@ export function getSyncStatusLabel(syncStatus) {
   switch (syncStatus) {
     case SYNC_STATUS.CLOUD:
       return 'Saved to cloud'
+    case SYNC_STATUS.SYNCING:
+      return 'Syncing…'
     case SYNC_STATUS.CLOUD_FAILED:
-      return 'Saved locally only — cloud save failed'
+      return 'Local only — cloud save failed'
+    case SYNC_STATUS.CLOUD_MISSING:
+      return 'Local only — cloud record missing'
     case SYNC_STATUS.LOCAL_ONLY:
       return NOT_SIGNED_IN_CLOUD_MESSAGE
     case SYNC_STATUS.OFFLINE:
     default:
       return 'Offline/local save only'
   }
+}
+
+export function needsCloudRetry(record) {
+  if (!record) return false
+  return (
+    record.syncStatus === SYNC_STATUS.CLOUD_FAILED ||
+    record.syncStatus === SYNC_STATUS.CLOUD_MISSING ||
+    record.syncStatus === SYNC_STATUS.OFFLINE
+  )
+}
+
+export function isConfirmedCloudRecord(cloudRecord) {
+  return Boolean(cloudRecord?.cloudId ?? cloudRecord?.id)
+}
+
+export function selectRecordsForCloudVerification(
+  records,
+  { maxCount = CLOUD_VERIFY_MAX_PER_LOAD, staleMinutes = CLOUD_VERIFY_STALE_MINUTES } = {},
+) {
+  const now = Date.now()
+  const staleMs = staleMinutes * 60 * 1000
+
+  return (records ?? [])
+    .filter((record) => record?.syncStatus === SYNC_STATUS.CLOUD && record?.cloudId)
+    .filter((record) => {
+      if (!record.lastVerifiedAt) return true
+      const verifiedAt = new Date(record.lastVerifiedAt).getTime()
+      if (Number.isNaN(verifiedAt)) return true
+      return now - verifiedAt > staleMs
+    })
+    .slice(0, maxCount)
+}
+
+export async function verifyCloudRecordExists(table, cloudId) {
+  if (!isSupabaseConfigured || !supabase || !cloudId) {
+    return { exists: false, error: null }
+  }
+
+  const { data, error } = await supabase
+    .from(table)
+    .select('id')
+    .eq('id', cloudId)
+    .maybeSingle()
+
+  if (error) {
+    return { exists: false, error }
+  }
+
+  return { exists: Boolean(data?.id), error: null }
+}
+
+export function logCloudSaveFailure({ table, operation, error }) {
+  console.error('[H&S cloud save failed]', {
+    table,
+    operation,
+    code: error?.code ?? null,
+    message: error?.message ?? String(error),
+    details: error?.details ?? null,
+  })
 }
 
 /** User-facing cloud error text; never treat a failed insert as success. */
@@ -64,7 +136,10 @@ export function getSyncStatusModifier(syncStatus) {
   switch (syncStatus) {
     case SYNC_STATUS.CLOUD:
       return 'cloud-sync-status--cloud'
+    case SYNC_STATUS.SYNCING:
+      return 'cloud-sync-status--pending'
     case SYNC_STATUS.CLOUD_FAILED:
+    case SYNC_STATUS.CLOUD_MISSING:
       return 'cloud-sync-status--failed'
     case SYNC_STATUS.OFFLINE:
     case SYNC_STATUS.LOCAL_ONLY:

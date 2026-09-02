@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   VISITOR_ACKNOWLEDGEMENT_ITEMS,
   VISITOR_DECLARATION_TEXT,
@@ -26,6 +26,7 @@ import {
   normalizeVisitorRecord,
   patchVisitorRecord,
   persistVisitorRecords,
+  upsertVisitorRecord,
   VISITOR_ACKNOWLEDGEMENT_KEYS,
 } from '../utils/storage/visitorSignInStorage.js'
 import {
@@ -34,9 +35,14 @@ import {
   getMergedVisitorRecords,
   getUnavailableSyncStatus,
   isCloudSaveUnavailable,
+  isConfirmedCloudRecord,
   saveVisitorSignInRecord,
   SYNC_STATUS,
   updateVisitorSignInRecord,
+  retryVisitorCloudSave,
+  needsCloudRetry,
+  verifyVisitorCloudRecords,
+  LOCAL_SAFE_CLOUD_FAILED_MESSAGE,
 } from '../utils/storage/visitorSignInCloudStorage.js'
 import {
   filterVisitorHistory,
@@ -121,6 +127,9 @@ export function VisitorSignInView({
   const [printRecord, setPrintRecord] = useState(null)
   const [printRollCall, setPrintRollCall] = useState(false)
   const [archiveMessage, setArchiveMessage] = useState('')
+  const [retryingId, setRetryingId] = useState(null)
+  const retryInFlightRef = useRef(new Set())
+  const autoRetriedRef = useRef(new Set())
 
   function handleVisitorArchived(archived, { localOnly } = {}) {
     setVisitorRecords((prev) => {
@@ -205,6 +214,85 @@ export function VisitorSignInView({
   }, [user?.id, setCloudVisitorRecords])
 
   useEffect(() => {
+    if (!user?.id || isCloudSaveUnavailable(user)) return undefined
+
+    let cancelled = false
+
+    async function verifyCloudClaims() {
+      const patches = await verifyVisitorCloudRecords(visitorRecords)
+      if (cancelled || patches.length === 0) return
+
+      setVisitorRecords((prev) => {
+        let next = prev
+        for (const { id, patch } of patches) {
+          next = patchVisitorRecord(next, id, patch)
+        }
+        persistVisitorRecords(next)
+        return next
+      })
+    }
+
+    verifyCloudClaims()
+
+    return () => {
+      cancelled = true
+    }
+  }, [user?.id, visitorRecords, setVisitorRecords])
+
+  useEffect(() => {
+    if (!user?.id) return undefined
+
+    let cancelled = false
+
+    async function retryFailedRecords(allowRetried = false) {
+      if (isCloudSaveUnavailable(user)) return
+
+      const candidates = visitorRecords.filter((record) => {
+        if (!needsCloudRetry(record)) return false
+        if (retryInFlightRef.current.has(record.id)) return false
+        if (!allowRetried && autoRetriedRef.current.has(record.id)) return false
+        return true
+      })
+
+      for (const record of candidates) {
+        if (cancelled) return
+        autoRetriedRef.current.add(record.id)
+        retryInFlightRef.current.add(record.id)
+        try {
+          const { record: cloudRecord, error } = await retryVisitorCloudSave(user, record)
+          if (cancelled || error) continue
+          if (!isConfirmedCloudRecord(cloudRecord)) continue
+          patchLocalRecord(record.id, {
+            syncStatus: SYNC_STATUS.CLOUD,
+            cloudId: cloudRecord.cloudId ?? record.cloudId,
+            cloudUserId: cloudRecord?.cloudUserId ?? null,
+            storageSource: 'both',
+            lastVerifiedAt: new Date().toISOString(),
+          })
+          if (cloudRecord) {
+            setCloudVisitorRecords((prev) => {
+              const withoutDup = prev.filter(
+                (item) => item.cloudId !== cloudRecord.cloudId && item.id !== record.id,
+              )
+              return [cloudRecord, ...withoutDup]
+            })
+          }
+        } finally {
+          retryInFlightRef.current.delete(record.id)
+        }
+      }
+    }
+
+    retryFailedRecords(false)
+    const onOnline = () => retryFailedRecords(true)
+    window.addEventListener('online', onOnline)
+    return () => {
+      cancelled = true
+      window.removeEventListener('online', onOnline)
+    }
+  }, [user?.id, visitorRecords, setCloudVisitorRecords])
+
+  useEffect(() => {
     if (!printRecord && !printRollCall) return undefined
 
     const timer = window.setTimeout(() => {
@@ -271,6 +359,47 @@ export function VisitorSignInView({
     setSignInSuccess((prev) => (prev?.id === recordId ? { ...prev, ...patch } : prev))
   }
 
+  async function handleRetryCloudSave(visitor) {
+    if (!user?.id || retryingId) return
+    setRetryingId(visitor.id)
+    patchLocalRecord(visitor.id, { syncStatus: SYNC_STATUS.SYNCING })
+
+    const { record: cloudRecord, error } = await retryVisitorCloudSave(user, visitor)
+
+    if (error) {
+      patchLocalRecord(visitor.id, { syncStatus: SYNC_STATUS.CLOUD_FAILED })
+      setRetryingId(null)
+      window.alert(`${LOCAL_SAFE_CLOUD_FAILED_MESSAGE}\n\n${formatCloudSaveError(error)}`)
+      return
+    }
+
+    if (!isConfirmedCloudRecord(cloudRecord)) {
+      patchLocalRecord(visitor.id, { syncStatus: SYNC_STATUS.CLOUD_FAILED })
+      setRetryingId(null)
+      window.alert(`${LOCAL_SAFE_CLOUD_FAILED_MESSAGE}\n\nCloud save did not return a record id.`)
+      return
+    }
+
+    patchLocalRecord(visitor.id, {
+      syncStatus: SYNC_STATUS.CLOUD,
+      cloudId: cloudRecord.cloudId,
+      cloudUserId: cloudRecord?.cloudUserId ?? null,
+      storageSource: 'both',
+      lastVerifiedAt: new Date().toISOString(),
+    })
+
+    if (cloudRecord) {
+      setCloudVisitorRecords((prev) => {
+        const withoutDup = prev.filter(
+          (item) => item.cloudId !== cloudRecord.cloudId && item.id !== visitor.id,
+        )
+        return [cloudRecord, ...withoutDup]
+      })
+    }
+
+    setRetryingId(null)
+  }
+
   async function handleSignIn(event) {
     event.preventDefault()
     if (submitting) return
@@ -307,7 +436,7 @@ export function VisitorSignInView({
       signedOutBy: null,
     })
 
-    const nextRecords = [record, ...visitorRecords]
+    const nextRecords = upsertVisitorRecord(visitorRecords, record)
     if (!persistVisitorRecords(nextRecords)) {
       setSubmitting(false)
       return
@@ -326,21 +455,32 @@ export function VisitorSignInView({
       return
     }
 
+    patchLocalRecord(record.id, { syncStatus: SYNC_STATUS.SYNCING })
+    setCompletedSyncStatus(SYNC_STATUS.SYNCING)
+
     const { record: cloudRecord, error } = await saveVisitorSignInRecord(user, record)
     setSubmitting(false)
 
     if (error) {
       patchLocalRecord(record.id, { syncStatus: SYNC_STATUS.CLOUD_FAILED })
       setCompletedSyncStatus(SYNC_STATUS.CLOUD_FAILED)
-      setCompletedCloudError(formatCloudSaveError(error))
+      setCompletedCloudError(`${LOCAL_SAFE_CLOUD_FAILED_MESSAGE} ${formatCloudSaveError(error)}`)
+      return
+    }
+
+    if (!isConfirmedCloudRecord(cloudRecord)) {
+      patchLocalRecord(record.id, { syncStatus: SYNC_STATUS.CLOUD_FAILED })
+      setCompletedSyncStatus(SYNC_STATUS.CLOUD_FAILED)
+      setCompletedCloudError(`${LOCAL_SAFE_CLOUD_FAILED_MESSAGE} Cloud save did not return a record id.`)
       return
     }
 
     patchLocalRecord(record.id, {
       syncStatus: SYNC_STATUS.CLOUD,
-      cloudId: cloudRecord?.cloudId ?? null,
+      cloudId: cloudRecord.cloudId,
       cloudUserId: cloudRecord?.cloudUserId ?? null,
       storageSource: 'both',
+      lastVerifiedAt: new Date().toISOString(),
     })
     setCompletedSyncStatus(SYNC_STATUS.CLOUD)
     setCompletedCloudError('')
@@ -381,6 +521,8 @@ export function VisitorSignInView({
       return
     }
 
+    patchLocalRecord(visitor.id, { ...patch, syncStatus: SYNC_STATUS.SYNCING })
+
     const { record: cloudRecord, error } = await updateVisitorSignInRecord(user, {
       ...updated,
       cloudId: visitor.cloudId,
@@ -389,7 +531,14 @@ export function VisitorSignInView({
     if (error) {
       patchLocalRecord(visitor.id, { ...patch, syncStatus: SYNC_STATUS.CLOUD_FAILED })
       setSigningOutId(null)
-      window.alert(`Cloud sign-out failed — saved on this device.\n\n${formatCloudSaveError(error)}`)
+      window.alert(`${LOCAL_SAFE_CLOUD_FAILED_MESSAGE}\n\n${formatCloudSaveError(error)}`)
+      return
+    }
+
+    if (!isConfirmedCloudRecord(cloudRecord)) {
+      patchLocalRecord(visitor.id, { ...patch, syncStatus: SYNC_STATUS.CLOUD_FAILED })
+      setSigningOutId(null)
+      window.alert(`${LOCAL_SAFE_CLOUD_FAILED_MESSAGE}\n\nCloud sign-out did not return a record id.`)
       return
     }
 
@@ -397,6 +546,7 @@ export function VisitorSignInView({
       ...patch,
       syncStatus: SYNC_STATUS.CLOUD,
       storageSource: visitor.cloudId ? 'both' : visitor.storageSource,
+      lastVerifiedAt: new Date().toISOString(),
     })
 
     if (cloudRecord) {
@@ -624,21 +774,20 @@ export function VisitorSignInView({
           {signInSuccess && (
             <div className="visitor-sign-in__success" role="status">
               <p className="complete-message">
-                {signInSuccess.visitorName} signed in successfully.
+                {signInSuccess.visitorName} saved on this device.
               </p>
-              {submitting ? (
-                <p className="cloud-sync-status cloud-sync-status--pending">Signing in…</p>
-              ) : (
-                completedSyncStatus && (
-                  <>
-                    <CloudSyncBadge syncStatus={completedSyncStatus} className="cloud-sync-status--block" />
-                    {completedCloudError && (
-                      <p className="validation-message validation-message--error" role="alert">
-                        {completedCloudError}
-                      </p>
-                    )}
-                  </>
-                )
+              {(submitting || completedSyncStatus === SYNC_STATUS.SYNCING) && (
+                <CloudSyncBadge syncStatus={SYNC_STATUS.SYNCING} className="cloud-sync-status--block" />
+              )}
+              {!submitting && completedSyncStatus && completedSyncStatus !== SYNC_STATUS.SYNCING && (
+                <>
+                  <CloudSyncBadge syncStatus={completedSyncStatus} className="cloud-sync-status--block" />
+                  {completedCloudError && (
+                    <p className="validation-message validation-message--error" role="alert">
+                      {completedCloudError}
+                    </p>
+                  )}
+                </>
               )}
             </div>
           )}
@@ -714,6 +863,16 @@ export function VisitorSignInView({
                   >
                     {signingOutId === visitor.id ? 'Signing out…' : 'Sign Out'}
                   </button>
+                  {needsCloudRetry(visitor) && (
+                    <button
+                      type="button"
+                      className="action-btn visitor-sign-in__retry-btn"
+                      onClick={() => handleRetryCloudSave(visitor)}
+                      disabled={retryingId === visitor.id}
+                    >
+                      {retryingId === visitor.id ? 'Retrying cloud save…' : 'Retry cloud save'}
+                    </button>
+                  )}
                 </li>
               ))}
             </ul>
@@ -846,6 +1005,16 @@ export function VisitorSignInView({
                 >
                   Print
                 </button>
+                {needsCloudRetry(selectedRecord) && (
+                  <button
+                    type="button"
+                    className="action-btn"
+                    onClick={() => handleRetryCloudSave(selectedRecord)}
+                    disabled={retryingId === selectedRecord.id}
+                  >
+                    {retryingId === selectedRecord.id ? 'Retrying cloud save…' : 'Retry cloud save'}
+                  </button>
+                )}
                 <AdminArchiveAction
                   recordType={ARCHIVE_RECORD_TYPES.VISITOR}
                   record={selectedRecord}
@@ -897,6 +1066,7 @@ export function VisitorSignInView({
                       {' · '}
                       {formatVisitorDuration(record.arrivalTime, record.departureTime)}
                     </p>
+                    <CloudSyncBadge record={record} size="small" />
                   </button>
                 </li>
               ))}

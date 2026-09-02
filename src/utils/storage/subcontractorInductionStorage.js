@@ -1,6 +1,7 @@
 import { SUBCONTRACTOR_INDUCTION_STORAGE_KEY } from '../../constants/storageKeys.js'
 import { TODAY } from '../../constants/index.js'
 import { createRecordId } from '../ids.js'
+import { SYNC_STATUS } from './cloudSyncStatus.js'
 
 export const INDUCTION_TOPICS = [
   ['siteRules', 'Site rules, access and restricted areas'],
@@ -33,7 +34,28 @@ export function createEmptySubcontractorInduction() {
 export function normalizeSubcontractorInduction(record) {
   const empty = createEmptySubcontractorInduction()
   if (!record || typeof record !== 'object') return empty
-  return { ...empty, ...record, id: record.id || createRecordId(), topics: { ...empty.topics, ...(record.topics || {}) } }
+  return {
+    ...empty,
+    ...record,
+    id: record.id || createRecordId(),
+    topics: { ...empty.topics, ...(record.topics || {}) },
+    lastVerifiedAt: record.lastVerifiedAt ?? null,
+  }
+}
+
+export function upsertSubcontractorInduction(records, record) {
+  const normalized = normalizeSubcontractorInduction(record)
+  const index = records.findIndex((item) => item.id === normalized.id)
+  if (index === -1) {
+    return [normalized, ...records]
+  }
+  const next = [...records]
+  next[index] = normalized
+  return next
+}
+
+export function persistSubcontractorInduction(records, record) {
+  return persistSubcontractorInductions(upsertSubcontractorInduction(records, record))
 }
 
 export function loadSubcontractorInductions() {
@@ -49,12 +71,51 @@ export function persistSubcontractorInductions(records) {
 }
 
 export function mergeSubcontractorInductions(localRecords = [], cloudRecords = []) {
-  const merged = new Map(localRecords.map((item) => [item.cloudId || item.id, normalizeSubcontractorInduction(item)]))
-  cloudRecords.forEach((item) => {
-    const key = item.cloudId || item.id
-    const local = merged.get(key)
-    merged.set(key, normalizeSubcontractorInduction({ ...local, ...item, id: local?.id || item.id, storageSource: local ? 'both' : 'cloud' }))
+  const byId = new Map()
+
+  function upsert(record) {
+    const normalized = normalizeSubcontractorInduction(record)
+    byId.set(normalized.id, normalized)
+  }
+
+  function findByCloudId(cloudId) {
+    if (!cloudId) return null
+    for (const record of byId.values()) {
+      if (record.cloudId === cloudId) return record
+    }
+    return null
+  }
+
+  localRecords.forEach((item) => {
+    upsert({ ...item, storageSource: item.cloudId ? 'both' : 'local' })
   })
-  return [...merged.values()].sort((a, b) => (b.inductionDate || b.createdAt).localeCompare(a.inductionDate || a.createdAt))
+
+  cloudRecords.forEach((item) => {
+    const cloud = normalizeSubcontractorInduction({ ...item, storageSource: 'cloud' })
+    const existing = findByCloudId(cloud.cloudId) || byId.get(cloud.id)
+
+    if (existing) {
+      const preferLocalSync =
+        existing.syncStatus === SYNC_STATUS.CLOUD_FAILED ||
+        existing.syncStatus === SYNC_STATUS.CLOUD_MISSING ||
+        existing.syncStatus === SYNC_STATUS.OFFLINE ||
+        existing.syncStatus === SYNC_STATUS.LOCAL_ONLY
+
+      upsert({
+        ...cloud,
+        ...existing,
+        id: existing.id,
+        cloudId: cloud.cloudId || existing.cloudId,
+        storageSource: 'both',
+        syncStatus: preferLocalSync ? existing.syncStatus : SYNC_STATUS.CLOUD,
+      })
+    } else {
+      upsert({ ...cloud, id: cloud.cloudId || cloud.id })
+    }
+  })
+
+  return [...byId.values()].sort((a, b) =>
+    (b.inductionDate || b.createdAt).localeCompare(a.inductionDate || a.createdAt),
+  )
 }
 

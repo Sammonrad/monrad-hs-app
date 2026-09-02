@@ -11,6 +11,26 @@ export const STATUS = {
   DISABLED: 'disabled',
 }
 
+export const TIMESHEET_TYPES = {
+  STANDARD: 'standard',
+  DRIVER: 'driver',
+}
+
+export function getProfileTimesheetType(profile) {
+  if (profile?.timesheet_type === TIMESHEET_TYPES.DRIVER) return TIMESHEET_TYPES.DRIVER
+  return TIMESHEET_TYPES.STANDARD
+}
+
+export function getTimesheetTypeLabel(profile) {
+  return getProfileTimesheetType(profile) === TIMESHEET_TYPES.DRIVER
+    ? 'Driver daily sheet'
+    : 'Standard timesheet'
+}
+
+export function isDriverTimesheetProfile(profile) {
+  return getProfileTimesheetType(profile) === TIMESHEET_TYPES.DRIVER
+}
+
 export function getProfileRole(profile) {
   if (profile?.role === ROLES.ADMIN) return ROLES.ADMIN
   return ROLES.STAFF
@@ -118,6 +138,12 @@ export async function updateProfile(userId, updates) {
   if (updates.status !== undefined) payload.status = updates.status
   if (updates.phone !== undefined) payload.phone = updates.phone.trim()
   if (updates.notes !== undefined) payload.notes = updates.notes.trim()
+  if (updates.timesheet_type !== undefined) {
+    const type = updates.timesheet_type
+    if (type === TIMESHEET_TYPES.DRIVER || type === TIMESHEET_TYPES.STANDARD) {
+      payload.timesheet_type = type
+    }
+  }
 
   const { data, error } = await supabase
     .from('user_profiles')

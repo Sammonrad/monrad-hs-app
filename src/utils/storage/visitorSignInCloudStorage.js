@@ -23,6 +23,10 @@ import { normalizeVisitorRecord } from './visitorSignInStorage.js'
 import {
   SYNC_STATUS,
   withSyncStatus,
+  logCloudSaveFailure,
+  isConfirmedCloudRecord,
+  verifyCloudRecordExists,
+  selectRecordsForCloudVerification,
 } from './cloudSyncStatus.js'
 import { ARCHIVE_RECORD_TYPES, filterArchived } from './archiveFilter.js'
 
@@ -34,7 +38,15 @@ export {
   getSyncStatusModifier,
   resolveRecordSyncStatus,
   formatCloudSaveError,
+  needsCloudRetry,
+  logCloudSaveFailure,
+  isConfirmedCloudRecord,
+  verifyCloudRecordExists,
+  selectRecordsForCloudVerification,
+  LOCAL_SAFE_CLOUD_FAILED_MESSAGE,
 } from './cloudSyncStatus.js'
+
+export const VISITOR_CLOUD_TABLE = 'visitor_sign_in_records'
 
 function blankToNull(value) {
   if (value == null) return null
@@ -124,94 +136,64 @@ export function rowToVisitorRecord(row) {
   )
 }
 
-function dedupeKey(record) {
-  const name = record.visitorName?.trim().toLowerCase() ?? ''
-  const arrival = record.arrivalTime ?? ''
-  const site = record.siteName?.trim().toLowerCase() ?? ''
-  return `${arrival}|${site}|${name}`
+function mergePair(local, cloud) {
+  const preferLocalSync =
+    local.syncStatus === SYNC_STATUS.CLOUD_FAILED ||
+    local.syncStatus === SYNC_STATUS.CLOUD_MISSING ||
+    local.syncStatus === SYNC_STATUS.OFFLINE ||
+    local.syncStatus === SYNC_STATUS.LOCAL_ONLY
+
+  return withSyncStatus(
+    normalizeVisitorRecord({
+      ...cloud,
+      ...local,
+      id: local.id,
+      cloudId: cloud.cloudId || local.cloudId,
+      cloudUserId: cloud.cloudUserId || local.cloudUserId,
+      storageSource: 'both',
+      departureTime:
+        preferLocalSync && local.departureTime
+          ? local.departureTime
+          : cloud.departureTime || local.departureTime,
+      signedOutBy:
+        preferLocalSync && local.signedOutBy
+          ? local.signedOutBy
+          : cloud.signedOutBy || local.signedOutBy,
+      syncStatus: preferLocalSync ? local.syncStatus : SYNC_STATUS.CLOUD,
+    }),
+  )
 }
 
 export function mergeVisitorRecords(localRecords, cloudRecords) {
   const byId = new Map()
-  const byCloudId = new Map()
-  const byDedupeKey = new Map()
 
-  function register(record, source) {
-    const entry = withSyncStatus({
-      ...normalizeVisitorRecord(record),
-      storageSource:
-        record.storageSource === 'cloud' && source === 'local'
-          ? 'both'
-          : record.storageSource === 'local' && source === 'cloud'
-            ? 'both'
-            : source,
-    })
+  function upsert(record) {
+    const normalized = withSyncStatus(normalizeVisitorRecord(record))
+    const existing = byId.get(normalized.id)
+    byId.set(normalized.id, existing ? mergePair(existing, normalized) : normalized)
+  }
 
-    if (entry.storageSource === 'both' || entry.cloudId) {
-      entry.syncStatus = SYNC_STATUS.CLOUD
+  function findByCloudId(cloudId) {
+    if (!cloudId) return null
+    for (const record of byId.values()) {
+      if (record.cloudId === cloudId) return record
     }
-
-    byId.set(entry.id, entry)
-    if (entry.cloudId) byCloudId.set(entry.cloudId, entry)
-    byDedupeKey.set(dedupeKey(entry), entry)
-    return entry
+    return null
   }
 
   localRecords.forEach((record) => {
-    register({ ...record, storageSource: record.cloudId ? 'both' : 'local' }, 'local')
+    upsert({ ...record, storageSource: record.cloudId ? 'both' : 'local' })
   })
 
   cloudRecords.forEach((cloudRecord) => {
-    const cloudId = cloudRecord.cloudId
-    if (cloudId && byCloudId.has(cloudId)) {
-      const existing = byCloudId.get(cloudId)
-      const merged = withSyncStatus({
-        ...existing,
-        ...cloudRecord,
-        id: existing.id,
-        cloudId,
-        storageSource: 'both',
-        syncStatus: SYNC_STATUS.CLOUD,
-      })
-      byId.set(existing.id, merged)
-      byCloudId.set(cloudId, merged)
-      byDedupeKey.set(dedupeKey(merged), merged)
-      return
-    }
+    const cloud = normalizeVisitorRecord({ ...cloudRecord, storageSource: 'cloud' })
+    const existing = findByCloudId(cloud.cloudId) || (cloud.id ? byId.get(cloud.id) : null)
 
-    const localId = cloudRecord.id
-    if (localId && byId.has(localId)) {
-      const existing = byId.get(localId)
-      const merged = withSyncStatus({
-        ...existing,
-        ...cloudRecord,
-        cloudId: cloudId ?? existing.cloudId,
-        storageSource: 'both',
-        syncStatus: SYNC_STATUS.CLOUD,
-      })
-      byId.set(localId, merged)
-      if (merged.cloudId) byCloudId.set(merged.cloudId, merged)
-      byDedupeKey.set(dedupeKey(merged), merged)
-      return
+    if (existing) {
+      byId.set(existing.id, mergePair(existing, cloud))
+    } else {
+      upsert({ ...cloud, id: cloud.cloudId || cloud.id })
     }
-
-    const dupKey = dedupeKey(cloudRecord)
-    if (byDedupeKey.has(dupKey)) {
-      const existing = byDedupeKey.get(dupKey)
-      const merged = withSyncStatus({
-        ...existing,
-        ...cloudRecord,
-        cloudId: cloudId ?? existing.cloudId,
-        storageSource: 'both',
-        syncStatus: SYNC_STATUS.CLOUD,
-      })
-      byId.set(existing.id, merged)
-      if (merged.cloudId) byCloudId.set(merged.cloudId, merged)
-      byDedupeKey.set(dupKey, merged)
-      return
-    }
-
-    register(cloudRecord, 'cloud')
   })
 
   return [...byId.values()].sort(
@@ -230,7 +212,7 @@ export async function fetchVisitorSignInRecords(userId, { includeArchived = fals
   }
 
   const { data, error } = await supabase
-    .from('visitor_sign_in_records')
+    .from(VISITOR_CLOUD_TABLE)
     .select('*')
     .order('arrival_time', { ascending: false })
     .order('created_at', { ascending: false })
@@ -260,13 +242,20 @@ export async function saveVisitorSignInRecord(user, record) {
   const row = mapVisitorToRow(record, userId)
 
   const { data, error } = await supabase
-    .from('visitor_sign_in_records')
+    .from(VISITOR_CLOUD_TABLE)
     .insert(row)
     .select()
     .single()
 
   if (error) {
+    logCloudSaveFailure({ table: VISITOR_CLOUD_TABLE, operation: 'insert', error })
     return { record: null, error }
+  }
+
+  if (!isConfirmedCloudRecord({ cloudId: data?.id })) {
+    const missingIdError = new Error('Cloud save did not return a record id.')
+    logCloudSaveFailure({ table: VISITOR_CLOUD_TABLE, operation: 'insert', error: missingIdError })
+    return { record: null, error: missingIdError }
   }
 
   return { record: rowToVisitorRecord(data), error: null }
@@ -288,7 +277,7 @@ export async function updateVisitorSignInRecord(user, record) {
 
   // Sign-out path: only columns staff are allowed to change (RLS trigger).
   const { data, error } = await supabase
-    .from('visitor_sign_in_records')
+    .from(VISITOR_CLOUD_TABLE)
     .update({
       departure_time: record.departureTime || null,
       signed_out_by: record.signedOutBy || userId,
@@ -299,8 +288,54 @@ export async function updateVisitorSignInRecord(user, record) {
     .single()
 
   if (error) {
+    logCloudSaveFailure({ table: VISITOR_CLOUD_TABLE, operation: 'update', error })
     return { record: null, error }
   }
 
+  if (!isConfirmedCloudRecord({ cloudId: data?.id })) {
+    const missingIdError = new Error('Cloud update did not return a record id.')
+    logCloudSaveFailure({ table: VISITOR_CLOUD_TABLE, operation: 'update', error: missingIdError })
+    return { record: null, error: missingIdError }
+  }
+
   return { record: rowToVisitorRecord(data), error: null }
+}
+
+export async function verifyVisitorCloudRecords(records, options = {}) {
+  const candidates = selectRecordsForCloudVerification(records, options)
+  const patches = []
+
+  for (const record of candidates) {
+    const { exists, error } = await verifyCloudRecordExists(VISITOR_CLOUD_TABLE, record.cloudId)
+    const lastVerifiedAt = new Date().toISOString()
+
+    if (error) {
+      patches.push({ id: record.id, patch: { lastVerifiedAt } })
+      continue
+    }
+
+    if (!exists) {
+      patches.push({
+        id: record.id,
+        patch: {
+          syncStatus: SYNC_STATUS.CLOUD_MISSING,
+          cloudId: null,
+          storageSource: 'local',
+          lastVerifiedAt,
+        },
+      })
+    } else {
+      patches.push({ id: record.id, patch: { lastVerifiedAt } })
+    }
+  }
+
+  return patches
+}
+
+export async function retryVisitorCloudSave(user, record) {
+  const normalized = normalizeVisitorRecord(record)
+  if (!normalized.cloudId) {
+    return saveVisitorSignInRecord(user, normalized)
+  }
+  return updateVisitorSignInRecord(user, normalized)
 }

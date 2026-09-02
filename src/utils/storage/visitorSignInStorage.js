@@ -93,6 +93,7 @@ export function normalizeVisitorRecord(record) {
     cloudUserId: record.cloudUserId ?? record.signed_in_by ?? null,
     storageSource: record.storageSource ?? (record.cloudId ? 'cloud' : 'local'),
     syncStatus: record.syncStatus ?? null,
+    lastVerifiedAt: record.lastVerifiedAt ?? null,
     ...(typeof record.archived === 'boolean' ? { archived: record.archived } : {}),
   }
 }
@@ -105,6 +106,21 @@ export function patchVisitorRecord(records, recordId, patch) {
   return records.map((record) =>
     record.id === recordId ? normalizeVisitorRecord({ ...record, ...patch }) : record,
   )
+}
+
+export function upsertVisitorRecord(records, record) {
+  const normalized = normalizeVisitorRecord(record)
+  const index = records.findIndex((item) => item.id === normalized.id)
+  if (index === -1) {
+    return [normalized, ...records]
+  }
+  const next = [...records]
+  next[index] = normalized
+  return next
+}
+
+export function persistVisitorRecord(records, record) {
+  return persistVisitorRecords(upsertVisitorRecord(records, record))
 }
 
 export function loadVisitorRecords() {

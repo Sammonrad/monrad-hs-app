@@ -31,7 +31,7 @@ import { PrintableRecord } from './components/PrintableRecord.jsx'
 import { loadSavedRecords } from './utils/storage/recordsStorage.js'
 import { loadActions, persistActions, syncActionsFromRecord, syncActionsFromGeneralMeeting, patchAction } from './utils/storage/actionsStorage.js'
 import { loadMeetings } from './utils/storage/generalMeetingStorage.js'
-import { loadSubcontractorInductions } from './utils/storage/subcontractorInductionStorage.js'
+import { loadSubcontractorInductions, mergeSubcontractorInductions, persistSubcontractorInductions } from './utils/storage/subcontractorInductionStorage.js'
 import { loadSettings } from './utils/storage/settingsStorage.js'
 import { loadVisitorRecords, persistVisitorRecords } from './utils/storage/visitorSignInStorage.js'
 import { AppShell } from './components/layout/AppShell.jsx'
@@ -582,6 +582,27 @@ function App() {
       return prev
     })
   }, [cloudVisitorRecords, session?.user?.id])
+
+  useEffect(() => {
+    if (!session?.user?.id) return undefined
+
+    setSubcontractorInductions((prev) => {
+      const merged = mergeSubcontractorInductions(prev, cloudSubcontractorInductions)
+      const changed =
+        merged.length !== prev.length ||
+        merged.some(
+          (record, index) =>
+            record.cloudId !== prev[index]?.cloudId ||
+            record.id !== prev[index]?.id ||
+            record.syncStatus !== prev[index]?.syncStatus,
+        )
+      if (changed) {
+        persistSubcontractorInductions(merged)
+        return merged
+      }
+      return prev
+    })
+  }, [cloudSubcontractorInductions, session?.user?.id])
 
   async function signIn(email, password) {
     if (!supabase) return

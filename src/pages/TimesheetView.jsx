@@ -70,6 +70,14 @@ import {
   hasValidationErrors,
   getValidationSummary,
 } from '../utils/formValidation.js'
+import {
+  DriverLoadsSection,
+} from '../components/timesheet/DriverLoadsSection.jsx'
+import { DriverLoadsAdminPanel } from '../components/timesheet/DriverLoadsAdminPanel.jsx'
+import { DriverDailySheetsAdminPanel } from '../components/timesheet/DriverDailySheetsAdminPanel.jsx'
+import { DailyDriverSheetView } from './DailyDriverSheetView.jsx'
+import { isDriverTimesheetProfile } from '../utils/storage/userProfileStorage.js'
+import { linkLoadsToTimesheet } from '../utils/storage/driverLoadsCloudStorage.js'
 
 function isOwnTimesheetRecord(record, user) {
   if (!user?.id || !record) return false
@@ -106,6 +114,17 @@ export function TimesheetView({
   cloudTimesheets,
   setCloudTimesheets,
 }) {
+  if (isDriverTimesheetProfile(profile)) {
+    return (
+      <DailyDriverSheetView
+        onBack={onBack}
+        settings={settings}
+        user={user}
+        profile={profile}
+      />
+    )
+  }
+
   const formConfig = FORM_TYPES.timesheet
   const [mode, setMode] = useState('list')
   const [draft, setDraft] = useState(() => createEmptyDraft('timesheet'))
@@ -125,7 +144,9 @@ export function TimesheetView({
   const [printPayload, setPrintPayload] = useState(null)
   const [scrollToRecordId, setScrollToRecordId] = useState(null)
   const [employeeFilter, setEmployeeFilter] = useState('')
+  const [listTab, setListTab] = useState('timesheets')
   const formRef = useRef(null)
+  const timesheetSessionIdRef = useRef(null)
 
   const { fields, signatureConfirmation } = draft
   const comboOptions = getSettingsOptions(settings)
@@ -311,6 +332,7 @@ export function TimesheetView({
 
   function handleStartNew() {
     if (cloudSaving || deleting) return
+    timesheetSessionIdRef.current = createRecordId()
     setEditingRecord(null)
     setDraft(createEmptyDraft('timesheet'))
     setFieldErrors({})
@@ -482,6 +504,7 @@ export function TimesheetView({
             return [cloudRecord, ...withoutDup]
           })
         }
+        await afterTimesheetCloudSave({ ...updatedRecord, ...cloudPatch, cloudId: cloudPatch.cloudId })
         returnToListAfterSave(updatedRecord.id, { message: 'Timesheet updated.' })
         return
       }
@@ -530,13 +553,16 @@ export function TimesheetView({
           return [merged, ...withoutDup]
         })
       }
+      await afterTimesheetCloudSave(merged)
       returnToListAfterSave(merged.id, { message: 'Timesheet updated.' })
       return
     }
 
     const submittedAt = new Date().toISOString()
+    const recordId = timesheetSessionIdRef.current || createRecordId()
+    timesheetSessionIdRef.current = recordId
     const record = {
-      id: createRecordId(),
+      id: recordId,
       formType: 'timesheet',
       formTypeLabel: formConfig.title,
       fields: nextFields,
@@ -588,11 +614,18 @@ export function TimesheetView({
       })
     }
 
+    await afterTimesheetCloudSave({
+      ...record,
+      cloudId: cloudRecord?.cloudId ?? null,
+      cloudUserId: cloudRecord?.cloudUserId ?? user?.id ?? null,
+    })
+
     returnToListAfterSave(record.id, { message: 'Timesheet saved.' })
   }
 
   function handleStartEdit(record) {
     if (!canManageTimesheetRecord(record, user, isAdmin) || cloudSaving || deleting) return
+    timesheetSessionIdRef.current = record.id
 
     setEditingRecord(record)
     setViewingRecordId(null)
@@ -723,6 +756,18 @@ export function TimesheetView({
   }, [printPayload])
 
   const isFormMode = mode === 'new' || mode === 'edit'
+
+  const activeTimesheetLocalId = editingRecord?.id || timesheetSessionIdRef.current
+
+  async function afterTimesheetCloudSave(record) {
+    if (!user?.id || !record?.cloudId) return
+    const localId = record.id || timesheetSessionIdRef.current
+    await linkLoadsToTimesheet(user, {
+      timesheetLocalId: localId,
+      timesheetCloudId: record.cloudId,
+      timesheetOwnerId: record.cloudUserId ?? user.id,
+    })
+  }
 
   function renderTimesheetRecordCard(record) {
     const isOtherUserCloudRecord =
@@ -1068,6 +1113,20 @@ export function TimesheetView({
         <NotesField value={fields.notes} onChange={updateField} />
       </FormSection>
 
+      <DriverLoadsSection
+        timesheetLocalId={activeTimesheetLocalId}
+        timesheetCloudId={editingRecord?.cloudId ?? null}
+        timesheetOwnerId={editingRecord?.cloudUserId ?? user?.id ?? null}
+        loadDate={fields.date}
+        driverName={fields.employeeName}
+        jobProjectName={fields.jobProjectName}
+        truckVehicle={fields.machineUsed}
+        comboOptions={comboOptions}
+        user={user}
+        isAdmin={isAdmin}
+        editable={!cloudSaving && !deleting}
+      />
+
       <FormSection title="Confirmation" id="timesheet-confirmation">
         <FormField
           label="Signature / name confirmation"
@@ -1187,7 +1246,38 @@ export function TimesheetView({
           <Plus size={16} aria-hidden="true" />
           New Timesheet
         </button>
-        {isAdmin && employeeOptions.length > 0 && (
+        {isAdmin && (
+          <div className="timesheet-list-toolbar__tabs" role="tablist" aria-label="Timesheet views">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={listTab === 'timesheets'}
+              className={`btn btn--secondary${listTab === 'timesheets' ? ' btn--active' : ''}`}
+              onClick={() => setListTab('timesheets')}
+            >
+              Timesheets
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={listTab === 'quarry-runs'}
+              className={`btn btn--secondary${listTab === 'quarry-runs' ? ' btn--active' : ''}`}
+              onClick={() => setListTab('quarry-runs')}
+            >
+              Quarry runs
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={listTab === 'driver-sheets'}
+              className={`btn btn--secondary${listTab === 'driver-sheets' ? ' btn--active' : ''}`}
+              onClick={() => setListTab('driver-sheets')}
+            >
+              Driver sheets
+            </button>
+          </div>
+        )}
+        {isAdmin && listTab === 'timesheets' && employeeOptions.length > 0 && (
           <label className="field timesheet-list-toolbar__filter">
             <span className="field__label">Employee</span>
             <select
@@ -1207,7 +1297,13 @@ export function TimesheetView({
         )}
       </div>
 
-      {savedRecordsSection}
+      {isAdmin && listTab === 'quarry-runs' ? (
+        <DriverLoadsAdminPanel user={user} settings={settings} />
+      ) : isAdmin && listTab === 'driver-sheets' ? (
+        <DriverDailySheetsAdminPanel user={user} settings={settings} />
+      ) : (
+        savedRecordsSection
+      )}
 
       <ConfirmModal
         open={Boolean(deleteTarget)}

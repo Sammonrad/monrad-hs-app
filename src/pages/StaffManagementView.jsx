@@ -3,9 +3,11 @@ import { BackButton } from '../components/BackButton.jsx'
 import {
   ROLES,
   STATUS,
+  TIMESHEET_TYPES,
   fetchAllProfiles,
   getProfileRole,
   getProfileStatus,
+  getProfileTimesheetType,
   getStatusLabel,
   isAdminProfile,
   updateProfile,
@@ -33,6 +35,7 @@ function buildEditsFromProfiles(profiles) {
         notes: item.notes ?? '',
         role: getProfileRole(item),
         status: getProfileStatus(item),
+        timesheet_type: getProfileTimesheetType(item),
       },
     ]),
   )
@@ -154,6 +157,7 @@ export function StaffManagementView({ onBack, profile, onProfileUpdated }) {
       notes: draft.notes,
       role: draft.role,
       status: draft.status,
+      timesheet_type: draft.timesheet_type,
     })
 
     setSavingId(null)
@@ -172,6 +176,7 @@ export function StaffManagementView({ onBack, profile, onProfileUpdated }) {
         notes: updated.notes ?? '',
         role: getProfileRole(updated),
         status: getProfileStatus(updated),
+        timesheet_type: getProfileTimesheetType(updated),
       },
     }))
     setRowMessage(userId, 'success', 'Profile saved.')
@@ -245,6 +250,7 @@ export function StaffManagementView({ onBack, profile, onProfileUpdated }) {
                 <th scope="col">Phone</th>
                 <th scope="col">Role</th>
                 <th scope="col">Status</th>
+                <th scope="col">Timesheet</th>
                 <th scope="col">Notes</th>
                 <th scope="col">Created</th>
                 <th scope="col">
@@ -260,6 +266,7 @@ export function StaffManagementView({ onBack, profile, onProfileUpdated }) {
                   notes: item.notes ?? '',
                   role: getProfileRole(item),
                   status: getProfileStatus(item),
+                  timesheet_type: getProfileTimesheetType(item),
                 }
                 const rowMessage = rowMessages[item.id]
                 const isSaving = savingId === item.id
@@ -322,6 +329,20 @@ export function StaffManagementView({ onBack, profile, onProfileUpdated }) {
                         <option value={STATUS.DISABLED}>Disabled</option>
                       </select>
                       <StatusBadge profile={{ status: draft.status }} />
+                    </td>
+                    <td data-label="Timesheet type">
+                      <select
+                        className="staff-management__select"
+                        value={draft.timesheet_type}
+                        onChange={(event) =>
+                          handleEditChange(item.id, 'timesheet_type', event.target.value)
+                        }
+                        disabled={isSaving}
+                        aria-label={`Timesheet type for ${item.email}`}
+                      >
+                        <option value={TIMESHEET_TYPES.STANDARD}>Standard</option>
+                        <option value={TIMESHEET_TYPES.DRIVER}>Driver daily sheet</option>
+                      </select>
                     </td>
                     <td data-label="Notes">
                       <textarea
